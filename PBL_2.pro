@@ -1,9 +1,16 @@
 QT += core gui widgets charts
 CONFIG += c++17
- 
-TARGET = PBL_2
+
+TARGET = MngCareBook
 TEMPLATE = app
- 
+
+# --- Cấu hình thư mục build ---
+DESTDIR = $$PWD
+OBJECTS_DIR = release
+MOC_DIR = release
+RCC_DIR = release
+UI_DIR = release
+
 SOURCES += \
     main.cpp \
     Controllers/AppointmentController.cpp \
@@ -14,7 +21,7 @@ SOURCES += \
     Models/Appointment.cpp \
     Models/Schedule.cpp \
     Models/Users.cpp
- 
+
 HEADERS += \
     Controllers/AppointmentController.h \
     Controllers/AuthController.h \
@@ -24,7 +31,3 @@ HEADERS += \
     Models/Appointment.h \
     Models/Schedule.h \
     Models/Users.h
- 
-# Nếu 1 class nào đó KHÔNG có .cpp riêng (viết hết trong .h, kiểu header-only,
-# thường gặp với template hoặc class ngắn), xoá dòng .cpp tương ứng ở SOURCES —
-# để nguyên sẽ báo lỗi "no such file" vì qmake không tìm thấy file đó.
