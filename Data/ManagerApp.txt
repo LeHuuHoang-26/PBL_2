@@ -1,0 +1,8 @@
+MA_ID  | MA_LastName | MA_MiddleName | MA_FirstName | MA_Role       | MA_Gender | MA_PhoneNumbers   | Ma_State
+-------|-------------|---------------|--------------|---------------|-----------|-------------------|----------
+MA_001 | Lê          | Hữu           | Hoàng        | 3             | 1         | 0352667148        | 1
+MA_002 | Đặng        | Thanh Bảo     | Lộc          | 3             | 1         | 0987654343        | 1
+MA_003 | Nguyễn      | Bảo           | Long         | 21            | 1         | 0786584432        | 1
+MA_004 | Hồ          | Khuynh        | Na           | 23            | 0         | 0897602200        | 1
+MA_005 | Lam         | Hãi           | Vu           | 1             | 0         | 0708009921        | 1
+MA_006 | Nguyệt      | Việt          | Giai         | 1             | 0         | 0906706681        | 0

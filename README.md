@@ -69,5 +69,19 @@
                         | Có Search, SlideBar
                 - Đặt lịch:
                         | Có SlideBar, Search Date,
+
+10/9/2026 --Thêm dữ liệu
++ Sửa đổi:      - Thay đổi PA_Description -> PA_Type
+                - Cấp 3 mức độ của bệnh nhân: 1 - nhẹ, 2 - trung bình, 3 - nặng
+                - Remove Specialization của bác sĩ
++ Các quyền hạn App:
+                - Cấp quyền
+                - Tra thông tin patient
+                - Tra thông tin doctor
+                - Chỉnh sửa thông tin patient
+                - Chỉnh sửa thông tin doctor
+                - Xếp lịch
+                - Sửa lịch
+                - Chỉnh sửa config
         
 

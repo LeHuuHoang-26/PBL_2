@@ -1,0 +1,8 @@
+(01) Cấp quyền
+(02) Tra thông tin patient
+(03) Tra thông tin doctor
+(04) Chỉnh sửa thông tin patient
+(05) Chỉnh sửa thông tin doctor
+(06) Xếp lịch
+(07) Sửa lịch
+(08) Chỉnh sửa config

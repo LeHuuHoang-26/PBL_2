@@ -1,0 +1,26 @@
+MA_ID | PM_Type
+{
+    MA_001,
+    Permission:,
+}
+{
+    MA_002,
+    Permission:,
+}
+{
+    MA_003,
+    Permission: (07),
+}
+{
+    MA_004,
+    Permission: (02), (03), (08)
+}
+{
+    MA_005,
+    Permission:,
+}
+{
+    MA_006,
+    Permission:,
+}
+

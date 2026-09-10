@@ -1,0 +1,446 @@
+1. Toàn thân
+Sốt
+Hạ thân nhiệt
+Ớn lạnh
+Run
+Mệt mỏi
+Kiệt sức
+Yếu sức
+Uể oải
+Buồn ngủ
+Ngủ nhiều
+Mất ngủ
+Khó ngủ
+Thức giấc nhiều lần
+Chán ăn
+Ăn nhiều bất thường
+Sụt cân
+Tăng cân
+Khát nước nhiều
+Đổ mồ hôi nhiều
+Đổ mồ hôi ban đêm
+Da xanh xao
+Da nhợt nhạt
+Phù
+Nổi hạch
+Cảm giác khó chịu toàn thân
+2. Đau
+Đau đầu
+Đau nửa đầu
+Đau mặt
+Đau mắt
+Đau tai
+Đau răng
+Đau hàm
+Đau cổ
+Đau vai
+Đau cánh tay
+Đau khuỷu tay
+Đau cổ tay
+Đau bàn tay
+Đau ngón tay
+Đau ngực
+Đau lưng
+Đau thắt lưng
+Đau bụng
+Đau vùng thượng vị
+Đau vùng hạ vị
+Đau vùng chậu
+Đau hông
+Đau háng
+Đau mông
+Đau đùi
+Đau đầu gối
+Đau cẳng chân
+Đau mắt cá
+Đau bàn chân
+Đau cơ
+Đau khớp
+Đau thần kinh
+Đau bỏng rát
+Đau nhói
+Đau âm ỉ
+Đau quặn
+Đau khi chạm vào
+Đau khi vận động
+3. Thần kinh
+Chóng mặt
+Choáng váng
+Mất thăng bằng
+Cảm giác quay cuồng
+Ngất
+Tiền ngất
+Đau đầu
+Run tay
+Run chân
+Co giật
+Tê
+Tê bì
+Dị cảm
+Cảm giác kim châm
+Cảm giác bỏng rát
+Giảm cảm giác
+Mất cảm giác
+Yếu cơ
+Liệt
+Co cứng cơ
+Co thắt cơ
+Mất phối hợp động tác
+Đi lại khó khăn
+Nói khó
+Nói lắp
+Khó tìm từ
+Lú lẫn
+Mất phương hướng
+Giảm trí nhớ
+Hay quên
+Khó tập trung
+Buồn ngủ bất thường
+Thay đổi ý thức
+4. Tâm lý – cảm xúc
+Lo âu
+Căng thẳng
+Bồn chồn
+Hoảng sợ
+Cơn hoảng loạn
+Khí sắc trầm
+Buồn bã kéo dài
+Mất hứng thú
+Dễ cáu gắt
+Thay đổi tâm trạng
+Khó kiểm soát cảm xúc
+Khó tập trung
+Suy nghĩ chậm
+Kích động
+Mất ngủ
+Ác mộng
+Giấc ngủ không sâu
+Mệt mỏi do stress
+5. Mắt – thị giác
+Nhìn mờ
+Giảm thị lực
+Mất thị lực
+Nhìn đôi
+Nhìn méo hình
+Ruồi bay
+Chớp sáng
+Đau mắt
+Đỏ mắt
+Ngứa mắt
+Cay mắt
+Khô mắt
+Chảy nước mắt
+Sợ ánh sáng
+Cộm mắt
+Sưng mí mắt
+Ghèn mắt
+Chảy dịch mắt
+Khó nhìn ban đêm
+Mất thị trường
+6. Tai – thính giác – tiền đình
+Đau tai
+Ù tai
+Nghe kém
+Mất thính lực
+Cảm giác đầy tai
+Tắc tai
+Ngứa tai
+Chảy dịch tai
+Chảy máu tai
+Chóng mặt
+Cảm giác quay cuồng
+Mất thăng bằng
+Nhạy cảm với âm thanh
+7. Mũi – xoang
+Nghẹt mũi
+Sổ mũi
+Chảy nước mũi
+Hắt hơi
+Ngứa mũi
+Khô mũi
+Chảy máu cam
+Mất khứu giác
+Giảm khứu giác
+Ngửi thấy mùi bất thường
+Đau vùng mặt
+Đau vùng xoang
+Cảm giác nặng mặt
+Dịch mũi đặc
+Dịch mũi có màu bất thường
+8. Miệng – răng – họng
+Đau họng
+Khô họng
+Ngứa họng
+Khó nuốt
+Đau khi nuốt
+Cảm giác nghẹn
+Khàn tiếng
+Mất tiếng
+Ho
+Loét miệng
+Nhiệt miệng
+Đau lưỡi
+Sưng lưỡi
+Khô miệng
+Chảy nước bọt nhiều
+Hôi miệng
+Đau răng
+Ê buốt răng
+Chảy máu chân răng
+Sưng lợi
+Đau hàm
+Vị giác giảm
+Mất vị giác
+Vị kim loại trong miệng
+Vị giác bất thường
+9. Hô hấp
+Ho
+Ho khan
+Ho có đờm
+Ho ra máu
+Khó thở
+Khó thở khi gắng sức
+Khó thở khi nằm
+Thở nhanh
+Thở chậm
+Thở nông
+Thở khò khè
+Thở rít
+Tức ngực
+Đau ngực khi hít vào
+Đờm nhiều
+Đờm có máu
+Cảm giác thiếu không khí
+Tím môi
+Giảm khả năng gắng sức
+10. Tim mạch
+Đau ngực
+Tức ngực
+Nặng ngực
+Hồi hộp
+Tim đập nhanh
+Tim đập chậm
+Tim đập không đều
+Đánh trống ngực
+Khó thở
+Khó thở khi nằm
+Khó thở về đêm
+Ngất
+Choáng
+Phù chân
+Phù mắt cá
+Tay chân lạnh
+Da tím tái
+Huyết áp cao
+Huyết áp thấp
+11. Tiêu hóa
+Buồn nôn
+Nôn
+Nôn ra máu
+Đau bụng
+Đau thượng vị
+Đầy bụng
+Chướng bụng
+Ợ hơi
+Ợ chua
+Ợ nóng
+Khó tiêu
+Cảm giác no sớm
+Chán ăn
+Tiêu chảy
+Táo bón
+Đi ngoài nhiều lần
+Mót rặn
+Phân lỏng
+Phân cứng
+Phân đen
+Phân có máu
+Phân nhầy
+Phân bạc màu
+Không kiểm soát đại tiện
+Đau khi đi đại tiện
+Ngứa hậu môn
+Đau hậu môn
+Chảy máu hậu môn
+12. Gan – mật
+Đau hạ sườn phải
+Vàng da
+Vàng mắt
+Nước tiểu sẫm màu
+Phân bạc màu
+Ngứa toàn thân
+Buồn nôn
+Chán ăn
+Đầy bụng
+Mệt mỏi
+Bụng to
+Phù chân
+13. Tiết niệu – thận
+Tiểu buốt
+Tiểu rắt
+Tiểu nhiều lần
+Tiểu ít
+Không tiểu được
+Tiểu đêm
+Tiểu gấp
+Tiểu không tự chủ
+Tiểu són
+Tiểu khó
+Dòng tiểu yếu
+Tiểu ngắt quãng
+Tiểu ra máu
+Nước tiểu đục
+Nước tiểu có mùi bất thường
+Nước tiểu nhiều bọt
+Đau khi tiểu
+Đau vùng hông
+Đau vùng thắt lưng
+Đau quặn
+Phù
+14. Da – tóc – móng
+Ngứa
+Phát ban
+Mẩn đỏ
+Mề đay
+Sẩn
+Mụn nước
+Bóng nước
+Da khô
+Da bong tróc
+Da nứt
+Da đỏ
+Da nóng
+Da sưng
+Đau rát da
+Loét da
+Vết thương
+Vết thương lâu lành
+Chảy mủ
+Chảy dịch
+Bầm tím
+Xuất huyết dưới da
+Thay đổi màu da
+Da vàng
+Da xanh
+Da tím
+Rụng tóc
+Tóc thưa
+Móng giòn
+Móng đổi màu
+Móng biến dạng
+15. Cơ – xương – khớp
+Đau cơ
+Yếu cơ
+Co cơ
+Chuột rút
+Cứng cơ
+Đau khớp
+Sưng khớp
+Nóng khớp
+Đỏ khớp
+Cứng khớp
+Hạn chế vận động
+Khó vận động
+Đau khi vận động
+Đau khi nghỉ
+Biến dạng khớp
+Đau lưng
+Đau cổ
+Đau vai
+Đau đầu gối
+Đau gót chân
+16. Nội tiết – chuyển hóa
+Khát nước nhiều
+Tiểu nhiều
+Đói nhiều
+Sụt cân không chủ ý
+Tăng cân không rõ nguyên nhân
+Mệt mỏi
+Run
+Tim đập nhanh
+Không chịu được nóng
+Không chịu được lạnh
+Đổ mồ hôi nhiều
+Da khô
+Rụng tóc
+Táo bón
+Tiêu chảy
+Thay đổi chu kỳ kinh
+Phù
+17. Sinh dục – nam
+Đau tinh hoàn
+Sưng tinh hoàn
+Đau bìu
+Sưng bìu
+Đau dương vật
+Tiết dịch niệu đạo
+Ngứa vùng sinh dục
+Tiểu buốt
+Tiểu khó
+Tiểu ra máu
+Rối loạn cương
+Giảm ham muốn
+Đau khi xuất tinh
+Xuất tinh sớm
+Máu trong tinh dịch
+18. Phụ khoa – nữ
+Đau bụng kinh
+Kinh nguyệt nhiều
+Kinh nguyệt ít
+Kinh nguyệt không đều
+Rong kinh
+Trễ kinh
+Chảy máu giữa kỳ
+Chảy máu sau quan hệ
+Đau vùng chậu
+Đau khi quan hệ
+Khí hư bất thường
+Khí hư có mùi
+Ngứa âm hộ
+Đau âm hộ
+Tiểu buốt
+Đau vú
+Có khối ở vú
+Tiết dịch núm vú
+Bốc hỏa
+19. Dị ứng – miễn dịch
+Hắt hơi
+Sổ mũi
+Ngứa
+Mề đay
+Phát ban
+Sưng môi
+Sưng mặt
+Sưng lưỡi
+Khó thở
+Khò khè
+Đỏ mắt
+Chảy nước mắt
+Đau họng
+Phản ứng sau ăn/uống/tiếp xúc
+20. Các dấu hiệu xuất huyết
+Chảy máu cam
+Chảy máu chân răng
+Dễ bầm tím
+Chấm xuất huyết
+Chảy máu dưới da
+Nôn ra máu
+Ho ra máu
+Tiểu ra máu
+Phân có máu
+Phân đen
+Rong kinh
+Chảy máu âm đạo bất thường
+⚠️ Một số dấu hiệu cần được đánh giá y tế khẩn cấp
+Đau ngực dữ dội hoặc khó thở đột ngột
+Yếu/liệt đột ngột một bên cơ thể
+Méo miệng, nói khó hoặc không nói được đột ngột
+Mất ý thức
+Co giật kéo dài hoặc tái diễn
+Khó thở nghiêm trọng
+Chảy máu nhiều không cầm được
+Nôn ra máu nhiều hoặc đi ngoài phân đen kèm choáng
+Đau đầu dữ dội đột ngột, khác hẳn bình thường
+Phản ứng dị ứng kèm sưng lưỡi/họng hoặc khó thở
+Đau bụng dữ dội đột ngột
+Sốt cao kèm lơ mơ, cứng cổ hoặc tình trạng xấu nhanh
