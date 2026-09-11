@@ -1,4 +1,3 @@
-MA_ID | PM_Type
 {
     MA_001,
     Permission:,
