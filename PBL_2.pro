@@ -18,14 +18,14 @@ SOURCES += \
     Controllers/DoctorController.cpp \
     Data_structures/BinarySearchTree.cpp \
     Data_structures/PatientQueue.cpp \
-    Models/Appointment.cpp \
-    Models/Schedule.cpp \
-    Models/Users.cpp
+    Controllers/Appointment.cpp \
+    Controllers/Schedule.cpp \
+    Controllers/Users.cpp
 
 HEADERS += \
-    Controllers/AppointmentController.h \
-    Controllers/AuthController.h \
-    Controllers/DoctorController.h \
+    Models/AppointmentController.h \
+    Models/AuthController.h \
+    Models/DoctorController.h \
     Data_structures/BinarySearchTree.h \
     Data_structures/PatientQueue.h \
     Models/Appointment.h \

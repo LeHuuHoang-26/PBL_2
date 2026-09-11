@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tâm An — Hệ thống quản lý phòng khám</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F5F6F1; --surface:#FFFFFF; --ink:#1E2A26; --ink-soft:#5B685F;
+    --primary:#235347; --primary-deep:#173A31; --sage:#8FA894; --accent:#BF5B3D;
+    --border:#DDE3DC; --warn-bg:#FBF0EA; --warn-border:#E4BBA5;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--ink);}
+  h1,h2,h3{font-family:'Source Serif 4',serif;margin:0;}
+  button{font-family:inherit;cursor:pointer;}
+  input,select{font-family:inherit;}
+
+  #login-screen{display:flex;min-height:100vh;}
+  .login-brand{flex:1.1;background:var(--primary-deep);color:#EFEFE9;display:flex;flex-direction:column;justify-content:space-between;padding:48px;position:relative;overflow:hidden;}
+  .login-brand::after{content:"";position:absolute;right:-60px;bottom:-60px;width:280px;height:280px;border:1px solid rgba(255,255,255,.14);border-radius:50%;}
+  .login-brand::before{content:"";position:absolute;right:20px;bottom:20px;width:180px;height:180px;border:1px solid rgba(255,255,255,.14);border-radius:50%;}
+  .brand-mark{font-size:14px;letter-spacing:.02em;color:var(--sage);}
+  .brand-title{font-size:42px;line-height:1.15;max-width:400px;font-weight:600;}
+  .brand-sub{font-size:15px;color:#C7D2C9;max-width:360px;line-height:1.6;margin-top:16px;}
+  .brand-foot{font-size:13px;color:#9FB3A4;}
+  .login-panel{flex:1;display:flex;align-items:center;justify-content:center;padding:32px;}
+  .login-card{width:100%;max-width:360px;}
+  .login-card h2{font-size:26px;margin-bottom:6px;}
+  .login-card p.hint{color:var(--ink-soft);font-size:14px;margin:0 0 28px;}
+  .field{margin-bottom:18px;}
+  .field label{display:block;font-size:13px;color:var(--ink-soft);margin-bottom:6px;}
+  .field input, .field select{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:4px;font-size:14px;background:var(--surface);}
+  .field input:focus, .field select:focus{outline:none;border-color:var(--primary);}
+  .role-toggle{display:flex;border:1px solid var(--border);border-radius:4px;overflow:hidden;margin-bottom:24px;}
+  .role-toggle button{flex:1;padding:10px 8px;border:none;background:var(--surface);font-size:13.5px;color:var(--ink-soft);}
+  .role-toggle button.active{background:var(--primary);color:#fff;}
+  .btn-primary{width:100%;padding:12px;border:none;border-radius:4px;background:var(--accent);color:#fff;font-size:14.5px;font-weight:600;}
+  .btn-primary:hover{background:#A94F34;}
+  .login-note{margin-top:16px;font-size:12.5px;color:var(--ink-soft);}
+
+  #dashboard{display:none;min-height:100vh;}
+  .shell{display:flex;min-height:100vh;}
+  .sidebar{width:246px;background:var(--primary-deep);color:#E7ECE7;display:flex;flex-direction:column;flex-shrink:0;}
+  .sidebar-head{padding:24px 22px 18px;border-bottom:1px solid rgba(255,255,255,.1);}
+  .sidebar-head .name{font-family:'Source Serif 4',serif;font-size:20px;}
+  .sidebar-head .sub{font-size:12px;color:#9FB3A4;margin-top:2px;}
+  .nav{flex:1;padding:14px 10px;}
+  .nav button{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:10px 12px;margin-bottom:2px;border:none;background:none;color:#CBD6CC;font-size:14px;border-radius:4px;border-left:3px solid transparent;}
+  .nav button svg{flex-shrink:0;opacity:.85;}
+  .nav button:hover{background:rgba(255,255,255,.06);}
+  .nav button.active{background:rgba(255,255,255,.09);color:#fff;border-left-color:var(--accent);}
+  .nav .granted-tag{margin-left:auto;font-size:10px;background:rgba(191,91,61,.25);color:#F3C6B4;padding:1px 6px;border-radius:8px;}
+  .sidebar-foot{padding:16px 22px;border-top:1px solid rgba(255,255,255,.1);}
+  .user-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+  .avatar{width:34px;height:34px;border-radius:50%;background:var(--sage);color:var(--primary-deep);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;}
+  .user-name{font-size:13.5px;font-weight:600;}
+  .user-role{font-size:11.5px;color:#9FB3A4;}
+  .logout-btn{width:100%;padding:8px;border:1px solid rgba(255,255,255,.2);background:none;color:#E7ECE7;border-radius:4px;font-size:13px;}
+  .logout-btn:hover{background:rgba(255,255,255,.08);}
+
+  .main{flex:1;display:flex;flex-direction:column;min-width:0;}
+  .topbar{padding:20px 32px;border-bottom:1px solid var(--border);background:var(--surface);}
+  .topbar h1{font-size:23px;}
+  .topbar .desc{color:var(--ink-soft);font-size:13.5px;margin-top:4px;}
+  .content{padding:28px 32px;overflow:auto;flex:1;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:22px;margin-bottom:20px;}
+  .card h3{font-size:16px;margin-bottom:4px;}
+  .card .card-sub{font-size:12.5px;color:var(--ink-soft);margin-bottom:14px;}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th{text-align:left;color:var(--ink-soft);font-weight:600;font-size:12.5px;padding:8px 10px;border-bottom:1px solid var(--border);}
+  td{padding:10px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  .badge{display:inline-block;padding:3px 9px;border-radius:3px;font-size:12px;font-weight:600;}
+  .badge.admin{background:#E5EEE9;color:var(--primary);}
+  .badge.tier2{background:#EAF1E9;color:#3F6B4A;}
+  .badge.tier3{background:#F0EAE0;color:#8A6A2E;}
+  .badge.ok{background:#E5EEE9;color:var(--primary);}
+  .badge.wait{background:#FBF0EA;color:var(--accent);}
+  .row-action{border:1px solid var(--border);background:var(--surface);padding:5px 10px;border-radius:4px;font-size:12.5px;color:var(--ink);margin-right:6px;}
+  .row-action:disabled{color:#B3B3B3;cursor:not-allowed;background:#F5F5F3;}
+  .row-action:not(:disabled):hover{border-color:var(--primary);color:var(--primary);}
+  .link-name{background:none;border:none;padding:0;font:inherit;color:var(--primary);text-decoration:underline;text-underline-offset:2px;}
+  .link-name:disabled{color:var(--ink);cursor:default;text-decoration:none;}
+
+  .notice{display:flex;gap:12px;background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:6px;padding:14px 16px;margin-bottom:20px;font-size:13.5px;color:#8A4A2E;}
+
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:18px;}
+  .stat-card .num{font-family:'Source Serif 4',serif;font-size:30px;color:var(--primary-deep);}
+  .stat-card .label{font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
+  .bars{display:flex;align-items:flex-end;gap:14px;height:160px;padding-top:10px;}
+  .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end;}
+  .bar{width:100%;background:var(--primary);border-radius:3px 3px 0 0;}
+  .bar-col .m{font-size:11.5px;color:var(--ink-soft);}
+
+  .toggle{position:relative;width:38px;height:21px;background:#D6DCD3;border-radius:20px;border:none;flex-shrink:0;}
+  .toggle::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;background:#fff;border-radius:50%;transition:left .15s;}
+  .toggle.on{background:var(--primary);}
+  .toggle.on::after{left:19px;}
+  .toggle:disabled{opacity:.4;cursor:not-allowed;}
+  input.editable-field{border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:13px;width:100%;}
+  input.editable-field:disabled{background:#F5F5F3;color:#8A8A8A;border-color:transparent;}
+
+  /* Account detail */
+  .back-link{background:none;border:none;color:var(--primary);font-size:13.5px;padding:0;margin-bottom:16px;}
+  .account-detail-head{display:flex;align-items:center;gap:12px;margin-bottom:22px;}
+  .account-detail-head .av{width:44px;height:44px;border-radius:50%;background:var(--sage);color:var(--primary-deep);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;}
+  .account-detail-head h2{font-size:20px;}
+  .tier-options{display:flex;gap:10px;}
+  .tier-opt{flex:1;border:1px solid var(--border);border-radius:6px;padding:12px 14px;text-align:left;background:var(--surface);}
+  .tier-opt.selected{border-color:var(--primary);background:#EAF1E9;}
+  .tier-opt:disabled{cursor:not-allowed;opacity:.7;}
+  .tier-opt-title{font-size:13.5px;font-weight:600;}
+  .tier-opt-desc{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+  .perm-row2{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border);}
+  .perm-row2:last-child{border-bottom:none;}
+  .perm-row2 .perm-name{font-size:13.5px;}
+  .perm-row2 .perm-desc{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+  .readonly-note{font-size:12px;color:var(--ink-soft);font-style:italic;margin-top:10px;}
+  .status-row{display:flex;align-items:center;justify-content:space-between;}
+
+  /* Calendar */
+  .cal-toolbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:18px;}
+  .cal-tabs{display:flex;border:1px solid var(--border);border-radius:4px;overflow:hidden;}
+  .cal-tabs button{padding:8px 16px;border:none;background:var(--surface);font-size:13px;color:var(--ink-soft);}
+  .cal-tabs button.active{background:var(--primary);color:#fff;}
+  .cal-nav{display:flex;align-items:center;gap:10px;}
+  .cal-nav-btn{border:1px solid var(--border);background:var(--surface);border-radius:4px;padding:6px 12px;font-size:13px;}
+  .cal-nav-btn:hover{border-color:var(--primary);}
+  .cal-label{font-size:14px;font-weight:600;min-width:190px;}
+  .cal-spacer{flex:1;}
+
+  .year-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  .year-cell{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px;text-align:left;}
+  .year-cell.is-today{border-color:var(--primary);}
+  .year-cell:hover{border-color:var(--primary);}
+  .year-cell-month{font-family:'Source Serif 4',serif;font-size:16px;margin-bottom:6px;}
+  .year-cell-count{font-size:12px;color:var(--accent);}
+  .year-cell-count.muted{color:var(--ink-soft);}
+
+  .month-weekday-row{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px;}
+  .month-weekday-row div{text-align:center;font-size:11.5px;color:var(--ink-soft);font-weight:600;}
+  .month-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+  .month-cell{background:var(--surface);border:1px solid var(--border);border-radius:6px;min-height:64px;padding:8px;text-align:left;display:flex;flex-direction:column;gap:4px;}
+  .month-cell:hover{border-color:var(--primary);}
+  .month-cell.is-outside{opacity:.35;}
+  .month-cell.is-today{border-color:var(--primary);}
+  .month-cell-num{font-size:13px;font-weight:600;}
+  .month-cell-dots{color:var(--accent);font-size:10px;letter-spacing:1px;}
+
+  .week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;}
+  .week-col{background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden;display:flex;flex-direction:column;min-height:190px;}
+  .week-col-head{background:none;border:none;border-bottom:1px solid var(--border);padding:10px 8px;text-align:center;width:100%;}
+  .week-col-head:hover{background:#F0F3EF;}
+  .week-col-head.is-today{background:#EAF1E9;}
+  .wch-dow{font-size:11px;color:var(--ink-soft);}
+  .wch-num{font-size:16px;font-weight:600;font-family:'Source Serif 4',serif;}
+  .week-col-body{padding:8px;display:flex;flex-direction:column;gap:6px;flex:1;}
+  .appt-chip{background:#F0F3EF;border-radius:4px;padding:5px 7px;font-size:11.5px;}
+  .appt-time{font-weight:600;color:var(--primary);margin-right:4px;}
+  .wcb-empty{font-size:11.5px;color:var(--ink-soft);padding-top:6px;}
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN SCREEN ================= -->
+<div id="login-screen">
+  <div class="login-brand">
+    <div>
+      <div class="brand-mark">TÂM AN — PHÒNG KHÁM ĐA KHOA</div>
+      <h1 class="brand-title" style="margin-top:60px;">Ba cấp quyền, một hệ thống rõ ràng.</h1>
+      <p class="brand-sub">Cấp 1 — Administrator định ra các quyền. Cấp 2 — Receptionist được chia sẻ một phần quyền, nhưng không mạnh bằng Admin. Cấp 3 — Receptionist cơ bản, chỉ tra cứu và xếp lịch.</p>
+    </div>
+    <div class="brand-foot">Setup File/Folder · 5/9/2026</div>
+  </div>
+  <div class="login-panel">
+    <div class="login-card">
+      <h2>Đăng nhập</h2>
+      <p class="hint">Chọn vai trò để xem giao diện tương ứng.</p>
+      <div class="role-toggle">
+        <button id="role-btn-admin" class="active" onclick="setLoginRole('admin')">Administrator</button>
+        <button id="role-btn-reception" onclick="setLoginRole('reception')">Receptionist</button>
+      </div>
+      <div class="field" id="username-field">
+        <label>Tên đăng nhập</label>
+        <input type="text" id="username-input" placeholder="vd. minh.admin">
+      </div>
+      <div class="field">
+        <label>Mật khẩu</label>
+        <input type="password" placeholder="••••••••">
+      </div>
+      <button class="btn-primary" onclick="login()">Đăng nhập</button>
+      <p class="login-note">Đây là bản demo — mật khẩu không được kiểm tra. Chọn từng Receptionist để thấy Cấp 2 và Cấp 3 khác nhau.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ================= DASHBOARD ================= -->
+<div id="dashboard">
+  <div class="shell">
+    <div class="sidebar">
+      <div class="sidebar-head">
+        <div class="name">Tâm An</div>
+        <div class="sub">Hệ thống quản lý phòng khám</div>
+      </div>
+      <div class="nav" id="nav-list"></div>
+      <div class="sidebar-foot">
+        <div class="user-row">
+          <div class="avatar" id="avatar-letter">A</div>
+          <div>
+            <div class="user-name" id="user-name-display">—</div>
+            <div class="user-role" id="user-role-display">—</div>
+          </div>
+        </div>
+        <button class="logout-btn" onclick="logout()">Đăng xuất</button>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="topbar">
+        <h1 id="page-title">Quản lý tài khoản</h1>
+        <div class="desc" id="page-desc"></div>
+      </div>
+      <div class="content">
+
+        <!-- Quản lý tài khoản: list + detail (quyền tích hợp ở đây) -->
+        <div class="panel" id="panel-accounts">
+          <div id="accounts-list-view">
+            <div class="card">
+              <h3>Danh sách tài khoản</h3>
+              <div class="card-sub">Nhấp vào tên hoặc "Quản lý" để xem chi tiết và cấp quyền cho từng tài khoản.</div>
+              <table><tbody id="accounts-tbody"></tbody></table>
+            </div>
+          </div>
+          <div id="accounts-detail-view" style="display:none;"></div>
+        </div>
+
+        <!-- Đặt lịch: tuần / tháng / năm -->
+        <div class="panel" id="panel-schedule">
+          <div class="cal-toolbar">
+            <div class="cal-tabs">
+              <button class="cal-tab" id="caltab-week" onclick="setCalView('week')">Tuần</button>
+              <button class="cal-tab" id="caltab-month" onclick="setCalView('month')">Tháng</button>
+              <button class="cal-tab" id="caltab-year" onclick="setCalView('year')">Năm</button>
+            </div>
+            <div class="cal-nav">
+              <button class="cal-nav-btn" onclick="calNav(-1)">‹ Trước</button>
+              <div class="cal-label" id="calendar-label"></div>
+              <button class="cal-nav-btn" onclick="calNav(1)">Sau ›</button>
+            </div>
+            <button class="cal-nav-btn" id="cal-back-btn" style="display:none;" onclick="setCalView('week')">← Quay lại tuần</button>
+            <div class="cal-spacer"></div>
+            <button class="btn-primary" style="width:auto;padding:9px 16px;">+ Thêm lịch hẹn</button>
+          </div>
+          <div id="calendar-body"></div>
+        </div>
+
+        <div class="panel" id="panel-info">
+          <div class="notice" id="reception-lock-notice" style="display:none;">
+            <span>🔒</span>
+            <span id="reception-lock-text"></span>
+          </div>
+          <div class="card">
+            <h3>Thông tin khách hàng</h3>
+            <div class="card-sub">Số điện thoại và bác sĩ phụ trách của khách hàng.</div>
+            <table><tbody id="customer-tbody"></tbody></table>
+          </div>
+          <div class="card">
+            <h3>Thông tin bác sĩ</h3>
+            <div class="card-sub">Số điện thoại liên hệ và phòng khám của bác sĩ.</div>
+            <table><tbody id="doctor-tbody"></tbody></table>
+          </div>
+        </div>
+
+        <div class="panel" id="panel-stats">
+          <div class="stat-grid">
+            <div class="stat-card"><div class="num">128</div><div class="label">Lượt khám tháng này</div></div>
+            <div class="stat-card"><div class="num">34</div><div class="label">Bệnh nhân mới</div></div>
+            <div class="stat-card"><div class="num">6</div><div class="label">Bác sĩ đang hoạt động</div></div>
+            <div class="stat-card"><div class="num">92%</div><div class="label">Tỉ lệ đến khám đúng hẹn</div></div>
+          </div>
+          <div class="card">
+            <h3>Lượt khám theo tháng</h3>
+            <div class="bars">
+              <div class="bar-col"><div class="bar" style="height:55%"></div><div class="m">T3</div></div>
+              <div class="bar-col"><div class="bar" style="height:70%"></div><div class="m">T4</div></div>
+              <div class="bar-col"><div class="bar" style="height:48%"></div><div class="m">T5</div></div>
+              <div class="bar-col"><div class="bar" style="height:82%"></div><div class="m">T6</div></div>
+              <div class="bar-col"><div class="bar" style="height:64%"></div><div class="m">T7</div></div>
+              <div class="bar-col"><div class="bar" style="height:100%"></div><div class="m">T8</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" id="panel-config">
+          <div class="card">
+            <h3>Cấu hình hệ thống</h3>
+            <div class="card-sub">Thiết lập chung cho toàn bộ phòng khám.</div>
+            <table>
+              <tr><td style="width:60%">Giờ làm việc: 08:00 – 17:00</td><td><button class="toggle on"></button></td></tr>
+              <tr><td>Nhắc lịch hẹn qua SMS</td><td><button class="toggle on"></button></td></tr>
+              <tr><td>Cho phép đặt lịch trực tuyến</td><td><button class="toggle"></button></td></tr>
+              <tr><td>Số lượng bệnh nhân tối đa / ngày: 60</td><td><button class="toggle on"></button></td></tr>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===================== ICONS & PAGES ===================== */
+const icons = {
+  accounts:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg>',
+  schedule:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="5.5" width="16" height="14.5" rx="1.5"/><path d="M4 10h16M8 3v4M16 3v4"/></svg>',
+  info:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 8v.01"/></svg>',
+  stats:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 19V10M12 19V5M19 19v-7"/></svg>',
+  config:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.14-1.4l2-1.56-2-3.46-2.36.94a7 7 0 00-2.4-1.4L13.6 3h-3.2l-.5 2.52a7 7 0 00-2.4 1.4l-2.36-.94-2 3.46 2 1.56A7 7 0 005 12c0 .47.05.94.14 1.4l-2 1.56 2 3.46 2.36-.94a7 7 0 002.4 1.4l.5 2.52h3.2l.5-2.52a7 7 0 002.4-1.4l2.36.94 2-3.46-2-1.56c.09-.46.14-.93.14-1.4z"/></svg>'
+};
+const pages = {
+  accounts:{title:"Quản lý tài khoản", desc:"Xem, chỉnh sửa và cấp quyền cho từng tài khoản.", icon:icons.accounts, label:"Quản lý tài khoản", perm:'manageAccounts'},
+  schedule:{title:"Đặt lịch", desc:"Xem lịch theo tuần, tháng hoặc năm.", icon:icons.schedule, label:"Đặt lịch"},
+  info:{title:"Kiểm tra thông tin", desc:"Tra cứu thông tin khách hàng và bác sĩ.", icon:icons.info, label:"Kiểm tra thông tin"},
+  stats:{title:"Thống kê", desc:"Tổng quan hoạt động phòng khám.", icon:icons.stats, label:"Thống kê", perm:'viewStats'},
+  config:{title:"Cấu hình hệ thống", desc:"Thiết lập chung cho toàn bộ phòng khám.", icon:icons.config, label:"Cấu hình hệ thống", perm:'systemConfig'}
+};
+const pageOrder = ['accounts','schedule','info','stats','config'];
+
+/* ===================== DATA ===================== */
+const accountsData = [
+  {id:'minh', name:'Nguyễn Văn Minh', tier:1, status:'ok'},
+  {id:'ha',   name:'Lê Thu Hà',       tier:1, status:'ok'},
+  {id:'ngoc', name:'Trần Bảo Ngọc',   tier:2, status:'ok'},
+  {id:'huy',  name:'Phạm Quốc Huy',   tier:3, status:'wait'},
+  {id:'linh', name:'Đỗ Mỹ Linh',      tier:3, status:'ok'}
+];
+const statusLabel = {ok:['ok','Đang hoạt động'], wait:['wait','Tạm khoá']};
+const receptionists = accountsData.filter(a=>a.tier>1);
+
+const permissionDefs = [
+  {key:'editCustomer', label:'Chỉnh sửa thông tin khách hàng', desc:'Cập nhật số điện thoại, bác sĩ phụ trách của khách hàng.'},
+  {key:'editDoctor', label:'Chỉnh sửa thông tin bác sĩ', desc:'Cập nhật số điện thoại, phòng khám của bác sĩ.'},
+  {key:'manageAccounts', label:'Quản lý tài khoản Cấp 3', desc:'Xem và chỉnh sửa các tài khoản Receptionist Cấp 3 (không áp dụng cho Cấp 1, Cấp 2).'},
+  {key:'editSchedule', label:'Chỉnh sửa lịch hẹn của người khác', desc:'Sửa hoặc huỷ lịch hẹn do đồng nghiệp tạo.'},
+  {key:'viewStats', label:'Xem báo cáo thống kê', desc:'Xem số liệu vận hành của phòng khám.'},
+  {key:'systemConfig', label:'Cấu hình hệ thống', desc:'Thay đổi giờ làm việc, thông báo và các thiết lập chung.'}
+];
+let permissions = {
+  ngoc: {editCustomer:true, editDoctor:false, manageAccounts:false, editSchedule:false, viewStats:false, systemConfig:false},
+  huy:  {editCustomer:false, editDoctor:false, manageAccounts:false, editSchedule:false, viewStats:false, systemConfig:false},
+  linh: {editCustomer:false, editDoctor:false, manageAccounts:false, editSchedule:false, viewStats:false, systemConfig:false}
+};
+
+const customerData = [
+  {name:'Vũ Thị Lan', phone:'0912 345 678', doctor:'BS. Nguyễn Đình Khoa'},
+  {name:'Hoàng Anh Tuấn', phone:'0987 654 321', doctor:'BS. Trần Thị Mai'},
+  {name:'Đặng Gia Bảo', phone:'0901 222 333', doctor:'BS. Nguyễn Đình Khoa'}
+];
+const doctorData = [
+  {name:'BS. Nguyễn Đình Khoa', phone:'0909 111 222', room:'P.101'},
+  {name:'BS. Trần Thị Mai', phone:'0909 333 444', room:'P.102'},
+  {name:'BS. Lý Văn Sơn', phone:'0909 555 666', room:'P.103'}
+];
+
+const scheduleData = [
+  {time:'08:30', patient:'Vũ Thị Lan', doctor:'BS. Nguyễn Đình Khoa', room:'P.101', status:'ok', date:'2026-09-05'},
+  {time:'10:00', patient:'Đặng Gia Bảo', doctor:'BS. Nguyễn Đình Khoa', room:'P.101', status:'ok', date:'2026-09-05'},
+  {time:'09:15', patient:'Hoàng Anh Tuấn', doctor:'BS. Trần Thị Mai', room:'P.102', status:'wait', date:'2026-09-03'},
+  {time:'14:30', patient:'Ngô Thu Trang', doctor:'BS. Lý Văn Sơn', room:'P.103', status:'wait', date:'2026-09-08'},
+  {time:'11:00', patient:'Bùi Anh Khoa', doctor:'BS. Trần Thị Mai', room:'P.102', status:'ok', date:'2026-09-10'},
+  {time:'15:00', patient:'Lâm Diễm My', doctor:'BS. Lý Văn Sơn', room:'P.103', status:'wait', date:'2026-08-28'},
+  {time:'09:00', patient:'Cao Việt Hoàng', doctor:'BS. Nguyễn Đình Khoa', room:'P.101', status:'ok', date:'2026-10-02'}
+];
+const scheduleStatusLabel = {ok:['ok','Đã xác nhận'], wait:['wait','Chờ xác nhận']};
+
+const TODAY = new Date(2026,8,5);
+const monthNames = ['Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5','Tháng 6','Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12'];
+const weekdayShort = ['T2','T3','T4','T5','T6','T7','CN'];
+const weekdayFull = ['Thứ Hai','Thứ Ba','Thứ Tư','Thứ Năm','Thứ Sáu','Thứ Bảy','Chủ Nhật'];
+
+/* ===================== SESSION ===================== */
+let currentLoginRole = 'admin';
+let currentUser = null;
+let currentDetailAccountId = null;
+let calState = {view:'week', anchor:new Date(TODAY)};
+
+function setLoginRole(r){
+  currentLoginRole = r;
+  document.getElementById('role-btn-admin').classList.toggle('active', r==='admin');
+  document.getElementById('role-btn-reception').classList.toggle('active', r==='reception');
+  const field = document.getElementById('username-field');
+  if(r==='admin'){
+    field.innerHTML = '<label>Tên đăng nhập</label><input type="text" id="username-input" placeholder="vd. minh.admin">';
+  } else {
+    let opts = receptionists.map(rp=>`<option value="${rp.id}">${rp.name} — Cấp ${rp.tier}</option>`).join('');
+    field.innerHTML = '<label>Chọn tài khoản Receptionist</label><select id="reception-select">'+opts+'</select>';
+  }
+}
+
+function login(){
+  if(currentLoginRole === 'admin'){
+    const nameInput = document.getElementById('username-input').value.trim();
+    currentUser = {role:'admin', id:'minh', name: nameInput || 'Nguyễn Văn Minh'};
+  } else {
+    const sel = document.getElementById('reception-select');
+    const rp = receptionists.find(r=>r.id===sel.value);
+    currentUser = {role:'reception', id: rp.id, name: rp.name};
+  }
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('user-name-display').textContent = currentUser.name;
+  document.getElementById('user-role-display').textContent = tierText(myAccount().tier);
+  document.getElementById('avatar-letter').textContent = currentUser.name.charAt(0).toUpperCase();
+  buildNav();
+  document.getElementById('accounts-list-view').style.display='block';
+  document.getElementById('accounts-detail-view').style.display='none';
+  renderAccounts();
+  renderInfo();
+  renderCalendar();
+  showPanel(availablePages()[0]);
+}
+function logout(){
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  currentUser = null;
+}
+
+function myAccount(){ return accountsData.find(a=>a.id===currentUser.id); }
+function myPerms(){ return currentUser.role==='reception' ? permissions[currentUser.id] : null; }
+function tierText(t){ return t===1 ? 'Administrator · Cấp 1' : (t===2 ? 'Receptionist · Cấp 2' : 'Receptionist · Cấp 3'); }
+function tierBadge(t){
+  if(t===1) return '<span class="badge admin">Administrator · Cấp 1</span>';
+  if(t===2) return '<span class="badge tier2">Receptionist · Cấp 2</span>';
+  return '<span class="badge tier3">Receptionist · Cấp 3</span>';
+}
+
+function hasPage(key){
+  if(currentUser.role==='admin') return true;
+  if(key==='schedule' || key==='info') return true;
+  const p = myPerms();
+  return !!p[pages[key].perm];
+}
+function availablePages(){ return pageOrder.filter(hasPage); }
+
+function buildNav(){
+  const nav = document.getElementById('nav-list');
+  nav.innerHTML = '';
+  availablePages().forEach(key=>{
+    const p = pages[key];
+    const btn = document.createElement('button');
+    btn.id = 'navbtn-'+key;
+    const grantedTag = (currentUser.role==='reception' && p.perm) ? '<span class="granted-tag">Được cấp</span>' : '';
+    btn.innerHTML = p.icon + '<span>'+p.label+'</span>' + grantedTag;
+    btn.onclick = ()=>showPanel(key);
+    nav.appendChild(btn);
+  });
+}
+function showPanel(key){
+  pageOrder.forEach(k=>{
+    document.getElementById('panel-'+k).classList.remove('active');
+    const b = document.getElementById('navbtn-'+k);
+    if(b) b.classList.remove('active');
+  });
+  document.getElementById('panel-'+key).classList.add('active');
+  const nb = document.getElementById('navbtn-'+key);
+  if(nb) nb.classList.add('active');
+  document.getElementById('page-title').textContent = pages[key].title;
+  document.getElementById('page-desc').textContent = pages[key].desc;
+}
+
+/* ===================== ACCOUNTS (list + integrated detail) ===================== */
+function viewerTier(){ return myAccount().tier; }
+
+function canManage(target){
+  const vt = viewerTier();
+  if(target.id===currentUser.id) return false;
+  if(target.tier <= vt) return false;
+  if(vt===1) return true;
+  if(vt===2) { const p = permissions[currentUser.id]; return !!(p && p.manageAccounts); }
+  return false;
+}
+function manageBlockReason(target){
+  const vt = viewerTier();
+  if(target.id===currentUser.id) return 'Không thể tự chỉnh sửa';
+  if(target.tier <= vt) return vt===1 ? 'Cùng cấp — không thể chỉnh sửa' : 'Không thể chỉnh sửa tài khoản cùng cấp hoặc cao hơn';
+  if(vt===2 && !(permissions[currentUser.id] && permissions[currentUser.id].manageAccounts)) return 'Chưa được cấp quyền quản lý tài khoản';
+  return '';
+}
+
+function renderAccounts(){
+  const tbody = document.getElementById('accounts-tbody');
+  tbody.innerHTML = '<tr><th>Họ tên</th><th>Vai trò</th><th>Trạng thái</th><th>Hành động</th></tr>';
+  accountsData.forEach(acc=>{
+    const editable = canManage(acc);
+    const reason = editable ? '' : manageBlockReason(acc);
+    const st = statusLabel[acc.status];
+    const nameShown = (acc.id===currentUser.id) ? acc.name+' (bạn)' : acc.name;
+    const nameCell = editable
+      ? `<button class="link-name" onclick="openAccountDetail('${acc.id}')">${nameShown}</button>`
+      : `<button class="link-name" disabled>${nameShown}</button>`;
+    tbody.innerHTML += `<tr>
+      <td>${nameCell}</td>
+      <td>${tierBadge(acc.tier)}</td>
+      <td><span class="badge ${st[0]}">${st[1]}</span></td>
+      <td><button class="row-action" ${editable?'':'disabled'} title="${reason}" onclick="${editable?`openAccountDetail('${acc.id}')`:''}">Quản lý</button></td>
+    </tr>`;
+  });
+}
+
+function openAccountDetail(id){
+  currentDetailAccountId = id;
+  document.getElementById('accounts-list-view').style.display='none';
+  document.getElementById('accounts-detail-view').style.display='block';
+  renderAccountDetail();
+}
+function closeAccountDetail(){
+  document.getElementById('accounts-detail-view').style.display='none';
+  document.getElementById('accounts-list-view').style.display='block';
+  renderAccounts();
+}
+
+function renderAccountDetail(){
+  const acc = accountsData.find(a=>a.id===currentDetailAccountId);
+  const vt = viewerTier();
+  const canChangeTier = vt===1; // chỉ Cấp 1 mới đổi cấp bậc / cấp quyền
+  const st = statusLabel[acc.status];
+
+  let html = `<button class="back-link" onclick="closeAccountDetail()">← Quay lại danh sách tài khoản</button>`;
+  html += `<div class="card">
+    <div class="account-detail-head">
+      <div class="av">${acc.name.charAt(0).toUpperCase()}</div>
+      <div><h2>${acc.name}</h2>${tierBadge(acc.tier)}</div>
+    </div>
+    <div class="status-row">
+      <div>
+        <div class="perm-name" style="font-size:13.5px;">Trạng thái tài khoản</div>
+        <div class="perm-desc" style="font-size:11.5px;color:var(--ink-soft);">${st[1]}</div>
+      </div>
+      <button class="toggle ${acc.status==='ok'?'on':''}" onclick="toggleAccountStatus('${acc.id}')"></button>
+    </div>
+  </div>`;
+
+  if(acc.tier>1){
+    html += `<div class="card">
+      <h3>Cấp bậc</h3>
+      <div class="card-sub">Cấp 2 được chia sẻ một phần quyền của Administrator, nhưng không mạnh bằng Cấp 1. Cấp 3 chỉ có quyền cơ bản: tra cứu và xếp lịch.</div>
+      <div class="tier-options">
+        <button class="tier-opt ${acc.tier===2?'selected':''}" ${canChangeTier?`onclick="changeTier('${acc.id}',2)"`:'disabled'}>
+          <div class="tier-opt-title">Cấp 2 — quyền nâng cao</div>
+          <div class="tier-opt-desc">Có thể được cấp một số quyền bên dưới.</div>
+        </button>
+        <button class="tier-opt ${acc.tier===3?'selected':''}" ${canChangeTier?`onclick="changeTier('${acc.id}',3)"`:'disabled'}>
+          <div class="tier-opt-title">Cấp 3 — quyền cơ bản</div>
+          <div class="tier-opt-desc">Chỉ tra cứu thông tin và xếp lịch.</div>
+        </button>
+      </div>
+      ${canChangeTier?'':'<div class="readonly-note">Chỉ Administrator (Cấp 1) mới có thể thay đổi cấp bậc.</div>'}
+    </div>`;
+
+    if(acc.tier===2){
+      html += `<div class="card">
+        <h3>Quyền nâng cao</h3>
+        <div class="card-sub">Từng quyền tách riêng từ Administrator — không cấp trọn bộ, chỉ bật những gì cần thiết.</div>`;
+      permissionDefs.forEach(pd=>{
+        const on = permissions[acc.id][pd.key];
+        html += `<div class="perm-row2">
+          <div><div class="perm-name">${pd.label}</div><div class="perm-desc">${pd.desc}</div></div>
+          <button class="toggle ${on?'on':''}" ${canChangeTier?`onclick="togglePermission('${acc.id}','${pd.key}')"`:'disabled'}></button>
+        </div>`;
+      });
+      html += `${canChangeTier?'':'<div class="readonly-note">Chỉ Administrator (Cấp 1) mới có thể cấp hoặc thu hồi quyền.</div>'}</div>`;
+    }
+  }
+
+  document.getElementById('accounts-detail-view').innerHTML = html;
+}
+
+function toggleAccountStatus(id){
+  const acc = accountsData.find(a=>a.id===id);
+  acc.status = acc.status==='ok' ? 'wait' : 'ok';
+  renderAccountDetail();
+}
+function changeTier(id, newTier){
+  const acc = accountsData.find(a=>a.id===id);
+  acc.tier = newTier;
+  if(newTier===3){
+    Object.keys(permissions[id]).forEach(k=> permissions[id][k]=false);
+  }
+  renderAccountDetail();
+}
+function togglePermission(id, key){
+  permissions[id][key] = !permissions[id][key];
+  renderAccountDetail();
+}
+
+/* ===================== KIỂM TRA THÔNG TIN ===================== */
+function renderInfo(){
+  const canEditCustomer = currentUser.role==='admin' || myPerms().editCustomer;
+  const canEditDoctor = currentUser.role==='admin' || myPerms().editDoctor;
+
+  const ctbody = document.getElementById('customer-tbody');
+  ctbody.innerHTML = '<tr><th>Họ tên</th><th>Số điện thoại</th><th>Bác sĩ phụ trách</th></tr>';
+  customerData.forEach(c=>{
+    ctbody.innerHTML += `<tr><td>${c.name}</td><td><input class="editable-field" value="${c.phone}" ${canEditCustomer?'':'disabled'}></td><td>${c.doctor}</td></tr>`;
+  });
+  const dtbody = document.getElementById('doctor-tbody');
+  dtbody.innerHTML = '<tr><th>Bác sĩ</th><th>Số điện thoại</th><th>Phòng</th></tr>';
+  doctorData.forEach(d=>{
+    dtbody.innerHTML += `<tr><td>${d.name}</td><td><input class="editable-field" value="${d.phone}" ${canEditDoctor?'':'disabled'}></td><td><input class="editable-field" value="${d.room}" ${canEditDoctor?'':'disabled'}></td></tr>`;
+  });
+  const notice = document.getElementById('reception-lock-notice');
+  if(currentUser.role==='reception' && (!canEditCustomer || !canEditDoctor)){
+    let locked = [];
+    if(!canEditCustomer) locked.push('thông tin khách hàng');
+    if(!canEditDoctor) locked.push('thông tin bác sĩ');
+    document.getElementById('reception-lock-text').textContent =
+      'Bạn đang xem ở chế độ chỉ đọc đối với '+locked.join(' và ')+'. Liên hệ Administrator để được cấp quyền chỉnh sửa.';
+    notice.style.display = 'flex';
+  } else { notice.style.display = 'none'; }
+}
+
+/* ===================== ĐẶT LỊCH: TUẦN / THÁNG / NĂM / NGÀY ===================== */
+function pad(n){ return String(n).padStart(2,'0'); }
+function formatISO(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function sameDay(a,b){ return formatISO(a)===formatISO(b); }
+function fmtShort(d){ return `${pad(d.getDate())}/${pad(d.getMonth()+1)}`; }
+function fmtLong(d){ return `${weekdayFull[(d.getDay()+6)%7]}, ${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`; }
+function startOfWeekMon(d){
+  const day = d.getDay();
+  const diff = (day===0 ? -6 : 1-day);
+  const monday = new Date(d);
+  monday.setDate(d.getDate()+diff);
+  monday.setHours(0,0,0,0);
+  return monday;
+}
+function weekRange(d){ const start=startOfWeekMon(d); const end=new Date(start); end.setDate(start.getDate()+6); return {start,end}; }
+function apptsOnDate(d){ const iso=formatISO(d); return scheduleData.filter(a=>a.date===iso).sort((a,b)=>a.time.localeCompare(b.time)); }
+function apptCountForMonth(year, monthIndex){ return scheduleData.filter(a=>{ const [y,m] = a.date.split('-').map(Number); return y===year && (m-1)===monthIndex; }).length; }
+
+function setCalView(view, date){
+  calState.view = view;
+  if(date) calState.anchor = date;
+  renderCalendar();
+}
+function calNav(step){
+  const a = new Date(calState.anchor);
+  if(calState.view==='year') a.setFullYear(a.getFullYear()+step);
+  else if(calState.view==='month') a.setMonth(a.getMonth()+step);
+  else if(calState.view==='week') a.setDate(a.getDate()+7*step);
+  else a.setDate(a.getDate()+step);
+  calState.anchor = a;
+  renderCalendar();
+}
+
+function renderCalendar(){
+  ['week','month','year'].forEach(v=> document.getElementById('caltab-'+v).classList.remove('active'));
+  const tabKey = calState.view==='day' ? 'week' : calState.view;
+  document.getElementById('caltab-'+tabKey).classList.add('active');
+  document.getElementById('cal-back-btn').style.display = calState.view==='day' ? 'inline-block' : 'none';
+
+  const label = document.getElementById('calendar-label');
+  const body = document.getElementById('calendar-body');
+  if(calState.view==='year'){ label.textContent = 'Năm '+calState.anchor.getFullYear(); body.innerHTML = buildYearGrid(); }
+  else if(calState.view==='month'){ label.textContent = monthNames[calState.anchor.getMonth()]+', '+calState.anchor.getFullYear(); body.innerHTML = buildMonthGrid(); }
+  else if(calState.view==='week'){ const {start,end}=weekRange(calState.anchor); label.textContent = 'Tuần '+fmtShort(start)+' – '+fmtShort(end)+'/'+end.getFullYear(); body.innerHTML = buildWeekGrid(); }
+  else { label.textContent = fmtLong(calState.anchor); body.innerHTML = buildDayAgenda(); }
+}
+
+function buildYearGrid(){
+  const year = calState.anchor.getFullYear();
+  let html = '<div class="year-grid">';
+  for(let m=0;m<12;m++){
+    const count = apptCountForMonth(year,m);
+    const isCurrent = (year===TODAY.getFullYear() && m===TODAY.getMonth());
+    html += `<button class="year-cell ${isCurrent?'is-today':''}" onclick="setCalView('month', new Date(${year},${m},1))">
+      <div class="year-cell-month">${monthNames[m]}</div>
+      ${count? `<div class="year-cell-count">${count} lịch hẹn</div>` : '<div class="year-cell-count muted">Không có lịch hẹn</div>'}
+    </button>`;
+  }
+  return html + '</div>';
+}
+
+function buildMonthGrid(){
+  const year = calState.anchor.getFullYear(), month = calState.anchor.getMonth();
+  const start = startOfWeekMon(new Date(year,month,1));
+  let html = '<div class="month-weekday-row">' + weekdayShort.map(w=>`<div>${w}</div>`).join('') + '</div><div class="month-grid">';
+  const cursor = new Date(start);
+  for(let i=0;i<42;i++){
+    const inMonth = cursor.getMonth()===month;
+    const appts = apptsOnDate(cursor);
+    const isToday = sameDay(cursor, TODAY);
+    html += `<button class="month-cell ${inMonth?'':'is-outside'} ${isToday?'is-today':''}" onclick="setCalView('week', new Date(${cursor.getFullYear()},${cursor.getMonth()},${cursor.getDate()}))">
+      <div class="month-cell-num">${cursor.getDate()}</div>
+      ${appts.length? `<div class="month-cell-dots">${'●'.repeat(Math.min(appts.length,3))}</div>` : ''}
+    </button>`;
+    cursor.setDate(cursor.getDate()+1);
+  }
+  return html + '</div>';
+}
+
+function buildWeekGrid(){
+  const {start} = weekRange(calState.anchor);
+  let html = '<div class="week-grid">';
+  for(let i=0;i<7;i++){
+    const d = new Date(start); d.setDate(start.getDate()+i);
+    const appts = apptsOnDate(d);
+    const isToday = sameDay(d, TODAY);
+    html += `<div class="week-col">
+      <button class="week-col-head ${isToday?'is-today':''}" onclick="setCalView('day', new Date(${d.getFullYear()},${d.getMonth()},${d.getDate()}))">
+        <div class="wch-dow">${weekdayShort[i]}</div>
+        <div class="wch-num">${d.getDate()}</div>
+      </button>
+      <div class="week-col-body">
+        ${appts.length ? appts.map(a=>`<div class="appt-chip"><span class="appt-time">${a.time}</span>${a.patient}</div>`).join('') : '<div class="wcb-empty">Không có lịch hẹn</div>'}
+      </div>
+    </div>`;
+  }
+  return html + '</div>';
+}
+
+function buildDayAgenda(){
+  const appts = apptsOnDate(calState.anchor);
+  if(appts.length===0){
+    return '<div class="card"><p style="color:var(--ink-soft);font-size:13.5px;margin:0;">Không có lịch hẹn nào trong ngày này.</p></div>';
+  }
+  const canEditOthers = currentUser.role==='admin' || (myPerms() && myPerms().editSchedule);
+  let rows = '<tr><th>Giờ</th><th>Bệnh nhân</th><th>Bác sĩ</th><th>Phòng</th><th>Trạng thái</th><th>Hành động</th></tr>';
+  appts.forEach(a=>{
+    const st = scheduleStatusLabel[a.status];
+    const title = canEditOthers ? '' : 'Cần quyền "Chỉnh sửa lịch hẹn của người khác"';
+    rows += `<tr>
+      <td>${a.time}</td><td>${a.patient}</td><td>${a.doctor}</td><td>${a.room}</td>
+      <td><span class="badge ${st[0]}">${st[1]}</span></td>
+      <td><button class="row-action" ${canEditOthers?'':'disabled'} title="${title}">Sửa</button><button class="row-action" ${canEditOthers?'':'disabled'} title="${title}">Huỷ</button></td>
+    </tr>`;
+  });
+  return `<div class="card"><table>${rows}</table></div>`;
+}
+</script>
+</body>
+</html>
