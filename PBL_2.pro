@@ -13,21 +13,19 @@ UI_DIR = release
 
 SOURCES += \
     main.cpp \
-    Controllers/AppointmentController.cpp \
-    Controllers/AuthController.cpp \
-    Controllers/DoctorController.cpp \
-    Data_structures/BinarySearchTree.cpp \
-    Data_structures/PatientQueue.cpp \
     Controllers/Appointment.cpp \
-    Controllers/Schedule.cpp \
-    Controllers/Users.cpp
+    Controllers/AuthController.cpp \
+    Controllers/Doctor.cpp \
+    Data_structures/LinkingList.cpp \
+    Data_structures/PatientPriorityQueue.cpp \
+    Controllers/Patient.cpp \
+    Controllers/Symptom.cpp
 
 HEADERS += \
-    Models/AppointmentController.h \
-    Models/AuthController.h \
-    Models/DoctorController.h \
-    Data_structures/BinarySearchTree.h \
-    Data_structures/PatientQueue.h \
     Models/Appointment.h \
-    Models/Schedule.h \
-    Models/Users.h
+    Models/AuthController.h \
+    Models/Doctor.h \
+    Data_structures/LinkingList.h \
+    Data_structures/PatientPriorityQueue.h \
+    Models/Patient.h \
+    Models/Symptom.h
