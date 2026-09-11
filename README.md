@@ -94,12 +94,15 @@
                 - Symptom_Patient (S_ID | P_ID | Description)
 
 + Cấu trúc DB hiện tại:
-DOCTOR           (D_ID   | D_LastName  | D_MiddleName  | D_FirstName  | D_PhoneNumbers | D_Gender  | Sp_ID)
-SPECIALIZATION   (Sp_ID  | Specialty)
-SYMPTOM_PATIENT  (S_ID   | P_ID        | Severity      | Sp_ID)
-SYMPTOM          (S_ID   | S_Name      | Sp_ID         | S_Score)
-APPOINTMENT      (A_ID   | P_ID        | D_ID          | A_Date       | A_State)
-APPOINTMENT_NOTE (A_ID   | Description)
-MANAGERAPP       (MA_ID  | MA_LastName | MA_MiddleName | MA_FirstName | MA_Role        | MA_Gender | MA_PhoneNumbers | Ma_State)
-PATIENT          (P_ID   | P_LastName  | P_MiddleName  | P_FirstName  | P_PHoneNumbers | P_Gender)
-PERMISSION       (MA_ID  | PM_Type)
+        DOCTOR           (D_ID   | D_LastName  | D_MiddleName  | D_FirstName  | D_PhoneNumbers | D_Gender  | Sp_ID)
+        SPECIALIZATION   (Sp_ID  | Specialty)
+        SYMPTOM_PATIENT  (S_ID   | P_ID        | Severity      | Sp_ID)
+        SYMPTOM          (S_ID   | S_Name      | Sp_ID         | S_Score)
+        APPOINTMENT      (A_ID   | P_ID        | D_ID          | A_Date       | A_State)
+        APPOINTMENT_NOTE (A_ID   | Description)
+        MANAGERAPP       (MA_ID  | MA_LastName | MA_MiddleName | MA_FirstName | MA_Role        | MA_Gender | MA_PhoneNumbers | Ma_State)
+        PATIENT          (P_ID   | P_LastName  | P_MiddleName  | P_FirstName  | P_PHoneNumbers | P_Gender)
+        PERMISSION       (MA_ID  | PM_Type)
++ Cấu trúc dữ liệu được sử dụng:
+        Priority Queue (Heap + Queue) -> Patient
+        LinkingList -> Another Data
