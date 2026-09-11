@@ -93,7 +93,7 @@
                 - Symptom (S_ID | S_Name | Sp_ID | S_Score)
                 - Symptom_Patient (S_ID | P_ID | Description)
 
-+ Cấu trúc hiện tại:
++ Cấu trúc DB hiện tại:
 DOCTOR           (D_ID   | D_LastName  | D_MiddleName  | D_FirstName  | D_PhoneNumbers | D_Gender  | Sp_ID)
 SPECIALIZATION   (Sp_ID  | Specialty)
 SYMPTOM_PATIENT  (S_ID   | P_ID        | Severity      | Sp_ID)
