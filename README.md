@@ -106,3 +106,8 @@
 + Cấu trúc dữ liệu được sử dụng:
         Priority Queue (Heap + Queue) -> Patient
         LinkingList -> Another Data
+
+12/9/2026 --code
++ LinkingList.h         - Thêm template để đánh dấu
+                        - Định nghĩa các hàm constructore, copy constructure, destructure
++ Symptom.h 
