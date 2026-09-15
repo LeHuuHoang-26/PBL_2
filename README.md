@@ -110,4 +110,10 @@
 12/9/2026 --code
 + LinkingList.h         - Thêm template để đánh dấu
                         - Định nghĩa các hàm constructore, copy constructure, destructure
-+ Symptom.h 
+
+15/9/2026 --mô tả App
+                        - Patient đi vào và điền các thông tin như FullName, CCCD, Gender, Age, ...
+                        - Sau đó đến ghi nhận các triệu chứng (Symptom).
+                        - Từ các triệu chứng để tìm ra các chuyên khoa (Specialization) phù hợp để đặt lịch khám, bệnh nhân có thể chọn khoa hoặc theo hệ thống.
+                        - Từ khoa, hệ thống sẽ tính ra lịch hẹn hợp lí.
+                        - 
