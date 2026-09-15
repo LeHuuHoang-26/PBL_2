@@ -7,25 +7,26 @@
 using namespace std;
 
 class Human {
-protected: // Dùng protected để các lớp con (Doctor, Patient) có thể truy cập được
+protected: 
     string id;
-    string name;
-    int age;
-    string gender;
+    string lastName;
+    string middleName;
+    string firstName;
+    string gender; 
 
 public:
-    // Constructor mặc định
-    Human(string _id = "", string _name = "", int _age = 0, string _gender = "")
-        : id(_id), name(_name), age(_age), gender(_gender) {}
+    Human(string _id = "", string _lastName = "", string _middleName = "", 
+          string _firstName = "", string _gender = "")
+        : id(_id), lastName(_lastName), middleName(_middleName), 
+          firstName(_firstName), gender(_gender) {}
 
-    // Hàm ảo (virtual) để các lớp con ghi đè (override)
     virtual void displayInfo() const {
-        cout << "ID: " << id << " | Ten: " << name 
-             << " | Tuoi: " << age << " | Gioi tinh: " << gender << endl;
+        cout << "ID: " << id 
+             << " | Ho ten: " << lastName << " " << middleName << " " << firstName 
+             << " | Gioi tinh: " << gender << endl;
     }
 
-    // Cần có virtual destructor cho lớp cha
     virtual ~Human() = default;
 };
 
-#endif // HUMAN_H
+#endif 
