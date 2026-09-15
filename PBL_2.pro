@@ -19,7 +19,8 @@ SOURCES += \
     Data_structures/LinkingList.cpp \
     Data_structures/PatientPriorityQueue.cpp \
     Controllers/Patient.cpp \
-    Controllers/Symptom.cpp
+    Controllers/Symptom.cpp \
+    Controllers/human.cpp
 
 HEADERS += \
     Models/Appointment.h \
@@ -28,4 +29,5 @@ HEADERS += \
     Data_structures/LinkingList.h \
     Data_structures/PatientPriorityQueue.h \
     Models/Patient.h \
-    Models/Symptom.h
+    Models/Symptom.h \
+    Models/human.h
