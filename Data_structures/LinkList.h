@@ -23,7 +23,7 @@ class LinkList {
         ~LinkList();
 
         bool insert(const T &info);
-        bool remove(const T &info);
+        bool remove(LinkList::Node *N);
 
         Node *getHeader() const;
         Node *getFooter() const;

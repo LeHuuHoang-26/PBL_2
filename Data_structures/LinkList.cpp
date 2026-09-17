@@ -7,21 +7,21 @@
 #include <iostream>
 
 template <typename T>
-
-LinkList::LinkList() header(new LinkList::Node), footer(new LinkList::Node)  {
+LinkList<T>::LinkList(): header(new LinkList::Node), footer(new LinkList::Node)  {
     header->next = footer;
     header->prev = nullptr;
 
     footer->next = nullptr;
-    header->prev = header;
+    footer->prev = header;
 }
 
-LinkList::LinkList(const LinkList &L): header(new LinkList::Node), footer(new LinkList::Node) {
+template <typename T>
+LinkList<T>::LinkList(const LinkList &L): header(new LinkList::Node), footer(new LinkList::Node) {
     header->next = footer;
     header->prev = nullptr;
 
     footer->next = nullptr;
-    header->prev = header;
+    footer->prev = header;
 
     LinkList::Node *tmp = L.header->next;
     while (tmp->next != nullptr) {
@@ -38,9 +38,10 @@ LinkList::LinkList(const LinkList &L): header(new LinkList::Node), footer(new Li
     }
 }
 
-LinkList::~LinkList() {
+template <typename T>
+LinkList<T>::~LinkList() {
     LinkList::Node *tmp = header;
-    while (tmp->next != nullptr) {
+    while (tmp != nullptr) {
         LinkList::Node *tmptotmp = tmp->next;
         delete tmp;
 
@@ -48,7 +49,8 @@ LinkList::~LinkList() {
     }
 }
 
-bool LinkList::insert(const T &info) {
+template <typename T>
+bool LinkList<T>::insert(const T &info) {
     LinkList::Node *tmp = new LinkList::Node;
     if (tmp == nullptr)
         return false;
@@ -63,18 +65,24 @@ bool LinkList::insert(const T &info) {
     return true;
 }   
 
-bool LinkList::remove(LinkList::Node *N) {
-    tmp->next->prev = tmp->prev;
-    tmp->prev->next = tmp->next;
+template <typename T>
+bool LinkList<T>::remove(LinkList::Node *N) {
+    if (N == header || N == footer)
+        return false;
+
+    N->next->prev = N->prev;
+    N->prev->next = N->next;
 
     delete N;
     return true;
 }
 
-Node *getHeader() const {
+template <typename T>
+typename LinkList<T>::Node *LinkList<T>::getHeader() const {
     return header;
 }
 
-Node *getFooter() const {
+template <typename T>
+typename LinkList<T>::Node *LinkList<T>::getFooter() const {
     return footer;
 }
