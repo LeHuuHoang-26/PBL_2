@@ -80,6 +80,10 @@ class Queue {
 
             return tmpData;
         }
+
+        bool isEmpty() const {
+            return (header->next == footer);
+        }
 };
 
 #endif

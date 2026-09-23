@@ -1,19 +1,19 @@
-#ifndef SYMPTOM_H
+#ifndef SYMTOMP_H
 #define SYMPTOM_H
 
-#include <bits/stdc++.h>
+#include <string>
+using namespace std;
 
-// Symptom kế thừa 
-class Symptom : public  {
+class Symptom {
     private:
         string id;
         string name;
         string Sp_id;
-        string score;
+        int score;
     public:
-        Symptom();
-        Symptom(const Symptom &S);
-        ~Symptom();
-}
+        static int countSymptom = 0;
 
-#endif //SYMPTOM_H
+        void getData();
+};
+
+#endif
