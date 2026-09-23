@@ -95,7 +95,7 @@
 
 + Cấu trúc DB hiện tại:
         DOCTOR           (D_ID   | D_LastName  | D_MiddleName  | D_FirstName  | D_PhoneNumbers | D_Gender  | Sp_ID)
-        SPECIALIZATION   (Sp_ID  | Specialty)
+        SPECIALIZATION   (Sp_ID  | Specialty)           
         SYMPTOM_PATIENT  (S_ID   | P_ID        | Severity      | Sp_ID)
         SYMPTOM          (S_ID   | S_Name      | Sp_ID         | S_Score)
         APPOINTMENT      (A_ID   | P_ID        | D_ID          | A_Date       | A_State)
@@ -110,10 +110,18 @@
 12/9/2026 --code
 + LinkingList.h         - Thêm template để đánh dấu
                         - Định nghĩa các hàm constructore, copy constructure, destructure
+23/9/2026 --
+ //LinkList       DOCTOR           (D_ID   | D_LastName  | D_MiddleName  | D_FirstName  | D_PhoneNumbers | D_Gender  | Sp_ID)
+ //LinkList       SPECIALIZATION   (Sp_ID  | Specialty)           
+ //LinkList       SYMPTOM_PATIENT  (S_ID   | P_ID)
+ //LinkList       SYMPTOM          (S_ID   | S_Name      | Sp_ID         | S_Score)
+ //LinkList       APPOINTMENT      (A_ID   | P_ID        | D_ID          | A_Date       | A_State)
+ //LinkList       APPOINTMENT_NOTE (A_ID   | Description)
+ //LinkList       MANAGERAPP       (MA_ID  | MA_LastName | MA_MiddleName | MA_FirstName | MA_Role        | MA_Gender | MA_PhoneNumbers | Ma_State)
+ //LinkList       PATIENT          (P_ID   | P_LastName  | P_MiddleName  | P_FirstName  | P_PHoneNumbers | P_Gender  | P_CCCD          | P_Age)
+ //LinkList       PERMISSION       (MA_ID  | PM_Type)
 
-15/9/2026 --mô tả App
-                        - Patient đi vào và điền các thông tin như FullName, CCCD, Gender, Age, ...
-                        - Sau đó đến ghi nhận các triệu chứng (Symptom).
-                        - Từ các triệu chứng để tìm ra các chuyên khoa (Specialization) phù hợp để đặt lịch khám, bệnh nhân có thể chọn khoa hoặc theo hệ thống.
-                        - Từ khoa, hệ thống sẽ tính ra lịch hẹn hợp lí.
-                        - 
+ //Queue          QueuePatient     (P_ID   | Sp_ID       | Severity)
+
+ Bắt đầu với việc nạp dữ liệu từ database;
+ Bệnh nhân vào và điền thông tin: hệ thống sẽ xác thực xem thông tin đã có chưa, nếu chưa thì thêm vào patient, sau đó nhận các triệu chứng và tính ra các khoa hợp lí để xếp lịch, chọn khoa và hệ thống sẽ chuyển
