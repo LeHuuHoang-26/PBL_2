@@ -5,8 +5,8 @@
 using namespace std;
 
 
-void Symptom::getData() {
-    ifstream f("Data/Symptom/Symptom.txt");
+Symptom::Symptom(string path) {
+    ifstream f(path);
     string tmp;
     for (int i = 0; i < 2 + countSymptom; i++)
         getline(f, tmp, '\n');

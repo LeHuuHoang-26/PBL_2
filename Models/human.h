@@ -20,12 +20,6 @@ public:
         : id(_id), lastName(_lastName), middleName(_middleName), 
           firstName(_firstName), gender(_gender) {}
 
-    virtual void displayInfo() const {
-        cout << "ID: " << id 
-             << " | Ho ten: " << lastName << " " << middleName << " " << firstName 
-             << " | Gioi tinh: " << gender << endl;
-    }
-
     virtual ~Human() = default;
 };
 
