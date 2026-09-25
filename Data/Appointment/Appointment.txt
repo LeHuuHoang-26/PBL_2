@@ -1,1 +1,1 @@
-A_ID | P_ID | D_ID | A_Date | A_State
+A_ID   | P_ID        | D_ID            | A_DateSet | A_DateGet | A_State

@@ -1,25 +1,10 @@
-{
-    MA_001,
-    Permission:,
-}
-{
-    MA_002,
-    Permission:,
-}
-{
-    MA_003,
-    Permission: (07),
-}
-{
-    MA_004,
-    Permission: (02), (03), (08)
-}
-{
-    MA_005,
-    Permission:,
-}
-{
-    MA_006,
-    Permission:,
-}
-
+Per_ID | Per_Name
+-------+-------------------------------------
+Per_01 | Cấp quyền
+Per_02 | Tra thông tin patient
+Per_03 | Tra thông tin doctor
+Per_04 | Chỉnh sửa thông tin patient
+Per_05 | Chỉnh sửa thông tin doctor
+Per_06 | Xếp lịch
+Per_07 | Sửa lịch
+Per_08 | Chỉnh sửa config

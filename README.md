@@ -111,17 +111,28 @@
 + LinkingList.h         - Thêm template để đánh dấu
                         - Định nghĩa các hàm constructore, copy constructure, destructure
 23/9/2026 --
- //LinkList       DOCTOR           (D_ID   | D_LastName  | D_MiddleName  | D_FirstName  | D_PhoneNumbers | D_Gender  | Sp_ID)
+ //LinkList       DOCTOR           (D_ID   | D_LastName  | D_MiddleName  | D_FirstName  | D_PhoneNumbers  | D_Gender  | Sp_ID)
  //LinkList       SPECIALIZATION   (Sp_ID  | Specialty)           
  //LinkList       SYMPTOM_PATIENT  (S_ID   | P_ID)
  //LinkList       SYMPTOM          (S_ID   | S_Name      | Sp_ID         | S_Score)
  //LinkList       APPOINTMENT      (A_ID   | P_ID        | D_ID          | A_Date       | A_State)
  //LinkList       APPOINTMENT_NOTE (A_ID   | Description)
- //LinkList       MANAGERAPP       (MA_ID  | MA_LastName | MA_MiddleName | MA_FirstName | MA_Role        | MA_Gender | MA_PhoneNumbers | Ma_State)
- //LinkList       PATIENT          (P_ID   | P_LastName  | P_MiddleName  | P_FirstName  | P_PHoneNumbers | P_Gender  | P_CCCD          | P_Age)
+ //LinkList       MANAGERAPP       (MA_ID  | MA_LastName | MA_MiddleName | MA_FirstName | MA_PhoneNumbers | MA_Gender | MA_Role | Ma_State)
+ //LinkList       PATIENT          (P_ID   | P_LastName  | P_MiddleName  | P_FirstName  | P_PHoneNumbers  | P_Gender  | P_CCCD  | P_Age)
  //LinkList       PERMISSION       (MA_ID  | PM_Type)
 
  //Queue          QueuePatient     (P_ID   | Sp_ID       | Severity)
 
- Bắt đầu với việc nạp dữ liệu từ database;
- Bệnh nhân vào và điền thông tin: hệ thống sẽ xác thực xem thông tin đã có chưa, nếu chưa thì thêm vào patient, sau đó nhận các triệu chứng và tính ra các khoa hợp lí để xếp lịch, chọn khoa và hệ thống sẽ chuyển
+25/9/2026 --
+
+DOCTOR                  (D_ID   | D_FullName  | D_PhoneNumbers  | D_Gender  | D_Age     | Sp_ID   | D_State)
+PATIENT                 (P_ID   | P_FullName  | P_PhoneNumbers  | P_Gender  | P_Age     | P_CCCD)
+MANAGER                 (MA_ID  | MA_FullName | MA_PhoneNumbers | MA_Gender | MA_Age    | MA_Role | MA_State)
+SPECIALIZATION          (Sp_ID  | Sp_Name)
+SYMPTOM                 (S_ID   | S_Name      | Sp_ID           | S_Score)
+SYMPTOM_PATIENT         (S_ID   | P_ID        | SP_Date)
+QUEUE_PATIENT           (P_ID   | Sp_ID       | QP_Severity     | QP_Date   | QP_State)
+APPOINTMENT             (A_ID   | P_ID        | D_ID            | A_DateSet | A_DateGet | A_State)
+APPOINTMENT_NOTE        (A_ID   | AN_Description)
+PERMISSION              (Per_ID | Per_Name)
+PERMISSION_MANAGER      (MA_ID  | Per_ID)

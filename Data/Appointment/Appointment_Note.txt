@@ -1,1 +1,1 @@
-APPOINTMENT_NOTE (A_ID   | Description)
+A_ID   | AN_Description
