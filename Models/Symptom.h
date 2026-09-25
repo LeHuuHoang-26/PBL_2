@@ -13,7 +13,7 @@ class Symptom {
     public:
         static int countSymptom = 0;
 
-        Symptom(string path = "data/Symptom/Symptom.txt");
+        Symptom(string path = "Data/Symptom/Symptom.txt");
 };
 
 #endif
