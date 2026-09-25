@@ -9,7 +9,7 @@ class SymptomPT {
         string S_id;
         string P_id;
     public:
-        static int countSymptomPT = 0;
+        static int count;
         
         SymptomPT(string path = "Data/Symptom/SymptomPatient.txt");
         SymptomPT(string S_id = "", string P_id = "");

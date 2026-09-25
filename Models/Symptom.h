@@ -1,4 +1,4 @@
-#ifndef SYMTOMP_H
+#ifndef SYMPTOM_H
 #define SYMPTOM_H
 
 #include <string>
@@ -11,7 +11,7 @@ class Symptom {
         string Sp_id;
         int score;
     public:
-        static int countSymptom = 0;
+        static int count;
 
         Symptom(string path = "Data/Symptom/Symptom.txt");
 };

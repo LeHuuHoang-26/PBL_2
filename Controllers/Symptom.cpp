@@ -1,14 +1,15 @@
 #include "Symptom.h"
 #include "libPBL2.h"
-#include <bits/stdc++.h>
+#include <fstream>
 #include <string>
 using namespace std;
 
+int Symptom::count = 0;
 
 Symptom::Symptom(string path) {
     ifstream f(path);
     string tmp;
-    for (int i = 0; i < 2 + countSymptom; i++)
+    for (int i = 0; i < 2 + Symptom::count; i++)
         getline(f, tmp, '\n');
 
     getline (f, id, '|');
@@ -20,5 +21,5 @@ Symptom::Symptom(string path) {
     libPBL2::trim(Sp_id);
     score = stod(tmp);
 
-    countSymptom++;
+    Symptom::count++;
 }
