@@ -125,14 +125,14 @@
 
 25/9/2026 --
 
-DOCTOR                  (D_ID   | D_FullName  | D_PhoneNumbers  | D_Gender  | D_Age     | Sp_ID   | D_State)
-PATIENT                 (P_ID   | P_FullName  | P_PhoneNumbers  | P_Gender  | P_Age     | P_CCCD)
-MANAGER                 (MA_ID  | MA_FullName | MA_PhoneNumbers | MA_Gender | MA_Age    | MA_Role | MA_State)
+DOCTOR                  (D_ID   | D_FullName  | D_Phone     | D_Gender  | D_Age     | Sp_ID   | D_State)
+PATIENT                 (P_ID   | P_FullName  | P_Phone     | P_Gender  | P_Age     | P_CCCD)
+MANAGER                 (MA_ID  | MA_FullName | MA_Phone    | MA_Gender | MA_Age    | MA_Role | MA_State)
 SPECIALIZATION          (Sp_ID  | Sp_Name)
-SYMPTOM                 (S_ID   | S_Name      | Sp_ID           | S_Score)
+SYMPTOM                 (S_ID   | S_Name      | Sp_ID       | S_Score)
 SYMPTOM_PATIENT         (S_ID   | P_ID        | SP_Date)
-QUEUE_PATIENT           (P_ID   | Sp_ID       | QP_Severity     | QP_Date   | QP_State)
-APPOINTMENT             (A_ID   | P_ID        | D_ID            | A_DateSet | A_DateGet | A_State)
+QUEUE_PATIENT           (P_ID   | Sp_ID       | QP_Severity | QP_Date   | QP_State)
+APPOINTMENT             (A_ID   | P_ID        | D_ID        | A_DateSet | A_DateGet | A_State)
 APPOINTMENT_NOTE        (A_ID   | AN_Description)
 PERMISSION              (Per_ID | Per_Name)
 PERMISSION_MANAGER      (MA_ID  | Per_ID)

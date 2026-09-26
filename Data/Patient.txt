@@ -1,1 +1,1 @@
-P_ID   | P_FullName  | P_PhoneNumbers  | P_Gender  | P_Age     | P_CCCD
+P_ID   | P_FullName  | P_Phone | P_Gender  | P_Age     | P_CCCD
