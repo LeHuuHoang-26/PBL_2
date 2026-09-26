@@ -14,7 +14,14 @@ SymptomPT::SymptomPT(string path) {
         getline (f, tmp, '\n');
 
     getline (f, S_id, '|');
-    getline (f, P_id, '\n');
+    getline (f, P_id, '|');
+
+    getline (f, tmp, '.');
+    date.day = strtod(tmp);
+    getline (f, tmp, '.');
+    date.month = strtod(tmp);
+    getline (f, tmp, '\n');
+    date.year = strtod(tmp);
 
     libPBL2::trim(S_id);
     libPBL2::trim(P_id);

@@ -8,6 +8,11 @@ class libPBL2 {
         static void trim(string &);
         static bool isFull(string path = "", int countLine = 0);
         static int countLine(string path);
+        struct Date;
 };
+
+struct libPBL2::Date {
+    int day, month, year;
+}
 
 #endif
