@@ -1,4 +1,5 @@
 #include "SymptomPatient.h"
+#include "Date.h"
 #include <string>
 #include <fstream>
 #include "libPBL2.h"
@@ -11,17 +12,20 @@ SymptomPT::SymptomPT(string path) {
 
     string tmp;
     for (int i = 0; i < SymptomPT::count + 2; i++)
-        getline (f, tmp, '\n');
+        getline(f, tmp, '\n');
 
-    getline (f, S_id, '|');
-    getline (f, P_id, '|');
+    getline(f, S_id, '|');
+    getline(f, P_id, '|');
 
-    getline (f, tmp, '.');
-    date.day = strtod(tmp);
-    getline (f, tmp, '.');
-    date.month = strtod(tmp);
-    getline (f, tmp, '\n');
-    date.year = strtod(tmp);
+    int day, month, year;
+    getline(f, tmp, '.');
+    day = stod(tmp);
+    getline(f, tmp, '.');
+    month = stod(tmp);
+    getline(f, tmp, '\n');
+    year = stod(tmp);
+
+    date.insert(day, month, year);
 
     libPBL2::trim(S_id);
     libPBL2::trim(P_id);
@@ -29,6 +33,6 @@ SymptomPT::SymptomPT(string path) {
     SymptomPT::count++;
 }
 
-SymptomPT::SymptomPT(string S_id, string P_id): S_id(S_id), P_id(P_id) {
+SymptomPT::SymptomPT(const string &S_id, const string &P_id, const Date &SP_date): S_id(S_id), P_id(P_id), date(SP_date) {
     SymptomPT::count++;
 }

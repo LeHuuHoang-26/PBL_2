@@ -1,7 +1,6 @@
 #ifndef HUMAN_H
 #define HUMAN_H
 
-#include <iostream>
 #include <string>
 
 using namespace std;
@@ -9,17 +8,13 @@ using namespace std;
 class Human {
 protected: 
     string id;
-    string lastName;
-    string middleName;
-    string firstName;
-    string gender; 
+    string fullName;
+    int phone;
+    bool gender;
+    int age; 
 
 public:
-    Human(string _id = "", string _lastName = "", string _middleName = "", 
-          string _firstName = "", string _gender = "")
-        : id(_id), lastName(_lastName), middleName(_middleName), 
-          firstName(_firstName), gender(_gender) {}
-
+    Human(string id = "", string fullName = "", int phone = 0, bool gender = 0, int age = 0);
     virtual ~Human() = default;
 };
 

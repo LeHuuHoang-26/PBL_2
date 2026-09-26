@@ -11,8 +11,4 @@ class libPBL2 {
         struct Date;
 };
 
-struct libPBL2::Date {
-    int day, month, year;
-}
-
 #endif

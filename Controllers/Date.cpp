@@ -22,7 +22,7 @@ istream &operator >> (istream &in, Date &D) {
         in >> D.day >> c >> D.month >> c >> D.year;
         if (D.year < 1 || D.month < 1 || D.month > 12) {
             int dayinmonth = D.posofdayinmonth();
-            if (day < 1 || day > dayinmonth)
+            if (D.day < 1 || D.day > dayinmonth)
                 flag = 1;
         }
         else
@@ -204,4 +204,18 @@ Date Date::operator - (const int &value) {
     return tmp;
 }
 
+void Date::insert(int dd, int mm, int yyyy) {
+    day = dd;
+    month = mm;
+    year = yyyy;
+}
 
+void Date::show() const {
+    cout << "Date (dd/mm/yyyy): ";
+    cout << setfill('0');
+    cout << setw(2) << day << '/' 
+        << setw(2) << month << '/' 
+        << setw(4) << year;
+
+    cout << endl;
+}

@@ -14,6 +14,8 @@ class Date {
         Date(const Date &D);
         ~Date();
 
+        void insert(int dd, int mm, int yyyy);
+        void show() const;
         friend istream &operator >> (istream &in, Date &D);
         friend ostream &operator << (ostream &out, const Date &D);
         Date operator ++ (int);
