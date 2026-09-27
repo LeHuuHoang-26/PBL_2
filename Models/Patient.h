@@ -12,8 +12,8 @@ class Patient: public Human {
 	public:
 		static int count;
 
-		Patient(string id, string fullName, int phone, bool gender, int age, string CCCD);
-		Patient(string path = "Data/Patient.txt");
+		Patient(string id = "", string fullName = "", int phone = 0, bool gender = 0, int age = 0, string CCCD = "");
+		Patient(string path);
 		
 };
 

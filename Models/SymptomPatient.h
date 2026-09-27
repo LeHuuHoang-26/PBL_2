@@ -14,8 +14,8 @@ class SymptomPT {
     public:
         static int count;
         
-        SymptomPT(string path = "Data/Symptom/SymptomPatient.txt");
-        SymptomPT(const string &S_id, const string &P_id, const Date &SP_date);
+        SymptomPT(string path);
+        SymptomPT(const string &S_id = "", const string &P_id = "", const Date &SP_date = "");
 };
 
 #endif

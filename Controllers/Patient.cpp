@@ -11,7 +11,13 @@ Patient::Patient(string id, string fullName, int phone, bool gender, int age, st
 	:Human(id, fullName, phone, gender, age), CCCD(CCCD) {}
 
 Patient::Patient(string path) {
+	if (path.empty()) {
+		CCCD = "";
+		return;
+	}
 	ifstream f(path);
+	if (!f.is_open())
+		return;
 
 	string tmp;
 	for (int i = 0; i < Patient::count + 2; i++)
@@ -24,13 +30,13 @@ Patient::Patient(string path) {
 	libPBL2::trim(fullName);
 
 	getline(f, tmp, '|');
-	phone = stod(tmp);
+	phone = stoi(tmp);
 
 	getline(f, tmp, '|');
-	gender = stod(tmp);
+	gender = stoi(tmp) != 0;
 	
 	getline(f, tmp, '|');
-	age = stod(tmp);
+	age = stoi(tmp);
 	
 	getline(f, CCCD, '\n');
 	libPBL2::trim(CCCD);

@@ -19,7 +19,7 @@ Symptom::Symptom(string path) {
     libPBL2::trim(id);
     libPBL2::trim(name);
     libPBL2::trim(Sp_id);
-    score = stod(tmp);
+    score = stoi(tmp);
 
     Symptom::count++;
 }

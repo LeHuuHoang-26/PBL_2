@@ -9,19 +9,23 @@ using namespace std;
 class Manager: public Human {
 	public:
 		enum Role {
-			Receptionist = 1,
+			Empty = 0,
+			Receptionist,
 			specialReceptionist,
 			adminstrator
 		};
 	private:
+		string username;
+		string password;
 		int role;
 		bool state;
 	public:
 		static int count;
 		
-		Manager(string path = "Data/Manager.txt");
-		Manager(string id, string fullName, int phone, bool gender, int age, int role, bool state);
-
+		Manager(string path);
+		Manager(string id = "", string fullName = "", int phone = 0, bool gender = 0, int age = 0, string username = "", string password = "", int role = 0, bool state = 0);
+		bool verifyAccount(string username, string password) const;
+		bool verifyInfo(const Manager *M) const;
 };
 
 #endif

@@ -16,6 +16,7 @@ protected:
 public:
     Human(string id = "", string fullName = "", int phone = 0, bool gender = 0, int age = 0);
     virtual ~Human() = default;
+    friend bool operator ==(const Human &, const Human &);
 };
 
 #endif 

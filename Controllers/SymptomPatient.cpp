@@ -8,8 +8,16 @@ using namespace std;
 int SymptomPT::count = 0;
 
 SymptomPT::SymptomPT(string path) {
-    ifstream f(path);
+    if (path.empty()) {
+        S_id = "";
+        P_id = "";
+        return;
+    }
 
+    ifstream f(path);
+    if (!f.is_open())
+        return;
+    
     string tmp;
     for (int i = 0; i < SymptomPT::count + 2; i++)
         getline(f, tmp, '\n');
@@ -19,11 +27,11 @@ SymptomPT::SymptomPT(string path) {
 
     int day, month, year;
     getline(f, tmp, '.');
-    day = stod(tmp);
+    day = stoi(tmp);
     getline(f, tmp, '.');
-    month = stod(tmp);
+    month = stoi(tmp);
     getline(f, tmp, '\n');
-    year = stod(tmp);
+    year = stoi(tmp);
 
     date.insert(day, month, year);
 
