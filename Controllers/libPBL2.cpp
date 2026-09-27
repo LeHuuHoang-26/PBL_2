@@ -19,30 +19,3 @@ void libPBL2::trim(string &str) {
 
     str.resize(i + 1);
 }
-
-bool libPBL2::isFull(string path, int countLine) {
-    ifstream f(path);
-
-    string tmp;
-    for (int i = 0; i < countLine + 2; i++)
-        getline(f, tmp, '\n');
-
-    char c;
-    while (f.get(c)) {
-        if (c != '\n' && c != ' ' && c != '\t')
-            return true;
-    }
-
-    return false;   
-}
-
-int libPBL2::countLine(string path) {
-    ifstream f(path);
-
-    string tmp;
-    int count = -2;
-    
-    while (getline(f, tmp, '\n'))
-        count++;
-    return count;
-}

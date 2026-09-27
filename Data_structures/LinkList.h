@@ -22,7 +22,7 @@ class LinkList {
             footer->prev = header;
         }
 
-        LinkList(const LinkList &Ll): header(new Node), footer(new Node) {
+        LinkList(const LinkList &L): header(new Node), footer(new Node) {
             header->next = footer;
             header->prev = nullptr;
 

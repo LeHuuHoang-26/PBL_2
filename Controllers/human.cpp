@@ -2,7 +2,7 @@
 #include <string>
 using namespace std;
 
-Human::Human(string id, string fullName, int phone, bool gender, int age)
+Human::Human(string id, string fullName, string phone, bool gender, int age)
     : id(id), fullName(fullName), phone(phone), gender(gender), age(age) {}
 
 bool operator ==(const Human &H1, const Human &H2) {
