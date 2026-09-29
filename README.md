@@ -151,4 +151,5 @@ APPOINTMENT             (A_ID   | P_ID        | D_ID        | A_DateSet | A_Date
 APPOINTMENT_NOTE        (A_ID   | AN_Description)
 PERMISSION              (Per_ID | Per_Name)
 PERMISSION_MANAGER      (MA_ID  | Per_ID)
+DOCTOR_RATING           (D_ID   | DR_Rate     | DR_Comment)
 

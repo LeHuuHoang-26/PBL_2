@@ -14,6 +14,7 @@ class LinkList {
         Node *header;
         Node *footer;
     public:
+        static int count;
         LinkList(): header(new Node), footer(new Node)  {
             header->next = footer;
             header->prev = nullptr;
@@ -21,7 +22,6 @@ class LinkList {
             footer->next = nullptr;
             footer->prev = header;
         }
-
         LinkList(const LinkList &L): header(new Node), footer(new Node) {
             header->next = footer;
             header->prev = nullptr;
@@ -52,22 +52,21 @@ class LinkList {
                 tmp = tmptotmp;
             }
         }
-
         bool insert(const T &info) {
             Node *tmp = new Node;
             if (tmp == nullptr)
                 return false;
 
             tmp->info = info;
-            tmp->next = header->next;
-            tmp->prev = header;
-            if (header->next != nullptr)
-                header->next->prev = tmp;
-            header->next = tmp;
+            tmp->next = footer;
+            tmp->prev = footer->prev;
+            if (footer->prev != nullptr)
+                footer->prev->next = tmp;
+            footer->prev = tmp;
 
+            LinkList<T>::count++;
             return true;
         }  
-
         bool remove(Node *N) {
             if (N == header || N == footer)
                 return false;
@@ -76,9 +75,9 @@ class LinkList {
             N->prev->next = N->next;
 
             delete N;
+            LinkList<T>::count--;
             return true;
         }
-
         Node *getHeader() const {
             return header;
         }
@@ -86,5 +85,8 @@ class LinkList {
             return footer;
         }
 };
+
+template <class T>
+int LinkList<T>::count = 0;
 
 #endif // LINKLIST_H
