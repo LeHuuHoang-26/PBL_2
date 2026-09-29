@@ -1,4 +1,4 @@
-#include "Human.h"
+#include "../Models/human.h"
 #include <string>
 using namespace std;
 
@@ -10,4 +10,12 @@ bool operator ==(const Human &H1, const Human &H2) {
         && H1.phone     == H2.phone
         && H1.gender    == H2.gender
         && H1.age       == H2.age;
+}
+
+void Human::displayInfo() const {
+    cout << "ID: " << id << "\n"
+         << "FullName: " << fullName << "\n"
+         << "Phone: " << phone << "\n"
+         << "Gender: " << (gender ? "Nam" : "Nu") << "\n"
+         << "Age: " << age << "\n";
 }

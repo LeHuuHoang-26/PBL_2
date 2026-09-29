@@ -1,4 +1,4 @@
-#include "doctor.h"
+#include "../Models/Doctor.h"
 #include <iostream>
 
 using namespace std;
