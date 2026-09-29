@@ -1,5 +1,6 @@
-#include "../Models/human.h"
+#include "human.h"
 #include <string>
+#include <ostream>
 using namespace std;
 
 Human::Human(string id, string fullName, string phone, bool gender, int age)
@@ -19,3 +20,15 @@ void Human::displayInfo() const {
          << "Gender: " << (gender ? "Nam" : "Nu") << "\n"
          << "Age: " << age << "\n";
 }
+
+string Human::getID() const {return this->id;}
+string Human::getfullName() const {return this->fullName;}
+string Human::getPhone() const {return this->phone;}
+bool Human::getGender() const {return this->gender;}
+int Human::getAge() const {return this->age;}
+
+string Human::setID(string id) {this->id = id;}
+string Human::setfullName(string fullName) {this->fullName = fullName;}
+string Human::setPhone(string phone) {this->phone = phone;}
+bool Human::setGender(bool gender) {this->gender = gender;}
+int Human::setAge(int age) {this->age = age;}
