@@ -3,6 +3,7 @@
 
 #include "human.h"
 #include <string>
+#include "../Data_structures/LinkList.h"
 
 class Doctor : public Human {
 private:
@@ -35,6 +36,9 @@ public:
     void setRoomId(std::string _roomId);
     void setFee(double _fee);
     void setRating(double _rating);
+
+    // Đọc danh sách bác sĩ từ file .txt
+    static LinkList<Doctor> loadFromFile(const std::string& filename);
 };
 
 #endif // DOCTOR_H
