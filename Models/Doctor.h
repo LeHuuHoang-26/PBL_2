@@ -4,31 +4,37 @@
 #include "human.h"
 #include <string>
 
-
 class Doctor : public Human {
 private:
-    string phoneNumbers; 
-    string spId; // Mã chuyên ngành
+    std::string spId;        // Sp_ID
+    bool state;              // D_State
+    std::string roomId;      // D_RoomID (Thuộc tính bổ sung)
+    double fee;              // D_Fee (Thuộc tính bổ sung)
+    double rating;           // D_Rating (Thuộc tính bổ sung)
 
 public:
-    // Hàm khởi tạo (Các giá trị mặc định = "" chỉ được phép đặt ở file .h)
-    Doctor(string _id = "", string _lastName = "", string _middleName = "", 
-           string _firstName = "", string _phoneNumbers = "", string _gender = "", 
-           string _spId = "");
+    // Hàm khởi tạo đúng chuẩn format CSDL mở rộng
+    Doctor(std::string _id = "", std::string _fullName = "", std::string _phone = "", 
+           bool _gender = true, int _age = 0, std::string _spId = "", bool _state = true,
+           std::string _roomId = "", double _fee = 0.0, double _rating = 5.0);
 
-    // Hàm hủy
     virtual ~Doctor();
 
-    // Ghi đè hàm hiển thị từ lớp Human
     void displayInfo() const override;
 
-    // Các hàm Getter
-    string getPhoneNumbers() const;
-    string getSpId() const;
+    // Getter
+    std::string getSpId() const;
+    bool getState() const;
+    std::string getRoomId() const;
+    double getFee() const;
+    double getRating() const;
 
-    // Các hàm Setter
-    void setPhoneNumbers(string _phone);
-    void setSpId(string _spId);
+    // Setter
+    void setSpId(std::string _spId);
+    void setState(bool _state);
+    void setRoomId(std::string _roomId);
+    void setFee(double _fee);
+    void setRating(double _rating);
 };
 
 #endif // DOCTOR_H
