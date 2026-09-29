@@ -1,6 +1,6 @@
 #include "human.h"
 #include <string>
-#include <ostream>
+#include <iostream>
 using namespace std;
 
 Human::Human(string id, string fullName, string phone, bool gender, int age)
