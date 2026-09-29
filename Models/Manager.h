@@ -1,31 +1,36 @@
 #ifndef MANAGER_H
 #define MANAGER_H
 
-#include "human.h"
-#include <fstream>
 #include <string>
-using namespace std;
+#include <fstream>
+#include <ostream>
+#include "human.h"
+
+enum class ManagerRole {
+    Empty,
+    Receptionist,
+    SpecialReceptionist,
+    Administrator
+};
 
 class Manager: public Human {
-	public:
-		enum Role {
-			Empty = 0,
-			Receptionist,
-			specialReceptionist,
-			adminstrator
-		};
-	private:
-		string username;
-		string password;
-		int role;
-		bool state;
-	public:
-		static int count;
-		
-		Manager(string path);
-		Manager(string id = "", string fullName = "", int phone = 0, bool gender = 0, int age = 0, string username = "", string password = "", int role = 0, bool state = 0);
-		bool verifyAccount(string username, string password) const;
-		bool verifyInfo(const Manager *M) const;
+    private:
+        std::string username;
+        std::string password;
+        ManagerRole role;
+        int state;
+    public:
+        Manager(std::ifstream &f);
+        Manager(std::string id, std::string fullName, std::string phone, bool gender, int age, std::string username, std::string password, ManagerRole role, int state);
+        Manager(const Manager &M);
+        Manager();
+        ~Manager();
+
+        void setDefault();
+        bool isDefault() const;
+        friend std::ostream &operator << (std::ostream &out, const Manager &M);
+        Manager &operator = (const Manager &M);
+        bool isValid(const std::string &username, const std::string &password) const;
 };
 
 #endif

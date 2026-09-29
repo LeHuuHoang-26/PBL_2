@@ -1,73 +1,125 @@
-#include "Manager.h"
-#include "human.h"
-#include "libPBL2.h"
 #include <string>
 #include <fstream>
+#include "Manager.h"
+#include "Human.h"
+#include "libPBL2.h"
+
 using namespace std;
 
-int Manager::count = 0;
+Manager::Manager(): username(""), password(""), role(ManagerRole::Empty), state(0) {}
 
-Manager::Manager(string path) {
-	if (path.empty()) {
-		username = "";
-		password = "";
-		role = 0;
-		state = 0;
+Manager::Manager(ifstream &f) {
+    string tmp;
+    if (!getline(f, id, '|')) {
+        this->setDefault();
+        return;
+    }
+    libPBL2::trim(id);
 
-		return;
-	}
+    if (!getline(f, fullName, '|')) {
+        this->setDefault();
+        return;
+    }
+    libPBL2::trim(fullName);
 
-	ifstream f(path);
-	if (!f.is_open()) {
-		return;
-	}
+    if (!getline(f, phone, '|')) {
+        this->setDefault();
+        return;
+    }
+    libPBL2::trim(phone);
 
-	string tmp;
-	for (int i = 0; i < Manager::count + 2; i++)
-		getline(f, tmp, '\n');
+    if (!getline(f, tmp, '|')) {
+        this->setDefault();
+        return;
+    }
+    gender = stoi(tmp);
 
-	getline(f, id, '|');
-	libPBL2::trim(id);
+    if (!getline(f, tmp, '|')) {
+        this->setDefault();
+        return;
+    }
+    age = stoi(tmp);
 
-	getline(f, fullName, '|');
-	libPBL2::trim(fullName);
+    if (!getline(f, username, '|')) {
+        this->setDefault();
+        return;
+    }
+    libPBL2::trim(username);
 
-	getline(f, tmp, '|');
-	phone = stoi(tmp);
+    if (!getline(f, password, '|')) {
+        this->setDefault();
+        return;
+    }
+    libPBL2::trim(password);
 
-	getline(f, tmp, '|');
-	gender = stoi(tmp) != 0;
+    if (!getline(f, tmp, '|')) {
+        this->setDefault();
+        return;
+    }
+    switch (stoi(tmp)) {
+        case 1: role = ManagerRole::Receptionist; break;
+        case 2: role = ManagerRole::SpecialReceptionist; break;
+        case 3: role = ManagerRole::Administrator; break;
+    }
 
-	getline(f, tmp, '|');
-	age = stoi(tmp);
-
-	getline(f, username, '|');
-	libPBL2::trim(username);
-
-	getline(f, password, '|');
-	libPBL2::trim(password);
-
-	getline(f, tmp, '|');
-	role = stoi(tmp);
-
-	getline(f, tmp, '\n');
-	state = stoi(tmp) != 0;
-
-	Manager::count++;
+    if (!getline(f, tmp, '\n')) {
+        this->setDefault();
+        return;
+    }
+    state = stoi(tmp);
 }
 
-Manager::Manager(string id, string fullName, int phone, bool gender, int age, string username, string password, int role, bool state)
-	: Human(id, fullName, phone, gender, age), username(username), password(password), role(role), state(state) {
-	Manager::count++;
+Manager::Manager(string id, string fullName, string phone, bool gender, int age, string username, string password, ManagerRole role, int state)
+    : Human(id, fullName, phone, gender, age), username(username), password(password), role(role), state(state) {}
+
+Manager::Manager(const Manager &M)
+    : Human(M.id, M.fullName, M.phone, M.gender, M.age), username(M.username), password(M.password), role(M.role), state(M.state) {}
+
+Manager::~Manager() {}
+
+void Manager::setDefault() {
+    id = "";
+    fullName = "";
+    phone = "";
+    gender = 0;
+    age = 0;
+    username = "";
+    password = "";
+    role = ManagerRole::Empty;
+    state = 0;
 }
 
-bool Manager::verifyAccount(string username, string password) const {
-	return this->username == username && this->password == password;
+ostream &operator << (ostream &out, const Manager &M) {
+    out << M.id << " | " << M.fullName << " | " << M.phone << " | " << (M.gender ? "Nam" : "Nữ") << " | " << M.age << endl;
+    return out;
 }
 
-bool Manager::verifyInfo(const Manager *M) const {
-	const Human *H1 = this;
-	const Human *H2 = M;
+Manager &Manager::operator = (const Manager &M) {
+    id = M.id;
+    fullName = M.fullName;
+    phone = M.phone;
+    gender = M.gender;
+    age = M.age;
+    username = M.username;
+    password = M.password;
+    role = M.role;
+    state = M.state;
 
-	return *H1 == *H2;
+    return *this;
+}
+
+bool Manager::isDefault() const {
+    return id == ""
+        && fullName == ""
+        && phone == ""
+        && gender == 0
+        && age == 0
+        && username == ""
+        && password == ""
+        && role == ManagerRole::Empty
+        && state == 0;
+}
+
+bool Manager::isValid(const std::string &username, const std::string &password) const {
+    return this->username == username && this->password == password;
 }
