@@ -23,11 +23,11 @@ public:
     bool getGender() const;
     int getAge() const;
 
-    std::string setID(std::string id);
-    std::string setfullName(std::string fullName);
-    std::string setPhone(std::string phone);
-    bool setGender(bool gender);
-    int setAge(int age);
+    void setID(std::string id);
+    void setfullName(std::string fullName);
+    void setPhone(std::string phone);
+    void setGender(bool gender);
+    void setAge(int age);
 };
 
 #endif 

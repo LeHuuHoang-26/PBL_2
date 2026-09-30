@@ -3,7 +3,7 @@
 #include "Manager.h"
 #include "Human.h"
 #include "libPBL2.h"
-
+#include <iostream>
 using namespace std;
 
 Manager::Manager(): username(""), password(""), role(ManagerRole::Empty), state(0) {}
@@ -120,6 +120,22 @@ bool Manager::isDefault() const {
         && state == 0;
 }
 
-bool Manager::isValid(const std::string &username, const std::string &password) const {
+bool Manager::isValid(const string &username, const string &password) const {
     return this->username == username && this->password == password;
+}
+
+ManagerRole Manager::getRole() const {
+    return this->role;
+}
+
+bool Manager::isActive() const {
+    return this->state;
+}
+
+void Manager::displayInfo() const {
+    cout << "Thông tin Manager:\n";
+    cout << "Username: " << this->username << endl;
+    cout << "Password: " << this->password << endl;
+    cout << "Role: ";
+    cout << libPBL2::toStr<ManagerRole>(this->role);
 }
