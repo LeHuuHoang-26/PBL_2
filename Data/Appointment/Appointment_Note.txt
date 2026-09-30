@@ -160,41 +160,41 @@
 }
 {
     A_ID: A_041
-    AN_Description: Đăng ký khám sàng lọc tổng quát do có dấu hiệu sốt âm ỉ kéo dài về chiều kèm mệt mỏi sụt cân.
+    AN_Description: Sốt siêu vi kéo dài kèm suy nhược, xét nghiệm công thức máu bạch cầu không tăng, kê đơn bù điện giải và vitamin nhóm B.
 }
 {
     A_ID: A_042
-    AN_Description: Hẹn khám vết thương phần mềm đầu gối bị sưng phù và hạn chế vận động sau tai nạn thể thao.
+    AN_Description: Chấn thương phần mềm khớp gối trái, tràn dịch bao hoạt dịch mức độ nhẹ, băng chun ép và dùng thuốc kháng viêm giảm phù nề.
 }
 {
     A_ID: A_043
-    AN_Description: Đăng ký khám chuyên khoa Tim mạch do xuất hiện các cơn tức ngực trái và cảm giác hồi hộp trống ngực.
+    AN_Description: Rối loạn nhịp tim ngoại tâm thu thất thưa, tim nghe rõ không tiếng thổi, chỉ định dùng thuốc chẹn beta giao cảm liều thấp.
 }
 {
     A_ID: A_044
-    AN_Description: Hẹn khám thần kinh do đau nửa đầu dữ dội kèm tê bì lan dọc cẳng tay trái kéo dài trên 1 tuần.
+    AN_Description: Đau dây thần kinh chẩm kết hợp đau căng cơ cổ vai gáy, chỉ định dùng thuốc giãn cơ và chiếu đèn hồng ngoại giảm đau.
 }
 {
     A_ID: A_045
-    AN_Description: Hẹn khám khẩn cấp Tai Mũi Họng vì đau rát họng dữ dội, nuốt khó và nghẹt mũi hoàn toàn về ban đêm.
+    AN_Description: Viêm họng thanh quản cấp thể xuất tiết, dây thanh phù nề nhẹ, hạn chế nói to và khí dung corticoid tại chỗ 3 ngày.
 }
 {
     A_ID: A_046
-    AN_Description: Đăng ký khám chuyên khoa Hô hấp do ho đờm vàng đục kéo dài 2 tuần, khó thở khi leo dốc.
+    AN_Description: Viêm phế quản cấp bội nhiễm, ran ẩm rải rác đáy phổi hai bên, chỉ định dùng kháng sinh cephalosporin thế hệ 3 uống 7 ngày.
 }
 {
     A_ID: A_047
-    AN_Description: Đặt hẹn khám Tiêu hóa do đau quặn bụng vùng quanh rốn kèm buồn nôn liên tục sau khi ăn.
+    AN_Description: Viêm ruột cấp tính do vi khuẩn, phân lỏng nhiều lần trong ngày, kê đơn kháng sinh đường ruột và men vi sinh probiotic.
 }
 {
     A_ID: A_048
-    AN_Description: Bệnh nhân đặt lịch tái khám định kỳ Cơ Xương Khớp theo dõi tình trạng đau khớp gối và cột sống.
+    AN_Description: Thoái hóa cột sống thắt lưng kèm hẹp lỗ liên hợp nhẹ, chỉ định dùng thuốc giảm đau thần kinh và tập bơi lội phục hồi chức năng.
 }
 {
     A_ID: A_049
-    AN_Description: Đặt lịch khám Da liễu do ngứa châm chích dữ dội và xuất hiện nhiều mảng ban đỏ lan rộng khắp lưng.
+    AN_Description: Dị ứng thuốc thể hồng ban đa dạng nhẹ, tổn thương da khô dần, cho ngừng thuốc nghi ngờ và bôi kem làm dịu dưỡng ẩm.
 }
 {
     A_ID: A_050
-    AN_Description: Đăng ký khám chuyên khoa Mắt do mắt phải nhìn mờ đột ngột kèm thấy nhiều chấm đen bay lơ lửng.
+    AN_Description: Đục dịch kính thể thoái hóa tuổi già mắt phải, màng bồ đào và võng mạc ổn định, nhỏ thuốc chống oxy hóa và theo dõi định kỳ.
 }
