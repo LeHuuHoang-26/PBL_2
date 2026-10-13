@@ -153,3 +153,6 @@ PERMISSION              (Per_ID | Per_Name)
 PERMISSION_MANAGER      (MA_ID  | Per_ID)
 DOCTOR_RATING           (D_ID   | DR_Rate     | DR_Comment)
 
+13/10/2026-- Chinh lai QUEUE_PATIENT & SYMPTOM_PATIENT
+QUEUE_PATIENT           (SP_id  | Sp_id       | State)
+SYMPTOM_PATIENT         (SP_id  | S_id        | P_id        | Date)
