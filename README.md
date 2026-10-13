@@ -154,5 +154,16 @@ PERMISSION_MANAGER      (MA_ID  | Per_ID)
 DOCTOR_RATING           (D_ID   | DR_Rate     | DR_Comment)
 
 13/10/2026-- Chinh lai QUEUE_PATIENT & SYMPTOM_PATIENT
+
+DOCTOR                  (D_ID   | D_FullName  | D_Phone     | D_Gender  | D_Age     | Sp_ID       | D_State     | D_RoomID | D_Fee | D_Rating)
+PATIENT                 (P_ID   | P_FullName  | P_Phone     | P_Gender  | P_Age     | P_CCCD)
+MANAGER                 (MA_ID  | MA_FullName | MA_Phone    | MA_Gender | MA_Age    | MA_UserName | MA_Password | MA_Role  | MA_State)
+SPECIALIZATION          (Sp_ID  | Sp_Name)
+SYMPTOM                 (S_ID   | S_Name      | Sp_ID       | S_Score)
 QUEUE_PATIENT           (SP_id  | Sp_id       | State)
 SYMPTOM_PATIENT         (SP_id  | S_id        | P_id        | Date)
+APPOINTMENT             (A_ID   | P_ID        | D_ID        | A_DateSet | A_DateGet | A_State)
+APPOINTMENT_NOTE        (A_ID   | AN_Description)
+PERMISSION              (Per_ID | Per_Name)
+PERMISSION_MANAGER      (MA_ID  | Per_ID)
+DOCTOR_RATING           (D_ID   | DR_Rate     | DR_Comment)
