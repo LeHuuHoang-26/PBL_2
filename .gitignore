@@ -1,0 +1,38 @@
+# ================================
+# Qt Runtime - Không cần commit
+# Ai cài Qt cũng tự có sẵn rồi
+# ================================
+*.dll
+platforms/
+
+# ================================
+# Executable - Build ra sẽ có
+# ================================
+*.exe
+
+# ================================
+# Build artifacts
+# ================================
+release/
+debug/
+*.o
+*.obj
+
+# ================================
+# Qt generated files
+# ================================
+Makefile
+Makefile.Debug
+Makefile.Release
+*.pro.user
+.qmake.stash
+*.moc
+moc_*.cpp
+ui_*.h
+
+# ================================
+# IDE / Editor
+# ================================
+.vs/
+.vscode/
+*.user

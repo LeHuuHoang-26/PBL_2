@@ -19,6 +19,12 @@ namespace libPBL2 {
 
     bool isAllowed(const Manager &M, PermissionType Per, const LinkList<Permission> *PermissionList = nullptr);
 
+    // Trả về đường dẫn thư mục chứa file .exe đang chạy
+    std::string getProjectRoot();
+
+    // Trả về đường dẫn đầy đủ đến file dữ liệu (tìm trong project hoặc cùng cấp .exe)
+    std::string getDataPath(const std::string &subPath);
+
 }
 
 #endif
