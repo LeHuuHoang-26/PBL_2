@@ -3,44 +3,45 @@
 #include <iomanip>
 using namespace std;
 
-Date::Date(int day, int month, int year): day(day), month(month), year(year) {}
+Date::Date(int day, int month, int year, int hour, int minute)
+    : day(day), month(month), year(year), hour(hour), minute(minute) {}
 
 Date::Date(const Date &D) {
     this->day = D.day;
     this->month = D.month;
     this->year = D.year;
+    this->hour = D.hour;
+    this->minute = D.minute;
 }
 
 Date::~Date() {}
 
 istream &operator >> (istream &in, Date &D) {
-    cout << "Date (dd/mm/yyyy): ";
-    char c;
-    int flag;
-    do {
-        flag = 0;
-        in >> D.day >> c >> D.month >> c >> D.year;
-        if (D.year < 1 || D.month < 1 || D.month > 12) {
-            int dayinmonth = D.posofdayinmonth();
-            if (D.day < 1 || D.day > dayinmonth)
-                flag = 1;
-        }
-        else
-            flag = 1;
-
-        if (flag)
-            cout << "Nhap lai: ";
-    } while (flag);
+    cout << "Date and time (dd/mm/yyyy hh:mm): ";
+    char dateSeparator1, dateSeparator2, timeSeparator;
+    while (in >> D.day >> dateSeparator1 >> D.month >> dateSeparator2
+              >> D.year >> D.hour >> timeSeparator >> D.minute) {
+        if (dateSeparator1 == '/' && dateSeparator2 == '/'
+            && timeSeparator == ':' && D.year >= 1
+            && D.month >= 1 && D.month <= 12
+            && D.day >= 1 && D.day <= D.posofdayinmonth()
+            && D.hour >= 0 && D.hour < 24
+            && D.minute >= 0 && D.minute < 60)
+            return in;
+        cout << "Nhap lai (dd/mm/yyyy hh:mm): ";
+    }
 
     return in;
 }
 
 ostream &operator << (ostream &out, const Date &D) {
-    out << "Date (dd/mm/yyyy): ";
+    out << "Date and time (dd/mm/yyyy hh:mm): ";
     out << setfill('0');
     out << setw(2) << D.day << '/' 
         << setw(2) << D.month << '/' 
-        << setw(4) << D.year;
+        << setw(4) << D.year << ' '
+        << setw(2) << D.hour << ':'
+        << setw(2) << D.minute;
 
     out << endl;
     return out;
@@ -204,18 +205,25 @@ Date Date::operator - (const int &value) {
     return tmp;
 }
 
-void Date::insert(int dd, int mm, int yyyy) {
+void Date::insert(int dd, int mm, int yyyy, int hh, int min) {
     day = dd;
     month = mm;
     year = yyyy;
+    hour = hh;
+    minute = min;
 }
 
+int Date::getHour() const { return hour; }
+int Date::getMinute() const { return minute; }
+
 void Date::show() const {
-    cout << "Date (dd/mm/yyyy): ";
+    cout << "Date and time (dd/mm/yyyy hh:mm): ";
     cout << setfill('0');
     cout << setw(2) << day << '/' 
         << setw(2) << month << '/' 
-        << setw(4) << year;
+        << setw(4) << year << ' '
+        << setw(2) << hour << ':'
+        << setw(2) << minute;
 
     cout << endl;
 }

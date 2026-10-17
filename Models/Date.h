@@ -5,17 +5,22 @@
 using namespace std;
 
 class Date {
-    private:
+    protected:
         int day;
         int month;
         int year;
+        int hour;
+        int minute;
     public:
-        Date(int day = 0, int month = 0, int year = 0);
+        Date(int day = 0, int month = 0, int year = 0,
+             int hour = 0, int minute = 0);
         Date(const Date &D);
         ~Date();
 
-        void insert(int dd, int mm, int yyyy);
+        void insert(int dd, int mm, int yyyy, int hh = 0, int min = 0);
         void show() const;
+        int getHour() const;
+        int getMinute() const;
         friend istream &operator >> (istream &in, Date &D);
         friend ostream &operator << (ostream &out, const Date &D);
         Date operator ++ (int);

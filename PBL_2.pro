@@ -19,6 +19,7 @@ INCLUDEPATH += \
 SOURCES += \
     main.cpp \
     Controllers/Appointment.cpp \
+    Controllers/Date.cpp \
     Controllers/AuthController.cpp \
     Controllers/Doctor.cpp \
     Controllers/Patient.cpp \
@@ -30,6 +31,7 @@ SOURCES += \
 
 HEADERS += \
     Models/Appointment.h \
+    Models/Date.h \
     Models/AuthController.h \
     Models/Doctor.h \
     Models/Patient.h \
