@@ -1,7 +1,6 @@
 #ifndef LINKLIST_H
 #define LINKLIST_H
 
-
 template <class T>
 class LinkList {
     public:
@@ -14,7 +13,7 @@ class LinkList {
         Node *header;
         Node *footer;
     public:
-        static int count;
+        int count = 0;
         LinkList(): header(new Node), footer(new Node)  {
             header->next = footer;
             header->prev = nullptr;
@@ -66,7 +65,7 @@ class LinkList {
 
             LinkList<T>::count++;
             return true;
-        }  
+        }
         bool remove(Node *N) {
             if (N == header || N == footer)
                 return false;
@@ -86,7 +85,4 @@ class LinkList {
         }
 };
 
-template <class T>
-int LinkList<T>::count = 0;
-
-#endif // LINKLIST_H
+#endif

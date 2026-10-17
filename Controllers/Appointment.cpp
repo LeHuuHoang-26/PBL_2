@@ -1,116 +1,139 @@
-#include "../Models/Appointment.h"
-#include "../Models/libPBL2.h"
-
 #include <fstream>
-#include <exception>
 #include <iostream>
 #include <sstream>
+#include <string>
+#include "Appointment.h"
+#include "libPBL2.h"
 
-namespace {
-bool parseDate(const std::string &value, Date &date) {
-    int year = 0;
-    int month = 0;
-    int day = 0;
-    int hour = 0;
-    int minute = 0;
-    char firstSeparator = '\0';
-    char secondSeparator = '\0';
-    char timeSeparator = '\0';
-    std::istringstream input(value);
+using namespace std;
 
-    if (!(input >> year >> firstSeparator >> month >> secondSeparator >> day
-                >> hour >> timeSeparator >> minute)
-        || firstSeparator != '-' || secondSeparator != '-' || timeSeparator != ':'
-        || hour < 0 || hour >= 24 || minute < 0 || minute >= 60)
-        return false;
+Appointment::Appointment(string id, string patientId, string doctorId, const Date &dateSet, const Date &dateGet, int state)
+    : id(id), patientId(patientId), doctorId(doctorId), dateSet(dateSet), dateGet(dateGet), state(state) {}
 
-    input >> std::ws;
-    if (!input.eof() || year < 1 || month < 1 || month > 12)
-        return false;
-
-    date.insert(day, month, year, hour, minute);
-    return day >= 1 && day <= date.posofdayinmonth();
-}
-}
-
-Appointment::Appointment(std::string id, std::string patientId,
-                         std::string doctorId, const Date &dateSet,
-                         const Date &dateGet, int state)
-    : id(id), patientId(patientId), doctorId(doctorId),
-      dateSet(dateSet), dateGet(dateGet), state(state) {}
-
-std::string Appointment::getId() const { return id; }
-std::string Appointment::getPatientId() const { return patientId; }
-std::string Appointment::getDoctorId() const { return doctorId; }
+string Appointment::getId() const { return id; }
+string Appointment::getPatientId() const { return patientId; }
+string Appointment::getDoctorId() const { return doctorId; }
 Date Appointment::getDateSet() const { return dateSet; }
 Date Appointment::getDateGet() const { return dateGet; }
 int Appointment::getState() const { return state; }
 
-void Appointment::setId(const std::string &value) { id = value; }
-void Appointment::setPatientId(const std::string &value) { patientId = value; }
-void Appointment::setDoctorId(const std::string &value) { doctorId = value; }
+void Appointment::setId(const string &value) { id = value; }
+void Appointment::setPatientId(const string &value) { patientId = value; }
+void Appointment::setDoctorId(const string &value) { doctorId = value; }
 void Appointment::setDateSet(const Date &value) { dateSet = value; }
 void Appointment::setDateGet(const Date &value) { dateGet = value; }
 void Appointment::setState(int value) { state = value; }
 
 void Appointment::displayInfo() const {
-    std::cout << "A_ID: " << id << '\n'
-              << "P_ID: " << patientId << '\n'
-              << "D_ID: " << doctorId << '\n'
-              << "A_DateSet: ";
-    dateSet.show();
-    std::cout << "A_DateGet: ";
-    dateGet.show();
-    std::cout << "A_State: " << state << '\n';
+    cout << "--- APPOINTMENT ---\n"
+         << "A_ID: " << id << "\n"
+         << "P_ID: " << patientId << "\n"
+         << "D_ID: " << doctorId << "\n"
+         << "A_DateSet: " << dateSet.toString() << "\n"
+         << "A_DateGet: " << dateGet.toString() << "\n"
+         << "A_State: " << state << "\n";
 }
 
-LinkList<Appointment> Appointment::loadFromFile(const std::string &filename) {
-    LinkList<Appointment> appointments;
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-        std::cerr << "Khong the mo file: " << filename << '\n';
-        return appointments;
+bool Appointment::isDefault() const {
+    return id.empty() && patientId.empty() && doctorId.empty();
+}
+
+void Appointment::setDefault() {
+    id = "";
+    patientId = "";
+    doctorId = "";
+    dateSet = Date();
+    dateGet = Date();
+    state = 0;
+}
+
+string Appointment::toString() const {
+    return libPBL2::padRightUtf8(id, 5) + " | "
+         + libPBL2::padRightUtf8(patientId, 5) + " | "
+         + libPBL2::padRightUtf8(doctorId, 5) + " | "
+         + libPBL2::padRightUtf8(dateSet.toString(), 16) + " | "
+         + libPBL2::padRightUtf8(dateGet.toString(), 16) + " | "
+         + to_string(state);
+}
+
+Appointment Appointment::loadFromString(const string &str) {
+    if (str.empty()) return Appointment();
+    stringstream ss(str);
+    string id, patientId, doctorId, dateSetStr, dateGetStr, stateStr;
+
+    if (!getline(ss, id, '|') ||
+        !getline(ss, patientId, '|') ||
+        !getline(ss, doctorId, '|') ||
+        !getline(ss, dateSetStr, '|') ||
+        !getline(ss, dateGetStr, '|') ||
+        !getline(ss, stateStr)) {
+        return Appointment();
     }
 
-    std::string line;
-    std::getline(file, line); // Bỏ qua tiêu đề.
-    std::getline(file, line); // Bỏ qua dòng phân cách.
+    libPBL2::trim(id);
+    libPBL2::trim(patientId);
+    libPBL2::trim(doctorId);
+    libPBL2::trim(dateSetStr);
+    libPBL2::trim(dateGetStr);
+    libPBL2::trim(stateStr);
 
-    while (std::getline(file, line)) {
+    if (id.empty() || patientId.empty() || doctorId.empty())
+        return Appointment();
+
+    Date dSet = Date::loadFromString(dateSetStr);
+    Date dGet = Date::loadFromString(dateGetStr);
+    int st = (!stateStr.empty() ? stoi(stateStr) : 0);
+
+    return Appointment(id, patientId, doctorId, dSet, dGet, st);
+}
+
+LinkList<Appointment>* Appointment::loadFromFile(const string &path) {
+    LinkList<Appointment> *list = new LinkList<Appointment>;
+    if (!list) return nullptr;
+
+    ifstream f(path);
+    if (!f.is_open()) {
+        delete list;
+        return nullptr;
+    }
+
+    string tmp;
+    getline(f, tmp); // Bỏ qua tiêu đề
+    getline(f, tmp); // Bỏ qua dòng phân cách
+
+    string line;
+    while (getline(f, line)) {
         libPBL2::trim(line);
-        if (line.empty())
-            continue;
-
-        std::istringstream row(line);
-        std::string id, patientId, doctorId, dateSetText, dateGetText, stateText;
-        if (!std::getline(row, id, '|')
-            || !std::getline(row, patientId, '|')
-            || !std::getline(row, doctorId, '|')
-            || !std::getline(row, dateSetText, '|')
-            || !std::getline(row, dateGetText, '|')
-            || !std::getline(row, stateText, '|'))
-            continue;
-
-        libPBL2::trim(id);
-        libPBL2::trim(patientId);
-        libPBL2::trim(doctorId);
-        libPBL2::trim(dateSetText);
-        libPBL2::trim(dateGetText);
-        libPBL2::trim(stateText);
-
-        Date dateSet, dateGet;
-        if (id.empty() || patientId.empty() || doctorId.empty()
-            || !parseDate(dateSetText, dateSet)
-            || !parseDate(dateGetText, dateGet))
-            continue;
-
-        try {
-            appointments.insert(Appointment(id, patientId, doctorId,
-                                            dateSet, dateGet, std::stoi(stateText)));
-        } catch (const std::exception &) {
-            // Bỏ qua dòng có trạng thái không phải số nguyên.
+        if (line.empty()) continue;
+        Appointment app = Appointment::loadFromString(line);
+        if (!app.isDefault()) {
+            list->insert(app);
         }
     }
 
-    return appointments;
+    f.close();
+    return list;
+}
+
+bool Appointment::saveToFile(const string &path, const LinkList<Appointment> *list) {
+    if (!list || list->getHeader() == nullptr)
+        return false;
+
+    ofstream f(path);
+    if (!f.is_open())
+        return false;
+
+    f << "A_ID  | P_ID  | D_ID  | A_DateSet        | A_DateGet        | A_State\n";
+    f << "------+-------+-------+------------------+------------------+--------\n";
+
+    LinkList<Appointment>::Node *tmp = list->getHeader()->next;
+    while (tmp != nullptr && tmp->next != nullptr) {
+        if (!tmp->info.isDefault()) {
+            f << tmp->info.toString() << "\n";
+        }
+        tmp = tmp->next;
+    }
+
+    f.close();
+    return true;
 }

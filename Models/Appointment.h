@@ -2,7 +2,7 @@
 #define APPOINTMENT_H
 
 #include "Date.h"
-#include "../Data_structures/LinkList.h"
+#include "LinkList.h"
 #include <string>
 
 class Appointment {
@@ -15,9 +15,7 @@ private:
     int state;
 
 public:
-    Appointment(std::string id = "", std::string patientId = "",
-                std::string doctorId = "", const Date &dateSet = Date(),
-                const Date &dateGet = Date(), int state = 0);
+    Appointment(std::string id = "", std::string patientId = "", std::string doctorId = "", const Date &dateSet = Date(), const Date &dateGet = Date(), int state = 0);
 
     std::string getId() const;
     std::string getPatientId() const;
@@ -35,8 +33,13 @@ public:
 
     void displayInfo() const;
 
-    // Ngày có định dạng yyyy-MM-dd HH:mm trong Appointment.txt.
-    static LinkList<Appointment> loadFromFile(const std::string &filename);
+    bool isDefault() const;
+    void setDefault();
+
+    std::string toString() const;
+    static Appointment loadFromString(const std::string &str);
+    static LinkList<Appointment>* loadFromFile(const std::string &path);
+    static bool saveToFile(const std::string &path, const LinkList<Appointment> *list);
 };
 
-#endif // APPOINTMENT_H
+#endif
