@@ -1,5 +1,5 @@
 QT += core gui widgets charts
-CONFIG += c++23 console
+CONFIG += c++23
 
 TARGET = MngCareBook
 TEMPLATE = app
@@ -16,6 +16,12 @@ INCLUDEPATH += \
     $$PWD/src/Models \
     $$PWD/src/Controllers \
     $$PWD/src/Views \
+    $$PWD/src/Views/Login \
+    $$PWD/src/Views/Doctor \
+    $$PWD/src/Views/Patient \
+    $$PWD/src/Views/Appointment \
+    $$PWD/src/Views/Account \
+    $$PWD/src/Views/Statistic \
     $$PWD/src/DataStructures \
     $$PWD/src/Utils
 
@@ -32,7 +38,19 @@ SOURCES += \
     src/Models/Symptom.cpp \
     src/Models/SymptomPatient.cpp \
     src/Utils/Date.cpp \
-    src/Utils/libPBL2.cpp
+    src/Utils/libPBL2.cpp \
+    src/Controllers/AuthController.cpp \
+    src/Controllers/DoctorController.cpp \
+    src/Controllers/PatientController.cpp \
+    src/Controllers/AppointmentController.cpp \
+    src/Controllers/StatisticController.cpp \
+    src/Views/MainWindow.cpp \
+    src/Views/Login/LoginDialog.cpp \
+    src/Views/Doctor/DoctorView.cpp \
+    src/Views/Patient/PatientView.cpp \
+    src/Views/Appointment/AppointmentView.cpp \
+    src/Views/Account/AccountView.cpp \
+    src/Views/Statistic/StatisticView.cpp
 
 # --- Header files ---
 HEADERS += \
@@ -48,4 +66,16 @@ HEADERS += \
     src/DataStructures/LinkList.h \
     src/DataStructures/Queue.h \
     src/Utils/Date.h \
-    src/Utils/libPBL2.h
+    src/Utils/libPBL2.h \
+    src/Controllers/AuthController.h \
+    src/Controllers/DoctorController.h \
+    src/Controllers/PatientController.h \
+    src/Controllers/AppointmentController.h \
+    src/Controllers/StatisticController.h \
+    src/Views/MainWindow.h \
+    src/Views/Login/LoginDialog.h \
+    src/Views/Doctor/DoctorView.h \
+    src/Views/Patient/PatientView.h \
+    src/Views/Appointment/AppointmentView.h \
+    src/Views/Account/AccountView.h \
+    src/Views/Statistic/StatisticView.h

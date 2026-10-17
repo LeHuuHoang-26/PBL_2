@@ -6,9 +6,10 @@
 platforms/
 
 # ================================
-# Executable - Build ra sẽ có
+# Executable & Binaries
 # ================================
 *.exe
+bin/
 
 # ================================
 # Build artifacts
