@@ -4,7 +4,7 @@ Manager *AuthController::authenticate(LinkList<Manager> *managers, const std::st
     if (!managers || !managers->getHeader()) return nullptr;
     auto *node = managers->getHeader()->next;
     while (node && node->next) {
-        if (node->info.isActive() && node->info.isValid(username, password)) return &node->info;
+        if (node->info.getValid() && node->info.isActive() && node->info.isValid(username, password)) return &node->info;
         node = node->next;
     }
     return nullptr;
@@ -40,7 +40,7 @@ bool AuthController::login(LinkList<Manager> *managers, const QString &username,
         n = n->next;
     }
 
-    if (!found) {
+    if (!found || !found->getValid()) {
         errorMessage = QStringLiteral("Tài khoản không tồn tại trên hệ thống!");
         return false;
     }

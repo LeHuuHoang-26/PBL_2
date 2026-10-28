@@ -1,5 +1,6 @@
 #include "Login.h"
 #include "libPBL2.h"
+#include "UIHelper.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -75,61 +76,6 @@ static QIcon createLockIcon() {
     p.setBrush(QColor("#FFFFFF"));
     p.drawEllipse(QPointF(14.0, 15.8), 1.6, 1.6);
     p.drawRect(QRectF(13.2, 15.8, 1.6, 3.0));
-
-    pix.setDevicePixelRatio(2.0);
-    return QIcon(pix);
-}
-
-static QIcon createEyeIcon(bool isVisible) {
-    int size = 56;
-    QPixmap pix(size, size);
-    pix.fill(Qt::transparent);
-    QPainter p(&pix);
-    p.setRenderHint(QPainter::Antialiasing);
-    p.scale(2.0, 2.0); // 28x28 logical canvas
-
-    if (!isVisible) {
-        // --- TRẠNG THÁI MẬT KHẨU ĐANG ẨN (Lucide/Feather Eye-Off tối giản, thanh lịch) ---
-        QColor color("#94A3B8"); // Màu xám slate nhẹ nhàng, đồng bộ màu viền input
-        QPen pen(color, 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-        p.setPen(pen);
-        p.setBrush(Qt::NoBrush);
-
-        // Vòng mí mắt
-        QPainterPath eyePath;
-        eyePath.moveTo(3.5, 14.0);
-        eyePath.quadTo(14.0, 6.5, 24.5, 14.0);
-        eyePath.quadTo(14.0, 21.5, 3.5, 14.0);
-        p.drawPath(eyePath);
-
-        // Con ngươi ở trung tâm
-        p.drawEllipse(QPointF(14.0, 14.0), 3.0, 3.0);
-
-        // Đường gạch chéo thanh lịch cùng màu slate
-        p.drawLine(QPointF(5.0, 5.0), QPointF(23.0, 23.0));
-    } else {
-        // --- TRẠNG THÁI MẬT KHẨU ĐANG HIỆN (Eye-Open màu Teal sáng rõ) ---
-        QColor color("#0D9488");
-        QPen pen(color, 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-        p.setPen(pen);
-        p.setBrush(Qt::NoBrush);
-
-        // Mí mắt mở to tròn
-        QPainterPath eyePath;
-        eyePath.moveTo(3.0, 14.0);
-        eyePath.quadTo(14.0, 6.0, 25.0, 14.0);
-        eyePath.quadTo(14.0, 22.0, 3.0, 14.0);
-        p.drawPath(eyePath);
-
-        // Con ngươi tròn đầy đặn
-        p.setBrush(color);
-        p.drawEllipse(QPointF(14.0, 14.0), 4.2, 4.2);
-
-        // Đốm sáng phản chiếu tạo sức sống cho mắt
-        p.setPen(Qt::NoPen);
-        p.setBrush(QColor("#FFFFFF"));
-        p.drawEllipse(QPointF(15.2, 12.8), 1.2, 1.2);
-    }
 
     pix.setDevicePixelRatio(2.0);
     return QIcon(pix);
@@ -301,7 +247,7 @@ void Login::setupUI() {
     m_txtPassword->setEchoMode(QLineEdit::Password);
     m_txtPassword->setStyleSheet(inputStyle);
     m_txtPassword->addAction(createLockIcon(), QLineEdit::LeadingPosition);
-    m_actionTogglePassword = m_txtPassword->addAction(createEyeIcon(false), QLineEdit::TrailingPosition);
+    m_actionTogglePassword = m_txtPassword->addAction(UIHelper::createEyeIcon(false), QLineEdit::TrailingPosition);
     formLayout->addWidget(m_txtPassword);
 
     formLayout->addSpacing(12);
@@ -453,7 +399,7 @@ void Login::setupConnections() {
 void Login::onTogglePasswordVisibility() {
     m_isPasswordVisible = !m_isPasswordVisible;
     m_txtPassword->setEchoMode(m_isPasswordVisible ? QLineEdit::Normal : QLineEdit::Password);
-    m_actionTogglePassword->setIcon(createEyeIcon(m_isPasswordVisible));
+    m_actionTogglePassword->setIcon(UIHelper::createEyeIcon(m_isPasswordVisible));
 }
 
 void Login::paintEvent(QPaintEvent *event) {

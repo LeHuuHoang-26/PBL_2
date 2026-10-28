@@ -33,6 +33,7 @@ public:
 
 private:
     MainWindow *mainWindow = nullptr;
+    void setupAppointmentCardRow(QTableWidget *table, int row, Appointment *a, const QString &dayText);
 };
 
 #endif // APPOINTMENTVIEW_H

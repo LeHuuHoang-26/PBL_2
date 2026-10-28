@@ -12,7 +12,7 @@ class Patient: public Human {
     public:
         Patient();
         Patient(std::ifstream &f);
-        Patient(std::string id, std::string fullName, std::string phone, bool gender, int age, std::string CCCD);
+        Patient(std::string id, std::string fullName, std::string phone, bool gender, int age, std::string CCCD, bool valid = true);
         Patient(const Patient &P);
         Patient &operator=(const Patient &P) = default;
         ~Patient();

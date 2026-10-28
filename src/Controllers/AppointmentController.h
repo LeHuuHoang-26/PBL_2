@@ -16,7 +16,8 @@ struct HolidayEntry {
 class AppointmentController {
 public:
     static int count(const LinkList<Appointment> *appointments);
-    static int pendingCount(const LinkList<Appointment> *appointments);
+    static int pendingAppointmentCount(const LinkList<Appointment> *appointments);
+    static int pendingCount(const LinkList<Appointment> *appointments) { return pendingAppointmentCount(appointments); }
     static QList<Appointment*> getAppointmentsForDate(const LinkList<Appointment> *appointments, const QDate &targetDate);
     static QList<Appointment*> getUpcomingAppointments(const LinkList<Appointment> *appointments, const QDate &today);
     static void sortAppointmentsByDate(QList<Appointment*> &list);

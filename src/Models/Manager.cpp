@@ -63,19 +63,31 @@ Manager::Manager(ifstream &f) {
     libPBL2::trim(tmp);
     role = roleFromString(tmp);
 
-    if (!getline(f, tmp, '\n')) {
+    string rest;
+    if (!getline(f, rest, '\n')) {
         this->setDefault();
         return;
     }
-    libPBL2::trim(tmp);
-    state = stoi(tmp);
+    auto pipePos = rest.find('|');
+    if (pipePos != string::npos) {
+        string stStr = rest.substr(0, pipePos);
+        libPBL2::trim(stStr);
+        state = stoi(stStr);
+        string vStr = rest.substr(pipePos + 1);
+        libPBL2::trim(vStr);
+        valid = (vStr == "1");
+    } else {
+        libPBL2::trim(rest);
+        state = stoi(rest);
+        valid = true;
+    }
 }
 
-Manager::Manager(string id, string fullName, string phone, bool gender, int age, string username, string password, ManagerRole role, int state)
-    : Human(id, fullName, phone, gender, age), username(username), password(password), role(role), state(state) {}
+Manager::Manager(string id, string fullName, string phone, bool gender, int age, string username, string password, ManagerRole role, int state, bool valid)
+    : Human(id, fullName, phone, gender, age, valid), username(username), password(password), role(role), state(state) {}
 
 Manager::Manager(const Manager &M)
-    : Human(M.id, M.fullName, M.phone, M.gender, M.age), username(M.username), password(M.password), role(M.role), state(M.state) {}
+    : Human(M.id, M.fullName, M.phone, M.gender, M.age, M.valid), username(M.username), password(M.password), role(M.role), state(M.state) {}
 
 Manager::~Manager() {}
 
@@ -99,6 +111,7 @@ void Manager::setDefault() {
     password = "";
     role = ManagerRole::Empty;
     state = 0;
+    valid = true;
 }
 
 bool Manager::isDefault() const {
@@ -119,6 +132,7 @@ Manager &Manager::operator = (const Manager &M) {
         this->phone = M.phone;
         this->gender = M.gender;
         this->age = M.age;
+        this->valid = M.valid;
         this->username = M.username;
         this->password = M.password;
         this->role = M.role;
@@ -144,7 +158,8 @@ void Manager::displayInfo() const {
          << "Age: " << age << "\n"
          << "Username: " << username << "\n"
          << "Role: " << roleToString(role) << "\n"
-         << "State: " << (state ? "Hoat dong" : "Khoa") << "\n";
+         << "State: " << (state ? "Hoat dong" : "Khoa") << "\n"
+         << "Valid: " << (valid ? "1" : "0") << "\n";
 }
 
 string Manager::roleToString(ManagerRole role) {
@@ -177,13 +192,14 @@ string Manager::toString() const {
          + libPBL2::padRightUtf8(username, 20) + " | "
          + libPBL2::padRightUtf8(password, 17) + " | "
          + libPBL2::padRightUtf8(roleNum, 7) + " | "
-         + to_string(state);
+         + libPBL2::padRightUtf8(to_string(state), 8) + " | "
+         + (valid ? "1" : "0");
 }
 
 Manager Manager::loadFromString(const string &str) {
     if (str.empty()) return Manager();
     stringstream ss(str);
-    string id, fullName, phone, genderStr, ageStr, un, pw, roleStr, stateStr;
+    string id, fullName, phone, genderStr, ageStr, un, pw, roleStr, stateStr, validStr;
 
     if (!getline(ss, id, '|') ||
         !getline(ss, fullName, '|') ||
@@ -192,9 +208,21 @@ Manager Manager::loadFromString(const string &str) {
         !getline(ss, ageStr, '|') ||
         !getline(ss, un, '|') ||
         !getline(ss, pw, '|') ||
-        !getline(ss, roleStr, '|') ||
-        !getline(ss, stateStr)) {
+        !getline(ss, roleStr, '|')) {
         return Manager();
+    }
+
+    string rest;
+    if (!getline(ss, rest)) {
+        return Manager();
+    }
+    auto pipePos = rest.find('|');
+    if (pipePos != string::npos) {
+        stateStr = rest.substr(0, pipePos);
+        validStr = rest.substr(pipePos + 1);
+    } else {
+        stateStr = rest;
+        validStr = "1";
     }
 
     libPBL2::trim(id);
@@ -206,6 +234,7 @@ Manager Manager::loadFromString(const string &str) {
     libPBL2::trim(pw);
     libPBL2::trim(roleStr);
     libPBL2::trim(stateStr);
+    libPBL2::trim(validStr);
 
     if (id.empty()) return Manager();
 
@@ -213,8 +242,9 @@ Manager Manager::loadFromString(const string &str) {
     int age = (!ageStr.empty() ? stoi(ageStr) : 0);
     ManagerRole r = roleFromString(roleStr);
     int st = (!stateStr.empty() ? stoi(stateStr) : 0);
+    bool valid = validStr.empty() || (validStr == "1");
 
-    return Manager(id, fullName, phone, gender, age, un, pw, r, st);
+    return Manager(id, fullName, phone, gender, age, un, pw, r, st, valid);
 }
 
 LinkList<Manager>* Manager::loadFromFile(const string &path) {
@@ -249,8 +279,8 @@ bool Manager::saveToFile(const string &path, const LinkList<Manager> *list) {
     if (!f.is_open())
         return false;
 
-    f << "MA_ID  | MA_FullName        | MA_Phone   | MA_Gender | MA_Age    | MA_UserName          | MA_Password       | MA_Role | MA_State\n";
-    f << "-------+--------------------+------------+-----------+-----------+----------------------+-------------------+---------+---------\n";
+    f << "MA_ID  | MA_FullName        | MA_Phone   | MA_Gender | MA_Age    | MA_UserName          | MA_Password       | MA_Role | MA_State | MA_Valid\n";
+    f << "-------+--------------------+------------+-----------+-----------+----------------------+-------------------+---------+----------+---------\n";
 
     LinkList<Manager>::Node *tmp = list->getHeader()->next;
     while (tmp != nullptr && tmp->next != nullptr) {

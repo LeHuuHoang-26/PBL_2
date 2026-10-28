@@ -13,7 +13,14 @@ Patient *PatientController::findById(LinkList<Patient> *patients, const std::str
 }
 
 int PatientController::count(const LinkList<Patient> *patients) {
-    return patients ? patients->count : 0;
+    if (!patients || !patients->getHeader()) return 0;
+    int c = 0;
+    auto *n = patients->getHeader()->next;
+    while (n && n->next) {
+        if (!n->info.isDefault() && n->info.getValid()) c++;
+        n = n->next;
+    }
+    return c;
 }
 
 QStringList PatientController::getSymptomsForPatient(const std::string &patientId,
@@ -88,17 +95,19 @@ void PatientController::updateSymptomStatus(const std::string &patientId,
 
     auto *appointment = aList->getHeader()->next;
     while (appointment && appointment->next) {
-        std::string spId = appointment->info.getSymptomPatientId();
-        int st = appointment->info.getState();
-        auto *record = spList->getHeader()->next;
-        while (record && record->next) {
-            if (record->info.getSP_id() == spId) {
-                if (patientId.empty() || record->info.getP_id() == patientId) {
-                    record->info.setResolved(st);
+        if (!appointment->info.isDefault() && appointment->info.getValid()) {
+            std::string spId = appointment->info.getSymptomPatientId();
+            int st = appointment->info.getState();
+            auto *record = spList->getHeader()->next;
+            while (record && record->next) {
+                if (record->info.getSP_id() == spId) {
+                    if (patientId.empty() || record->info.getP_id() == patientId) {
+                        record->info.setResolved(st);
+                    }
+                    break;
                 }
-                break;
+                record = record->next;
             }
-            record = record->next;
         }
         appointment = appointment->next;
     }

@@ -15,6 +15,7 @@ private:
     Date dateSet;
     Date dateGet;
     int state;
+    bool valid;
 
 public:
     enum State {
@@ -23,7 +24,7 @@ public:
         Completed = 1  // Đã khám
     };
 
-    Appointment(std::string id = "", std::string symptomPatientId = "", std::string doctorId = "", const Date &dateSet = Date(), const Date &dateGet = Date(), int state = 0);
+    Appointment(std::string id = "", std::string symptomPatientId = "", std::string doctorId = "", const Date &dateSet = Date(), const Date &dateGet = Date(), int state = 0, bool valid = true);
 
     std::string getId() const;
     std::string getSymptomPatientId() const;
@@ -31,6 +32,7 @@ public:
     Date getDateSet() const;
     Date getDateGet() const;
     int getState() const;
+    bool getValid() const;
 
     void setId(const std::string &id);
     void setSymptomPatientId(const std::string &spId);
@@ -38,6 +40,7 @@ public:
     void setDateSet(const Date &dateSet);
     void setDateGet(const Date &dateGet);
     void setState(int state);
+    void setValid(bool valid);
 
     std::string getStateString() const;
     static std::string stateToString(int state);

@@ -15,7 +15,14 @@ Manager *ManagerController::findById(LinkList<Manager> *managers, const std::str
 }
 
 int ManagerController::count(const LinkList<Manager> *managers) {
-    return managers ? managers->count : 0;
+    if (!managers || !managers->getHeader()) return 0;
+    int c = 0;
+    auto *n = managers->getHeader()->next;
+    while (n && n->next) {
+        if (!n->info.isDefault() && n->info.getValid()) c++;
+        n = n->next;
+    }
+    return c;
 }
 
 bool ManagerController::setLocked(LinkList<Manager> *managers, const std::string &managerId, bool locked, const std::string &actorId) {

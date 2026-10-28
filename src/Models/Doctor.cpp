@@ -7,13 +7,13 @@
 
 using namespace std;
 
-Doctor::Doctor(string _id, string _fullName, string _phone, bool _gender, int _age, string _spId, bool _state, string _roomId, double _fee, double _rating)
-    : Human(_id, _fullName, _phone, _gender, _age), spId(_spId), state(_state), roomId(_roomId), fee(_fee), rating(_rating) {}
+Doctor::Doctor(string _id, string _fullName, string _phone, bool _gender, int _age, string _spId, bool _state, string _roomId, double _fee, double _rating, bool _valid)
+    : Human(_id, _fullName, _phone, _gender, _age, _valid), spId(_spId), state(_state), roomId(_roomId), fee(_fee), rating(_rating) {}
 
 Doctor::~Doctor() {}
 
 void Doctor::displayInfo() const {
-    cout << "--- DOCTOR (D_ID | D_FullName | D_Phone | D_Gender | D_Age | Sp_ID | D_State | D_RoomID | D_Fee | D_Rating) ---\n"
+    cout << "--- DOCTOR (D_ID | D_FullName | D_Phone | D_Gender | D_Age | Sp_ID | D_State | D_RoomID | D_Fee | D_Rating | D_Valid) ---\n"
          << "D_ID: " << id << "\n"
          << "D_FullName: " << fullName << "\n"
          << "D_Phone: " << phone << "\n"
@@ -23,7 +23,8 @@ void Doctor::displayInfo() const {
          << "D_State: " << (state ? "Dang lam viec" : "Nghi") << "\n"
          << "D_RoomID: " << roomId << "\n"
          << "D_Fee: " << fee << "\n"
-         << "D_Rating: " << rating << "\n";
+         << "D_Rating: " << rating << "\n"
+         << "D_Valid: " << (valid ? "1" : "0") << "\n";
 }
 
 bool Doctor::isDefault() const {
@@ -41,6 +42,7 @@ void Doctor::setDefault() {
     roomId = "";
     fee = 0.0;
     rating = 5.0;
+    valid = true;
 }
 
 string Doctor::getSpId() const { return spId; }
@@ -74,7 +76,8 @@ string Doctor::toString() const {
             ostringstream rss;
             rss << fixed << setprecision(1) << rating;
             return rss.str();
-        }(), 6);
+        }(), 6) << " | "
+        << (valid ? "1" : "0");
     return oss.str();
 }
 
@@ -82,7 +85,7 @@ Doctor Doctor::loadFromString(const string &str) {
     if (str.empty()) return Doctor();
     stringstream ss(str);
     string id, fullName, phone, genderStr, ageStr;
-    string spId, stateStr, roomId, feeStr, ratingStr;
+    string spId, stateStr, roomId, feeStr, ratingStr, validStr;
 
     if (!getline(ss, id, '|') ||
         !getline(ss, fullName, '|') ||
@@ -92,9 +95,21 @@ Doctor Doctor::loadFromString(const string &str) {
         !getline(ss, spId, '|') ||
         !getline(ss, stateStr, '|') ||
         !getline(ss, roomId, '|') ||
-        !getline(ss, feeStr, '|') ||
-        !getline(ss, ratingStr)) {
+        !getline(ss, feeStr, '|')) {
         return Doctor();
+    }
+
+    string rest;
+    if (!getline(ss, rest)) {
+        return Doctor();
+    }
+    auto pipePos = rest.find('|');
+    if (pipePos != string::npos) {
+        ratingStr = rest.substr(0, pipePos);
+        validStr = rest.substr(pipePos + 1);
+    } else {
+        ratingStr = rest;
+        validStr = "1";
     }
 
     libPBL2::trim(id);
@@ -107,6 +122,7 @@ Doctor Doctor::loadFromString(const string &str) {
     libPBL2::trim(roomId);
     libPBL2::trim(feeStr);
     libPBL2::trim(ratingStr);
+    libPBL2::trim(validStr);
 
     if (id.empty()) return Doctor();
 
@@ -115,8 +131,9 @@ Doctor Doctor::loadFromString(const string &str) {
     bool state = (stateStr == "1");
     double fee = (!feeStr.empty() ? stod(feeStr) : 0.0);
     double rating = (!ratingStr.empty() ? stod(ratingStr) : 0.0);
+    bool valid = validStr.empty() || (validStr == "1");
 
-    return Doctor(id, fullName, phone, gender, age, spId, state, roomId, fee, rating);
+    return Doctor(id, fullName, phone, gender, age, spId, state, roomId, fee, rating, valid);
 }
 
 LinkList<Doctor>* Doctor::loadFromFile(const string &path) {
@@ -155,8 +172,8 @@ bool Doctor::saveToFile(const string &path, const LinkList<Doctor> *list) {
     if (!f.is_open())
         return false;
 
-    f << "D_ID   | D_FullName           | D_Phone    | D_Gender | D_Age | Sp_ID  | D_State | Room_ID  | Consultation_Fee | Rating\n";
-    f << "-------+----------------------+------------+----------+-------+--------+---------+----------+------------------+-------\n";
+    f << "D_ID   | D_FullName           | D_Phone    | D_Gender | D_Age | Sp_ID  | D_State | Room_ID  | Consultation_Fee | Rating | D_Valid\n";
+    f << "-------+----------------------+------------+----------+-------+--------+---------+----------+------------------+--------+--------\n";
 
     LinkList<Doctor>::Node *tmp = list->getHeader()->next;
     while (tmp != nullptr && tmp->next != nullptr) {

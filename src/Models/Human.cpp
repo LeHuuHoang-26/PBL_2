@@ -3,8 +3,8 @@
 #include <iostream>
 using namespace std;
 
-Human::Human(string id, string fullName, string phone, bool gender, int age)
-    : id(id), fullName(fullName), phone(phone), gender(gender), age(age) {}
+Human::Human(string id, string fullName, string phone, bool gender, int age, bool valid)
+    : id(id), fullName(fullName), phone(phone), gender(gender), age(age), valid(valid) {}
 
 bool operator ==(const Human &H1, const Human &H2) {
     return H1.fullName  == H2.fullName
@@ -18,7 +18,8 @@ void Human::displayInfo() const {
          << "FullName: " << fullName << "\n"
          << "Phone: " << phone << "\n"
          << "Gender: " << (gender ? "Nam" : "Nu") << "\n"
-         << "Age: " << age << "\n";
+         << "Age: " << age << "\n"
+         << "Valid: " << (valid ? "1" : "0") << "\n";
 }
 
 string Human::getID() const {return this->id;}
@@ -26,9 +27,11 @@ string Human::getfullName() const {return this->fullName;}
 string Human::getPhone() const {return this->phone;}
 bool Human::getGender() const {return this->gender;}
 int Human::getAge() const {return this->age;}
+bool Human::getValid() const {return this->valid;}
 
 void Human::setID(string id) {this->id = id;}
 void Human::setfullName(string fullName) {this->fullName = fullName;}
 void Human::setPhone(string phone) {this->phone = phone;}
 void Human::setGender(bool gender) {this->gender = gender;}
 void Human::setAge(int age) {this->age = age;}
+void Human::setValid(bool valid) {this->valid = valid;}

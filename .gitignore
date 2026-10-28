@@ -32,6 +32,7 @@ qrc_*.cpp
 Thumbs.db
 *.res
 *.rc
+!src/Launcher/launcher.rc
 /.qmake.cache
 /.qmake.stash
 
@@ -72,6 +73,9 @@ CMakeLists.txt.user*
 # --------
 *.dll
 *.exe
+bin/
+release/
+debug/
 
 # Directories with generated files
 .moc/

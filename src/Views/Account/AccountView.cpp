@@ -37,40 +37,6 @@ static const PermissionDef permissionDefinitions[] = {
 };
 static const int permissionDefinitionCount = 5;
 
-static QIcon createEyeIcon(bool isVisible) {
-    int size = 48;
-    QPixmap pix(size, size);
-    pix.fill(Qt::transparent);
-    QPainter p(&pix);
-    p.setRenderHint(QPainter::Antialiasing);
-    p.scale(size / 24.0, size / 24.0);
-
-    QColor color = isVisible ? QColor("#0d9488") : QColor("#94a3b8");
-    QPen pen(color, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-    p.setPen(pen);
-    p.setBrush(Qt::NoBrush);
-
-    QPainterPath eyePath;
-    eyePath.moveTo(3.0, 12.0);
-    eyePath.quadTo(12.0, 5.0, 21.0, 12.0);
-    eyePath.quadTo(12.0, 19.0, 3.0, 12.0);
-    p.drawPath(eyePath);
-
-    if (isVisible) {
-        p.setBrush(color);
-        p.drawEllipse(QPointF(12.0, 12.0), 3.5, 3.5);
-        p.setPen(Qt::NoPen);
-        p.setBrush(Qt::white);
-        p.drawEllipse(QPointF(13.2, 10.8), 1.0, 1.0);
-    } else {
-        p.drawEllipse(QPointF(12.0, 12.0), 2.5, 2.5);
-        p.drawLine(QPointF(4.5, 4.5), QPointF(19.5, 19.5));
-    }
-
-    pix.setDevicePixelRatio(2.0);
-    return QIcon(pix);
-}
-
 AccountView::AccountView(MainWindow *mainWindow, QWidget *parent)
     : QWidget(parent), mainWindow(mainWindow) {
     setupUI();
@@ -112,71 +78,40 @@ void AccountView::setupUI() {
     layout->addLayout(actions);
 
     // Table: Bỏ cột mã, đặt các cột thẳng hàng tương tự tổng quan
-    table = new QTableWidget;
-    table->setColumnCount(4);
-    table->setHorizontalHeaderLabels({"HỌ VÀ TÊN", "TÀI KHOẢN", "VAI TRÒ", "TRẠNG THÁI"});
-    table->verticalHeader()->setVisible(false);
-    table->setSelectionBehavior(QAbstractItemView::SelectRows);
-    table->setSelectionMode(QAbstractItemView::SingleSelection);
-    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    table->setShowGrid(false);
-    table->setFocusPolicy(Qt::NoFocus);
-    table->setStyleSheet(R"(
-        QTableWidget {
-            background-color: transparent;
-            border: none;
-            gridline-color: transparent;
-        }
-        QHeaderView {
-            border: none;
-            background: transparent;
-        }
-        QHeaderView::section {
-            background: #f8fafc;
-            color: #475569;
-            font-weight: 700;
-            font-size: 11.5px;
-            padding: 10px 14px;
-            border: none;
-            border-top: 1px solid #e2e8f0;
-            border-bottom: 2px solid #e2e8f0;
-            border-left: none;
-            border-right: none;
-        }
-        QTableWidget::item {
-            background: #ffffff;
-            border: none;
-            border-bottom: 1px solid #f1f5f9;
-            border-left: none;
-            border-right: none;
-            padding-left: 14px;
-            padding-right: 14px;
-            color: #1e293b;
-            font-size: 13px;
-        }
-        QTableWidget::item:hover {
-            background: #f0fdfa;
-        }
-        QTableWidget::item:selected {
-            background-color: #ccfbf1;
-            color: #0f766e;
-            font-weight: 700;
-        }
-    )");
+    table = UIHelper::table({"HỌ VÀ TÊN", "TÀI KHOẢN", "VAI TRÒ", "TRẠNG THÁI", ""});
+    table->setCursor(Qt::PointingHandCursor);
     table->setWordWrap(false);
     table->setTextElideMode(Qt::ElideRight);
-    table->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    table->verticalHeader()->setDefaultSectionSize(48);
+
     if (table->horizontalHeaderItem(0)) table->horizontalHeaderItem(0)->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     if (table->horizontalHeaderItem(1)) table->horizontalHeaderItem(1)->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     if (table->horizontalHeaderItem(2)) table->horizontalHeaderItem(2)->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     if (table->horizontalHeaderItem(3)) table->horizontalHeaderItem(3)->setTextAlignment(Qt::AlignCenter);
-    table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
-    table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
-    table->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
-    table->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Fixed);
-    table->setColumnWidth(3, 160);
-    table->verticalHeader()->setDefaultSectionSize(48);
-    layout->addWidget(table, 1);
+    if (table->horizontalHeaderItem(4)) table->horizontalHeaderItem(4)->setTextAlignment(Qt::AlignCenter);
+
+    // Tự động scale các cột sao cho tổng chiều rộng các cột luôn bằng chính xác chiều rộng bảng
+    UIHelper::setupTableScaling(table, {0.30, 0.26, 0.26, 0.18}, 56);
+
+    // Kích hoạt tính năng click tiêu đề cột để QuickSort
+    table->horizontalHeader()->setSectionsClickable(true);
+    table->horizontalHeader()->setSortIndicatorShown(false);
+    table->horizontalHeader()->setCursor(Qt::PointingHandCursor);
+    connect(table->horizontalHeader(), &QHeaderView::sectionClicked, this, [this](int logicalIndex) {
+        if (logicalIndex == 4) return; // Bỏ qua cột thao tác xóa
+        if (sortColumn == logicalIndex) {
+            sortOrder = (sortOrder == Qt::AscendingOrder) ? Qt::DescendingOrder : Qt::AscendingOrder;
+        } else {
+            sortColumn = logicalIndex;
+            sortOrder = Qt::AscendingOrder;
+        }
+        currentPage = 0;
+        refresh();
+    });
+
+    // Khung thẻ bo tròn hoàn thiện 4 góc, chống tràn viền
+    auto *tableCard = UIHelper::createTableCard(table);
+    layout->addWidget(tableCard, 1);
 
     // Pagination: Thêm page với stack là 8
     auto *pagination = new QHBoxLayout;
@@ -215,8 +150,9 @@ void AccountView::setupUI() {
         refresh();
     });
 
-    // Dup click vào hàng thì có thể sửa thông tin
-    connect(table, &QTableWidget::cellDoubleClicked, this, [this](int row, int) {
+    // Dup click vào hàng thì có thể sửa thông tin (bỏ qua cột xóa)
+    connect(table, &QTableWidget::cellDoubleClicked, this, [this](int row, int col) {
+        if (col == 4) return;
         if (row < 0 || row >= table->rowCount()) return;
         auto *item = table->item(row, 0);
         if (!item) return;
@@ -236,10 +172,44 @@ void AccountView::refresh() {
     QList<Manager*> allList;
     auto *n = managers->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.isDefault()) {
+        if (!n->info.isDefault() && n->info.getValid()) {
             allList.append(&n->info);
         }
         n = n->next;
+    }
+
+    // Sắp xếp danh sách tài khoản bằng QuickSort mẫu (Template QuickSort)
+    if (sortColumn >= 0) {
+        UIHelper::quickSort(allList, [this](const Manager *a, const Manager *b) -> bool {
+            if (a == b) return false;
+            bool asc = (sortOrder == Qt::AscendingOrder);
+            switch (sortColumn) {
+                case 0: { // Họ và tên
+                    int cmp = UIHelper::compareVietnameseNames(UIHelper::qs(a->getfullName()), UIHelper::qs(b->getfullName()));
+                    if (cmp != 0) return asc ? (cmp < 0) : (cmp > 0);
+                    break;
+                }
+                case 1: { // Tài khoản (Username)
+                    int cmp = QString::localeAwareCompare(UIHelper::qs(a->getUsername()), UIHelper::qs(b->getUsername()));
+                    if (cmp != 0) return asc ? (cmp < 0) : (cmp > 0);
+                    break;
+                }
+                case 2: { // Vai trò
+                    if (static_cast<int>(a->getRole()) != static_cast<int>(b->getRole()))
+                        return asc ? (static_cast<int>(a->getRole()) < static_cast<int>(b->getRole()))
+                                   : (static_cast<int>(a->getRole()) > static_cast<int>(b->getRole()));
+                    break;
+                }
+                case 3: { // Trạng thái
+                    if (a->getState() != b->getState())
+                        return asc ? (a->getState() < b->getState()) : (a->getState() > b->getState());
+                    break;
+                }
+                default:
+                    break;
+            }
+            return asc ? (a->getID() < b->getID()) : (a->getID() > b->getID());
+        });
     }
 
     int total = allList.size();
@@ -295,163 +265,68 @@ void AccountView::refresh() {
         sf.setWeight(QFont::Bold);
         item3->setFont(sf);
         table->setItem(r, 3, item3);
+
+        // Cột 4: Nút xóa tài khoản (icon thùng rác đỏ)
+        auto action = UIHelper::createActionCell(UIHelper::trashIcon(), "Xóa tài khoản");
+        connect(action.second, &QPushButton::clicked, this, [this, m]() {
+            if (!mainWindow) return;
+            Manager *cur = mainWindow->getCurrentManager();
+            if (cur && cur->getID() == m->getID()) {
+                UIHelper::showWarning(this, "Không thể xóa", "Bạn không thể xóa tài khoản hiện đang đăng nhập vào hệ thống.");
+                return;
+            }
+            if (ManagerController::isRootAdmin(m)) {
+                UIHelper::showWarning(this, "Không thể xóa", "Không thể xóa tài khoản Quản trị viên gốc của hệ thống.");
+                return;
+            }
+            QString name = UIHelper::qs(m->getfullName());
+            if (!UIHelper::confirmDelete(this, "Xác nhận xóa tài khoản",
+                QStringLiteral("Bạn có chắc chắn muốn xóa tài khoản \"%1\" khỏi hệ thống?\nTài khoản sau khi xóa sẽ bị vô hiệu hóa hoàn toàn.").arg(name),
+                "Xóa tài khoản", "Không xóa")) {
+                return;
+            }
+            m->setValid(false);
+            mainWindow->saveAll();
+            refresh();
+        });
+        table->setCellWidget(r, 4, action.first);
     }
 }
 
-void AccountView::addManagerDialog() {
-    if (!mainWindow) return;
+namespace {
 
-    QDialog dialog(this);
-    dialog.setWindowTitle("Thêm tài khoản quản lý mới");
-    dialog.setFixedWidth(540);
-    dialog.setStyleSheet(R"(
-        QDialog {
-            background-color: #f8fafc;
-            font-family: 'Segoe UI', sans-serif;
-        }
-        QLineEdit, QSpinBox, QComboBox {
-            background: #ffffff;
-            border: 1.5px solid #cbd5e1;
-            border-radius: 8px;
-            padding: 8px 12px;
-            font-size: 13px;
-            color: #0f172a;
-            min-height: 20px;
-        }
-        QLineEdit:focus, QSpinBox:focus, QComboBox:focus {
-            border: 1.5px solid #0d9488;
-            background: #ffffff;
-        }
-        QLineEdit:disabled, QSpinBox:disabled, QComboBox:disabled {
-            background: #f1f5f9;
-            color: #64748b;
-        }
-        QSpinBox {
-            padding-right: 30px;
-        }
-        QSpinBox::up-button {
-            subcontrol-origin: border;
-            subcontrol-position: top right;
-            width: 25px;
-            border-left: 1.5px solid #94a3b8;
-            border-bottom: 1px solid #94a3b8;
-            border-top-right-radius: 7px;
-            background: #e2e8f0;
-        }
-        QSpinBox::up-button:hover {
-            background: #0d9488;
-        }
-        QSpinBox::up-button:hover QSpinBox::up-arrow {
-            image: url(:/assets/textures/arrow_up_white.png);
-        }
-        QSpinBox::up-button:pressed {
-            background: #0f766e;
-        }
-        QSpinBox::up-arrow {
-            image: url(:/assets/textures/arrow_up_dark.png);
-            width: 9px;
-            height: 9px;
-        }
-        QSpinBox::down-button {
-            subcontrol-origin: border;
-            subcontrol-position: bottom right;
-            width: 25px;
-            border-left: 1.5px solid #94a3b8;
-            border-bottom-right-radius: 7px;
-            background: #e2e8f0;
-        }
-        QSpinBox::down-button:hover {
-            background: #0d9488;
-        }
-        QSpinBox::down-button:hover QSpinBox::down-arrow {
-            image: url(:/assets/textures/arrow_down_white.png);
-        }
-        QSpinBox::down-button:pressed {
-            background: #0f766e;
-        }
-        QSpinBox::down-arrow {
-            image: url(:/assets/textures/arrow_down_dark.png);
-            width: 9px;
-            height: 9px;
-        }
-        QComboBox {
-            padding-right: 28px;
-        }
-        QComboBox:disabled {
-            background: #f1f5f9;
-            color: #94a3b8;
-            border-color: #e2e8f0;
-        }
-        QComboBox::drop-down {
-            subcontrol-origin: border;
-            subcontrol-position: top right;
-            width: 28px;
-            border: none;
-            background: transparent;
-        }
-        QComboBox::drop-down:disabled {
-            width: 0px;
-            border: none;
-        }
-        QComboBox::down-arrow {
-            image: url(:/assets/textures/arrow_down_dark.png);
-            width: 11px;
-            height: 11px;
-            margin-right: 8px;
-        }
-        QComboBox::down-arrow:disabled {
-            image: none;
-        }
-        QComboBox QAbstractItemView {
-            background: #ffffff;
-            border: 1.5px solid #cbd5e1;
-            border-radius: 8px;
-            selection-background-color: #0d9488;
-            selection-color: #ffffff;
-            outline: none;
-            padding: 4px;
-        }
-        QComboBox QAbstractItemView::item {
-            min-height: 28px;
-            padding-left: 8px;
-            border-radius: 6px;
-        }
-        QComboBox QAbstractItemView::item:hover {
-            background: #f0fdfa;
-            color: #0d9488;
-        }
-    )");
+struct PermCheckItem {
+    QCheckBox *box = nullptr;
+    QSpinBox *spin = nullptr;
+};
 
-    auto *root = new QVBoxLayout(&dialog);
-    root->setContentsMargins(24, 22, 24, 22);
-    root->setSpacing(16);
+struct ManagerFormData {
+    QLineEdit *name = nullptr;
+    QLineEdit *phone = nullptr;
+    QSpinBox *age = nullptr;
+    QComboBox *gender = nullptr;
+    QLineEdit *username = nullptr;
+    QLineEdit *password = nullptr;
+    QComboBox *role = nullptr;
+    QComboBox *statusCombo = nullptr;
+};
 
-    // Header Banner
-    auto *headerBox = new QHBoxLayout;
-    headerBox->setSpacing(12);
-
-    auto *icon = new QLabel("➕");
-    icon->setFixedSize(46, 46);
-    icon->setAlignment(Qt::AlignCenter);
-    icon->setStyleSheet("background: #f0fdfa; border: 1.5px solid #99f6e4; border-radius: 12px; font-size: 20px;");
-
-    auto *titleCol = new QVBoxLayout;
-    titleCol->setSpacing(2);
-    auto *title = new QLabel("Thêm tài khoản quản lý mới");
-    title->setStyleSheet("font-size: 18px; font-weight: 800; color: #0f172a;");
-    auto *sub = new QLabel("Tạo tài khoản người dùng nhân viên mới cho hệ thống");
-    sub->setStyleSheet("font-size: 12.5px; color: #64748b;");
-    titleCol->addWidget(title);
-    titleCol->addWidget(sub);
-
-    headerBox->addWidget(icon);
-    headerBox->addLayout(titleCol, 1);
-    root->addLayout(headerBox);
-
-    // Form Container
+QFrame *createManagerFormCard(ManagerFormData &form,
+                              bool isEditMode = false,
+                              const QString &initName = "",
+                              const QString &initPhone = "",
+                              int initAge = 28,
+                              bool initGender = true,
+                              const QString &initUsername = "",
+                              const QString &initPassword = "",
+                              ManagerRole initRole = ManagerRole::Receptionist,
+                              bool initActive = true,
+                              bool disableUsername = false,
+                              bool disableRole = false,
+                              bool disableStatus = false) {
     auto *card = new QFrame;
-    card->setObjectName("addCard");
-    card->setStyleSheet("QFrame#addCard { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; }");
+    card->setObjectName("managerCard");
+    card->setStyleSheet("QFrame#managerCard { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; }");
     auto *cardLayout = new QVBoxLayout(card);
     cardLayout->setContentsMargins(20, 18, 20, 20);
     cardLayout->setSpacing(12);
@@ -466,45 +341,181 @@ void AccountView::addManagerDialog() {
         return col;
     };
 
-    auto *name = new QLineEdit;
-    auto *phone = new QLineEdit;
+    form.name = new QLineEdit(initName);
+    form.phone = new QLineEdit(initPhone);
+    form.phone->setPlaceholderText("Ví dụ: 0905123456");
+    UIHelper::setupPhoneInput(form.phone);
     auto *row1 = new QHBoxLayout;
     row1->setSpacing(12);
-    row1->addLayout(makeField("HỌ VÀ TÊN *", name), 3);
-    row1->addLayout(makeField("SỐ ĐIỆN THOẠI *", phone), 2);
+    row1->addLayout(makeField("HỌ VÀ TÊN *", form.name), 3);
+    row1->addLayout(makeField("SỐ ĐIỆN THOẠI *", form.phone), 2);
     cardLayout->addLayout(row1);
 
-    auto *age = new QSpinBox;
-    age->setRange(18, 120);
-    age->setValue(28);
+    form.age = new QSpinBox;
+    form.age->setRange(18, 120);
+    form.age->setValue(initAge);
 
-    auto *gender = new QComboBox;
-    gender->addItems({"Nam", "Nữ"});
+    form.gender = new QComboBox;
+    form.gender->addItems({"Nam", "Nữ"});
+    form.gender->setCurrentIndex(initGender ? 0 : 1);
 
-    auto *username = new QLineEdit;
+    form.username = new QLineEdit(initUsername);
+    if (disableUsername) {
+        form.username->setEnabled(false);
+    }
 
     auto *row2 = new QHBoxLayout;
     row2->setSpacing(12);
-    row2->addLayout(makeField("TUỔI", age), 1);
-    row2->addLayout(makeField("GIỚI TÍNH", gender), 1);
-    row2->addLayout(makeField("TÊN ĐĂNG NHẬP *", username), 2);
+    row2->addLayout(makeField("TUỔI", form.age), 1);
+    row2->addLayout(makeField("GIỚI TÍNH", form.gender), 1);
+    row2->addLayout(makeField("TÊN ĐĂNG NHẬP *", form.username), 2);
     cardLayout->addLayout(row2);
 
-    auto *password = new QLineEdit;
-    password->setEchoMode(QLineEdit::Normal);
-    auto *toggleAddAction = password->addAction(createEyeIcon(true), QLineEdit::TrailingPosition);
-    connect(toggleAddAction, &QAction::triggered, password, [password, toggleAddAction]() {
-        bool isNormal = (password->echoMode() == QLineEdit::Normal);
-        password->setEchoMode(isNormal ? QLineEdit::Password : QLineEdit::Normal);
-        toggleAddAction->setIcon(createEyeIcon(!isNormal));
+    form.password = new QLineEdit(initPassword);
+    form.password->setEchoMode(QLineEdit::Normal);
+    auto *toggleAction = form.password->addAction(UIHelper::createEyeIcon(true), QLineEdit::TrailingPosition);
+    QObject::connect(toggleAction, &QAction::triggered, form.password, [pwd = form.password, toggleAction]() {
+        bool isNormal = (pwd->echoMode() == QLineEdit::Normal);
+        pwd->setEchoMode(isNormal ? QLineEdit::Password : QLineEdit::Normal);
+        toggleAction->setIcon(UIHelper::createEyeIcon(!isNormal));
     });
-    cardLayout->addLayout(makeField("MẬT KHẨU *", password));
+    cardLayout->addLayout(makeField("MẬT KHẨU *", form.password));
 
-    auto *role = new QComboBox;
-    role->addItems({"Lễ tân", "Lễ tân chuyên trách", "Quản trị viên"});
-    cardLayout->addLayout(makeField("VAI TRÒ HỆ THỐNG", role));
+    form.role = new QComboBox;
+    form.role->addItems({"Lễ tân", "Lễ tân chuyên trách", "Quản trị viên"});
+    int roleIdx = (initRole == ManagerRole::Administrator) ? 2 :
+                  ((initRole == ManagerRole::SpecialReceptionist) ? 1 : 0);
+    form.role->setCurrentIndex(roleIdx);
+    if (disableRole) {
+        form.role->setEnabled(false);
+    }
 
-    root->addWidget(card);
+    if (isEditMode) {
+        form.statusCombo = new QComboBox;
+        form.statusCombo->addItems({"Hoạt động", "Đã khóa"});
+        form.statusCombo->setCurrentIndex(initActive ? 0 : 1);
+        if (disableStatus) {
+            form.statusCombo->setEnabled(false);
+        }
+
+        auto *row3 = new QHBoxLayout;
+        row3->setSpacing(12);
+        row3->addLayout(makeField("VAI TRÒ HỆ THỐNG", form.role), 1);
+        row3->addLayout(makeField("TRẠNG THÁI TÀI KHOẢN", form.statusCombo), 1);
+        cardLayout->addLayout(row3);
+    } else {
+        cardLayout->addLayout(makeField("VAI TRÒ HỆ THỐNG", form.role));
+    }
+
+    return card;
+}
+
+bool validateManagerInput(QWidget *parent, LinkList<Manager> *managers,
+                          const QString &name, const QString &phone,
+                          const QString &username, const QString &password,
+                          const std::string &excludeId = "") {
+    if (name.trimmed().isEmpty() || phone.trimmed().isEmpty() ||
+        username.trimmed().isEmpty() || password.trimmed().isEmpty()) {
+        UIHelper::showWarning(parent, "Thiếu thông tin", "Vui lòng nhập đầy đủ các thông tin bắt buộc.");
+        return false;
+    }
+    if (phone.trimmed().length() != 10) {
+        UIHelper::showWarning(parent, "Số điện thoại không hợp lệ", "Số điện thoại phải gồm đúng 10 chữ số.");
+        return false;
+    }
+
+    std::string newUsername = UIHelper::ss(username.trimmed());
+    if (managers) {
+        auto *n = managers->getHeader()->next;
+        while (n && n->next) {
+            if (n->info.getValid() && (excludeId.empty() || n->info.getID() != excludeId) &&
+                n->info.getUsername() == newUsername) {
+                UIHelper::showWarning(parent, "Trùng tài khoản", "Tên đăng nhập này đã được sử dụng. Vui lòng chọn tên khác.");
+                return false;
+            }
+            n = n->next;
+        }
+    }
+    return true;
+}
+
+void buildPermissionsSection(QVBoxLayout *layout, const std::string &managerId, QList<PermCheckItem> &checks) {
+    auto *permDivider = new QFrame;
+    permDivider->setFrameShape(QFrame::HLine);
+    permDivider->setStyleSheet("background-color: #f1f5f9; max-height: 1px; border: none; margin: 4px 0;");
+    layout->addWidget(permDivider);
+
+    auto *permTitle = new QLabel("Phân quyền nâng cao (Quản trị viên gốc)");
+    permTitle->setStyleSheet("font-size: 13px; font-weight: 750; color: #0d9488;");
+    layout->addWidget(permTitle);
+
+    QStringList granted = ManagerController::getGrantedPermissions(managerId, "Data/PermissionManager.txt");
+
+    for (int i = 0; i < permissionDefinitionCount; ++i) {
+        const auto &entry = permissionDefinitions[i];
+        auto *check = new QCheckBox(QString::fromUtf8(entry.name));
+        check->setStyleSheet("QCheckBox { font-size: 12.5px; color: #334155; } QCheckBox:hover { color: #0d9488; }");
+        check->setChecked(granted.contains(QString::fromUtf8(entry.id)));
+        check->setProperty("permissionId", QString::fromUtf8(entry.id));
+        layout->addWidget(check);
+
+        QSpinBox *duration = nullptr;
+        if (std::string(entry.id) == "Per_1") {
+            auto *durRow = new QHBoxLayout;
+            durRow->setContentsMargins(20, 0, 0, 0);
+            auto *durLbl = new QLabel("Thời hạn hiệu lực (ngày):");
+            durLbl->setStyleSheet("font-size: 12px; color: #64748b; font-weight: 600;");
+            duration = new QSpinBox;
+            duration->setRange(1, 3650);
+            duration->setValue(30);
+            durRow->addWidget(durLbl);
+            durRow->addWidget(duration);
+            durRow->addStretch();
+            layout->addLayout(durRow);
+
+            durLbl->setVisible(check->isChecked());
+            duration->setVisible(check->isChecked());
+            QObject::connect(check, &QCheckBox::toggled, [durLbl, duration](bool c) {
+                durLbl->setVisible(c);
+                duration->setVisible(c);
+            });
+        }
+        checks.append({check, duration});
+    }
+}
+
+void savePermissionsFromChecks(const std::string &managerId, const QList<PermCheckItem> &checks) {
+    QList<PermissionRecord> newGrants;
+    for (const auto &entry : checks) {
+        if (entry.box && entry.box->isChecked()) {
+            std::string expiry;
+            if (entry.spin) {
+                expiry = UIHelper::ss(QDateTime::currentDateTime().addDays(entry.spin->value()).toString(Qt::ISODate));
+            }
+            newGrants.append({managerId, UIHelper::ss(entry.box->property("permissionId").toString()), expiry});
+        }
+    }
+    ManagerController::savePermissions(managerId, newGrants, "Data/PermissionManager.txt");
+}
+
+} // namespace
+
+void AccountView::addManagerDialog() {
+    if (!mainWindow) return;
+
+    QDialog dialog(this);
+    dialog.setWindowTitle("Thêm tài khoản quản lý mới");
+    dialog.setFixedWidth(540);
+    dialog.setStyleSheet(UIHelper::dialogFormStyle());
+
+    auto *root = new QVBoxLayout(&dialog);
+    root->setContentsMargins(24, 22, 24, 22);
+    root->setSpacing(16);
+
+    root->addLayout(UIHelper::createDialogHeader("➕", "Thêm tài khoản quản lý mới", "Tạo tài khoản người dùng nhân viên mới cho hệ thống"));
+
+    ManagerFormData form;
+    root->addWidget(createManagerFormCard(form, false));
 
     // Buttons
     auto *btnBox = new QHBoxLayout;
@@ -516,34 +527,24 @@ void AccountView::addManagerDialog() {
     auto *saveBtn = new QPushButton("＋  Tạo tài khoản");
     saveBtn->setStyleSheet("QPushButton { background: #0d9488; border: none; border-radius: 8px; padding: 9px 22px; font-size: 13px; font-weight: 700; color: white; } QPushButton:hover { background: #0f766e; }");
 
-    connect(saveBtn, &QPushButton::clicked, &dialog, [this, &dialog, name, phone, username, password, age, gender, role] {
-        if (name->text().trimmed().isEmpty() || phone->text().trimmed().isEmpty() ||
-            username->text().trimmed().isEmpty() || password->text().isEmpty()) {
-            QMessageBox::warning(&dialog, "Thiếu thông tin", "Vui lòng nhập đầy đủ các thông tin bắt buộc.");
-            return;
-        }
+    connect(saveBtn, &QPushButton::clicked, &dialog, [this, &dialog, &form] {
         auto *managers = mainWindow->getManagers();
-        if (managers) {
-            auto *n = managers->getHeader()->next;
-            while (n && n->next) {
-                if (n->info.getUsername() == UIHelper::ss(username->text().trimmed())) {
-                    QMessageBox::warning(&dialog, "Trùng tài khoản", "Tên đăng nhập này đã được sử dụng. Vui lòng chọn tên khác.");
-                    return;
-                }
-                n = n->next;
-            }
+        if (!validateManagerInput(&dialog, managers, form.name->text(), form.phone->text(), form.username->text(), form.password->text())) {
+            return;
         }
 
         std::string id = ManagerController::generateNextId(managers);
-        ManagerRole r = role->currentIndex() == 2 ? ManagerRole::Administrator :
-                       (role->currentIndex() == 1 ? ManagerRole::SpecialReceptionist : ManagerRole::Receptionist);
+        ManagerRole r = form.role->currentIndex() == 2 ? ManagerRole::Administrator :
+                       (form.role->currentIndex() == 1 ? ManagerRole::SpecialReceptionist : ManagerRole::Receptionist);
 
         if (managers) {
-            managers->insert(Manager(id, UIHelper::ss(name->text().trimmed()), UIHelper::ss(phone->text().trimmed()), gender->currentIndex() == 0, age->value(), UIHelper::ss(username->text().trimmed()), UIHelper::ss(password->text()), r, 1));
+            managers->insert(Manager(id, UIHelper::ss(form.name->text().trimmed()), UIHelper::ss(form.phone->text().trimmed()),
+                                     form.gender->currentIndex() == 0, form.age->value(),
+                                     UIHelper::ss(form.username->text().trimmed()), UIHelper::ss(form.password->text()), r, 1));
         }
         mainWindow->saveAll();
         dialog.accept();
-        QMessageBox::information(this, "Thành công", "Tài khoản quản lý mới đã được tạo thành công.");
+        UIHelper::showSuccess(this, "Thành công", "Tài khoản quản lý mới đã được tạo thành công.");
     });
 
     btnBox->addWidget(cancelBtn);
@@ -571,287 +572,42 @@ void AccountView::editManagerDialog(const std::string &managerId) {
 
     // Nếu sửa tài khoản MA_001 mà bản thân không phải root admin thì không có quyền
     if (isTargetRoot && !isCurrentRoot) {
-        QMessageBox::warning(this, "Không có quyền", "Chỉ quản trị viên gốc mới có quyền chỉnh sửa tài khoản này.");
+        UIHelper::showWarning(this, "Không có quyền", "Chỉ quản trị viên gốc mới có quyền chỉnh sửa tài khoản này.");
         return;
     }
 
     QDialog dialog(this);
     dialog.setWindowTitle("Chỉnh sửa thông tin tài khoản");
     dialog.setFixedWidth(540);
-    dialog.setStyleSheet(R"(
-        QDialog {
-            background-color: #f8fafc;
-            font-family: 'Segoe UI', sans-serif;
-        }
-        QLineEdit, QSpinBox, QComboBox {
-            background: #ffffff;
-            border: 1.5px solid #cbd5e1;
-            border-radius: 8px;
-            padding: 8px 12px;
-            font-size: 13px;
-            color: #0f172a;
-            min-height: 20px;
-        }
-        QLineEdit:focus, QSpinBox:focus, QComboBox:focus {
-            border: 1.5px solid #0d9488;
-            background: #ffffff;
-        }
-        QLineEdit:disabled, QSpinBox:disabled, QComboBox:disabled {
-            background: #f1f5f9;
-            color: #64748b;
-        }
-        QSpinBox {
-            padding-right: 30px;
-        }
-        QSpinBox::up-button {
-            subcontrol-origin: border;
-            subcontrol-position: top right;
-            width: 25px;
-            border-left: 1.5px solid #94a3b8;
-            border-bottom: 1px solid #94a3b8;
-            border-top-right-radius: 7px;
-            background: #e2e8f0;
-        }
-        QSpinBox::up-button:hover {
-            background: #0d9488;
-        }
-        QSpinBox::up-button:hover QSpinBox::up-arrow {
-            image: url(:/assets/textures/arrow_up_white.png);
-        }
-        QSpinBox::up-button:pressed {
-            background: #0f766e;
-        }
-        QSpinBox::up-arrow {
-            image: url(:/assets/textures/arrow_up_dark.png);
-            width: 9px;
-            height: 9px;
-        }
-        QSpinBox::down-button {
-            subcontrol-origin: border;
-            subcontrol-position: bottom right;
-            width: 25px;
-            border-left: 1.5px solid #94a3b8;
-            border-bottom-right-radius: 7px;
-            background: #e2e8f0;
-        }
-        QSpinBox::down-button:hover {
-            background: #0d9488;
-        }
-        QSpinBox::down-button:hover QSpinBox::down-arrow {
-            image: url(:/assets/textures/arrow_down_white.png);
-        }
-        QSpinBox::down-button:pressed {
-            background: #0f766e;
-        }
-        QSpinBox::down-arrow {
-            image: url(:/assets/textures/arrow_down_dark.png);
-            width: 9px;
-            height: 9px;
-        }
-        QComboBox {
-            padding-right: 28px;
-        }
-        QComboBox:disabled {
-            background: #f1f5f9;
-            color: #94a3b8;
-            border-color: #e2e8f0;
-        }
-        QComboBox::drop-down {
-            subcontrol-origin: border;
-            subcontrol-position: top right;
-            width: 28px;
-            border: none;
-            background: transparent;
-        }
-        QComboBox::drop-down:disabled {
-            width: 0px;
-            border: none;
-        }
-        QComboBox::down-arrow {
-            image: url(:/assets/textures/arrow_down_dark.png);
-            width: 11px;
-            height: 11px;
-            margin-right: 8px;
-        }
-        QComboBox::down-arrow:disabled {
-            image: none;
-        }
-        QComboBox QAbstractItemView {
-            background: #ffffff;
-            border: 1.5px solid #cbd5e1;
-            border-radius: 8px;
-            selection-background-color: #0d9488;
-            selection-color: #ffffff;
-            outline: none;
-            padding: 4px;
-        }
-        QComboBox QAbstractItemView::item {
-            min-height: 28px;
-            padding-left: 8px;
-            border-radius: 6px;
-        }
-        QComboBox QAbstractItemView::item:hover {
-            background: #f0fdfa;
-            color: #0d9488;
-        }
-    )");
+    dialog.setStyleSheet(UIHelper::dialogFormStyle());
 
     auto *root = new QVBoxLayout(&dialog);
     root->setContentsMargins(24, 22, 24, 22);
     root->setSpacing(16);
 
-    // Header Banner
-    auto *headerBox = new QHBoxLayout;
-    headerBox->setSpacing(12);
+    root->addLayout(UIHelper::createDialogHeader("👤", "Chỉnh sửa thông tin tài khoản", "Cập nhật thông tin quản lý, vai trò và trạng thái hoạt động"));
 
-    auto *icon = new QLabel("👤");
-    icon->setFixedSize(46, 46);
-    icon->setAlignment(Qt::AlignCenter);
-    icon->setStyleSheet("background: #f0fdfa; border: 1.5px solid #99f6e4; border-radius: 12px; font-size: 22px;");
+    ManagerFormData form;
+    auto *card = createManagerFormCard(form, true,
+                                       UIHelper::qs(targetMgr->getfullName()),
+                                       UIHelper::qs(targetMgr->getPhone()),
+                                       targetMgr->getAge(),
+                                       targetMgr->getGender(),
+                                       UIHelper::qs(targetMgr->getUsername()),
+                                       UIHelper::qs(targetMgr->getPassword()),
+                                       targetMgr->getRole(),
+                                       targetMgr->isActive(),
+                                       isTargetRoot,
+                                       isTargetRoot,
+                                       isTargetRoot || isSelf);
 
-    auto *titleCol = new QVBoxLayout;
-    titleCol->setSpacing(2);
-    auto *title = new QLabel("Chỉnh sửa thông tin tài khoản");
-    title->setStyleSheet("font-size: 18px; font-weight: 800; color: #0f172a;");
-    auto *sub = new QLabel("Cập nhật thông tin quản lý, vai trò và trạng thái hoạt động");
-    sub->setStyleSheet("font-size: 12.5px; color: #64748b;");
-    titleCol->addWidget(title);
-    titleCol->addWidget(sub);
-
-    headerBox->addWidget(icon);
-    headerBox->addLayout(titleCol, 1);
-    root->addLayout(headerBox);
-
-    // Card Container
-    auto *card = new QFrame;
-    card->setObjectName("editCard");
-    card->setStyleSheet("QFrame#editCard { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; }");
-    auto *cardLayout = new QVBoxLayout(card);
-    cardLayout->setContentsMargins(20, 18, 20, 20);
-    cardLayout->setSpacing(12);
-
-    auto makeField = [](const QString &labelText, QWidget *inputWidget) {
-        auto *col = new QVBoxLayout;
-        col->setSpacing(5);
-        auto *lbl = new QLabel(labelText);
-        lbl->setStyleSheet("font-weight: 700; font-size: 12px; color: #475569;");
-        col->addWidget(lbl);
-        col->addWidget(inputWidget);
-        return col;
-    };
-
-    auto *name = new QLineEdit(UIHelper::qs(targetMgr->getfullName()));
-    auto *phone = new QLineEdit(UIHelper::qs(targetMgr->getPhone()));
-    auto *row1 = new QHBoxLayout;
-    row1->setSpacing(12);
-    row1->addLayout(makeField("HỌ VÀ TÊN *", name), 3);
-    row1->addLayout(makeField("SỐ ĐIỆN THOẠI *", phone), 2);
-    cardLayout->addLayout(row1);
-
-    auto *age = new QSpinBox;
-    age->setRange(18, 120);
-    age->setValue(targetMgr->getAge());
-
-    auto *gender = new QComboBox;
-    gender->addItems({"Nam", "Nữ"});
-    gender->setCurrentIndex(targetMgr->getGender() ? 0 : 1);
-
-    auto *username = new QLineEdit(UIHelper::qs(targetMgr->getUsername()));
-    if (isTargetRoot) {
-        username->setEnabled(false); // Không đổi username của root admin
-    }
-
-    auto *row2 = new QHBoxLayout;
-    row2->setSpacing(12);
-    row2->addLayout(makeField("TUỔI", age), 1);
-    row2->addLayout(makeField("GIỚI TÍNH", gender), 1);
-    row2->addLayout(makeField("TÊN ĐĂNG NHẬP *", username), 2);
-    cardLayout->addLayout(row2);
-
-    auto *password = new QLineEdit(UIHelper::qs(targetMgr->getPassword()));
-    password->setEchoMode(QLineEdit::Normal);
-    auto *toggleEditAction = password->addAction(createEyeIcon(true), QLineEdit::TrailingPosition);
-    connect(toggleEditAction, &QAction::triggered, password, [password, toggleEditAction]() {
-        bool isNormal = (password->echoMode() == QLineEdit::Normal);
-        password->setEchoMode(isNormal ? QLineEdit::Password : QLineEdit::Normal);
-        toggleEditAction->setIcon(createEyeIcon(!isNormal));
-    });
-    cardLayout->addLayout(makeField("MẬT KHẨU *", password));
-
-    auto *role = new QComboBox;
-    role->addItems({"Lễ tân", "Lễ tân chuyên trách", "Quản trị viên"});
-    int roleIdx = (targetMgr->getRole() == ManagerRole::Administrator) ? 2 :
-                  ((targetMgr->getRole() == ManagerRole::SpecialReceptionist) ? 1 : 0);
-    role->setCurrentIndex(roleIdx);
-    if (isTargetRoot) {
-        role->setEnabled(false); // Root admin luôn là Administrator
-    }
-
-    auto *statusCombo = new QComboBox;
-    statusCombo->addItems({"Hoạt động", "Đã khóa"});
-    statusCombo->setCurrentIndex(targetMgr->isActive() ? 0 : 1);
-    if (isTargetRoot || isSelf) {
-        statusCombo->setEnabled(false); // Không khóa root admin hoặc chính mình
-    }
-
-    auto *row3 = new QHBoxLayout;
-    row3->setSpacing(12);
-    row3->addLayout(makeField("VAI TRÒ HỆ THỐNG", role), 1);
-    row3->addLayout(makeField("TRẠNG THÁI TÀI KHOẢN", statusCombo), 1);
-    cardLayout->addLayout(row3);
-
-    // Phân quyền đặc biệt: Hiển thị khi Root Admin chỉnh sửa tài khoản nhân viên
-    struct PermCheckItem {
-        QCheckBox *box;
-        QSpinBox *spin;
-    };
     auto *checks = new QList<PermCheckItem>;
-
     if (isCurrentRoot && !isTargetRoot) {
-        auto *permDivider = new QFrame;
-        permDivider->setFrameShape(QFrame::HLine);
-        permDivider->setStyleSheet("background-color: #f1f5f9; max-height: 1px; border: none; margin: 4px 0;");
-        cardLayout->addWidget(permDivider);
-
-        auto *permTitle = new QLabel("Phân quyền nâng cao (Quản trị viên gốc)");
-        permTitle->setStyleSheet("font-size: 13px; font-weight: 750; color: #0d9488;");
-        cardLayout->addWidget(permTitle);
-
-        QStringList granted = ManagerController::getGrantedPermissions(managerId, "Data/PermissionManager.txt");
-
-        for (int i = 0; i < permissionDefinitionCount; ++i) {
-            const auto &entry = permissionDefinitions[i];
-            auto *check = new QCheckBox(QString::fromUtf8(entry.name));
-            check->setStyleSheet("QCheckBox { font-size: 12.5px; color: #334155; } QCheckBox:hover { color: #0d9488; }");
-            check->setChecked(granted.contains(QString::fromUtf8(entry.id)));
-            check->setProperty("permissionId", QString::fromUtf8(entry.id));
-            cardLayout->addWidget(check);
-
-            QSpinBox *duration = nullptr;
-            if (std::string(entry.id) == "Per_1") {
-                auto *durRow = new QHBoxLayout;
-                durRow->setContentsMargins(20, 0, 0, 0);
-                auto *durLbl = new QLabel("Thời hạn hiệu lực (ngày):");
-                durLbl->setStyleSheet("font-size: 12px; color: #64748b; font-weight: 600;");
-                duration = new QSpinBox;
-                duration->setRange(1, 3650);
-                duration->setValue(30);
-                durRow->addWidget(durLbl);
-                durRow->addWidget(duration);
-                durRow->addStretch();
-                cardLayout->addLayout(durRow);
-
-                durLbl->setVisible(check->isChecked());
-                duration->setVisible(check->isChecked());
-                connect(check, &QCheckBox::toggled, [durLbl, duration](bool c) {
-                    durLbl->setVisible(c);
-                    duration->setVisible(c);
-                });
-            }
-            checks->append({check, duration});
+        auto *cardLayout = qobject_cast<QVBoxLayout*>(card->layout());
+        if (cardLayout) {
+            buildPermissionsSection(cardLayout, managerId, *checks);
         }
     }
-
     root->addWidget(card);
 
     // Buttons
@@ -864,63 +620,38 @@ void AccountView::editManagerDialog(const std::string &managerId) {
     auto *saveBtn = new QPushButton("✓  Lưu thay đổi");
     saveBtn->setStyleSheet("QPushButton { background: #0d9488; border: none; border-radius: 8px; padding: 9px 22px; font-size: 13px; font-weight: 700; color: white; } QPushButton:hover { background: #0f766e; }");
 
-    connect(saveBtn, &QPushButton::clicked, &dialog, [this, &dialog, targetMgr, managerId, name, phone, age, gender, username, password, role, statusCombo, isTargetRoot, isSelf, isCurrentRoot, checks] {
-        if (name->text().trimmed().isEmpty() || phone->text().trimmed().isEmpty() ||
-            username->text().trimmed().isEmpty() || password->text().trimmed().isEmpty()) {
-            QMessageBox::warning(&dialog, "Thiếu thông tin", "Vui lòng nhập đầy đủ các thông tin bắt buộc.");
+    connect(saveBtn, &QPushButton::clicked, &dialog, [this, &dialog, targetMgr, managerId, &form, isTargetRoot, isSelf, isCurrentRoot, checks] {
+        auto *managers = mainWindow->getManagers();
+        if (!validateManagerInput(&dialog, managers, form.name->text(), form.phone->text(), form.username->text(), form.password->text(), targetMgr->getID())) {
             return;
         }
 
-        std::string newUsername = UIHelper::ss(username->text().trimmed());
-        if (newUsername != targetMgr->getUsername()) {
-            auto *managers = mainWindow->getManagers();
-            if (managers) {
-                auto *n = managers->getHeader()->next;
-                while (n && n->next) {
-                    if (n->info.getID() != targetMgr->getID() && n->info.getUsername() == newUsername) {
-                        QMessageBox::warning(&dialog, "Trùng tài khoản", "Tên đăng nhập này đã được sử dụng. Vui lòng chọn tên khác.");
-                        return;
-                    }
-                    n = n->next;
-                    }
-            }
-        }
-
-        targetMgr->setfullName(UIHelper::ss(name->text().trimmed()));
-        targetMgr->setPhone(UIHelper::ss(phone->text().trimmed()));
-        targetMgr->setAge(age->value());
-        targetMgr->setGender(gender->currentIndex() == 0);
+        std::string newUsername = UIHelper::ss(form.username->text().trimmed());
+        targetMgr->setfullName(UIHelper::ss(form.name->text().trimmed()));
+        targetMgr->setPhone(UIHelper::ss(form.phone->text().trimmed()));
+        targetMgr->setAge(form.age->value());
+        targetMgr->setGender(form.gender->currentIndex() == 0);
         targetMgr->setUsername(newUsername);
-        targetMgr->setPassword(UIHelper::ss(password->text().trimmed()));
+        targetMgr->setPassword(UIHelper::ss(form.password->text().trimmed()));
 
         if (!isTargetRoot) {
-            ManagerRole r = (role->currentIndex() == 2) ? ManagerRole::Administrator :
-                           ((role->currentIndex() == 1) ? ManagerRole::SpecialReceptionist : ManagerRole::Receptionist);
+            ManagerRole r = (form.role->currentIndex() == 2) ? ManagerRole::Administrator :
+                           ((form.role->currentIndex() == 1) ? ManagerRole::SpecialReceptionist : ManagerRole::Receptionist);
             targetMgr->setRole(r);
         }
 
-        if (!isTargetRoot && !isSelf) {
-            targetMgr->setState(statusCombo->currentIndex() == 0 ? 1 : 0);
+        if (!isTargetRoot && !isSelf && form.statusCombo) {
+            targetMgr->setState(form.statusCombo->currentIndex() == 0 ? 1 : 0);
         }
 
         if (isCurrentRoot && !isTargetRoot) {
-            QList<PermissionRecord> newGrants;
-            for (const auto &entry : *checks) {
-                if (entry.box->isChecked()) {
-                    std::string expiry;
-                    if (entry.spin) {
-                        expiry = UIHelper::ss(QDateTime::currentDateTime().addDays(entry.spin->value()).toString(Qt::ISODate));
-                    }
-                    newGrants.append({managerId, UIHelper::ss(entry.box->property("permissionId").toString()), expiry});
-                }
-            }
-            ManagerController::savePermissions(managerId, newGrants, "Data/PermissionManager.txt");
+            savePermissionsFromChecks(managerId, *checks);
         }
 
         mainWindow->saveAll();
         refresh();
         dialog.accept();
-        QMessageBox::information(this, "Thành công", "Thông tin tài khoản đã được cập nhật thành công.");
+        UIHelper::showSuccess(this, "Thành công", "Thông tin tài khoản đã được cập nhật thành công.");
     });
 
     btnBox->addWidget(cancelBtn);

@@ -319,6 +319,8 @@ QString MainWindow::style() const
             QTableWidget { background: white; border: 1px solid #e2e8f0; border-radius: 12px; gridline-color: transparent; selection-background-color: #f1f5f9; selection-color: #17334a; }
             QHeaderView { border: none; background: transparent; }
             QHeaderView::section { background: #f8fafc; color: #475569; border: none; border-bottom: 2px solid #e2e8f0; border-left: none; border-right: none; padding: 12px 20px; font-size: 12px; font-weight: 700; letter-spacing: 0.5px; }
+            QHeaderView::section:hover { background-color: #f1f5f9; color: #0d9488; }
+            QHeaderView::up-arrow, QHeaderView::down-arrow { image: none; width: 0px; height: 0px; padding: 0px; margin: 0px; }
             QTableWidget::item { padding: 4px 8px; font-size: 13.5px; color: #1e293b; border: none; border-bottom: 1px solid #f1f5f9; border-left: none; border-right: none; }
             QTableWidget::item:hover { background-color: #f8fafc; }
             QFrame#card, QFrame#panel { background: white; border: 1px solid #e2e8f0; border-radius: 14px; }
@@ -326,6 +328,44 @@ QString MainWindow::style() const
             QLabel#metricLabel { color: #64748b; font-size: 12px; font-weight: 700; letter-spacing: 0.5px; }
             QLabel#pill { background: #e6f5f2; color: #14756e; border-radius: 10px; padding: 5px 9px; font-size: 11px; font-weight: 700; }
             QCheckBox { spacing: 9px; }
+            QMessageBox {
+                background-color: #ffffff;
+                border: 1px solid #cbd5e1;
+                border-radius: 12px;
+            }
+            QMessageBox QLabel {
+                color: #0f172a;
+                font-size: 13.5px;
+                background: transparent;
+            }
+            QMessageBox QPushButton {
+                background-color: #f1f5f9;
+                color: #334155;
+                border: 1.5px solid #cbd5e1;
+                border-radius: 8px;
+                padding: 8px 18px;
+                font-size: 13px;
+                font-weight: 600;
+                min-width: 80px;
+                min-height: 22px;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #e2e8f0;
+                color: #0f172a;
+                border-color: #94a3b8;
+            }
+            QMessageBox QPushButton:pressed {
+                background-color: #cbd5e1;
+            }
+            QMessageBox QPushButton:default {
+                background-color: #0d9488;
+                color: #ffffff;
+                border: none;
+                font-weight: 700;
+            }
+            QMessageBox QPushButton:default:hover {
+                background-color: #0f766e;
+            }
         )");
 }
 
@@ -375,7 +415,7 @@ void MainWindow::handleLogin()
     if (!loginView) return;
     loginView->clearMessage();
 
-    QString username = loginView->getUsername();
+    QString username = loginView->getUsername().trimmed();
     QString password = loginView->getPassword();
 
     QString errorMessage;
@@ -509,76 +549,8 @@ void MainWindow::handleLogout()
     }
 }
 
-// --- SHELL GIAO DIỆN CHÍNH ---
-void MainWindow::setupShell()
+QFrame *MainWindow::createUserCardWidget()
 {
-    if (root)
-    {
-        if (windowStack)
-            windowStack->removeWidget(root);
-        delete root;
-        root = nullptr;
-    }
-
-    root = new QWidget;
-    root->setObjectName("appRoot");
-
-    auto *outer = new QHBoxLayout(root);
-    outer->setContentsMargins(0, 0, 0, 0);
-    outer->setSpacing(0);
-
-    sidebar = new QFrame;
-    sidebar->setObjectName("sidebar");
-    sidebar->setFixedWidth(238);
-
-    auto *side = new QVBoxLayout(sidebar);
-    side->setContentsMargins(18, 22, 18, 16);
-    side->setSpacing(8);
-
-    // Tiêu đề thương hiệu chuẩn ✦ AN TÂM
-    auto *brand = new QLabel("✦  AN TÂM");
-    brand->setObjectName("brand");
-    auto *brandSub = new QLabel("PHÒNG KHÁM ĐA KHOA");
-    brandSub->setObjectName("brandSub");
-    side->addWidget(brand);
-    side->addWidget(brandSub);
-    side->addSpacing(27);
-
-    navButtons.clear();
-    const QStringList labels = {
-        "⌂   Tổng quan",
-        "＋   Đặt lịch khám",
-        "♡   Bệnh nhân",
-        "✚   Bác sĩ",
-        "▤   Quản lý lịch khám",
-        "📊   Thống kê"};
-    for (int i = 0; i < labels.size(); ++i)
-    {
-        auto *b = button(labels[i], "nav");
-        navButtons.push_back(b);
-        connect(b, &QPushButton::clicked, this, [this, i]
-        {
-            refreshPage(i);
-            setPage(i);
-        });
-        side->addWidget(b);
-    }
-
-    if (isAdministrator())
-    {
-        auto *b = button("♙   Quản lý tài khoản", "nav");
-        navButtons.push_back(b);
-        connect(b, &QPushButton::clicked, this, [this]
-        {
-            refreshPage(6);
-            setPage(6);
-        });
-        side->addWidget(b);
-    }
-
-    side->addStretch();
-
-    // Khung tài khoản góc dưới bên trái (nhích lên phía trên thời gian thực)
     QFrame *userCard = new QFrame;
     userCard->setObjectName("userCard");
     userCard->setStyleSheet(R"(
@@ -636,11 +608,11 @@ void MainWindow::setupShell()
         )");
     connect(logout, &QPushButton::clicked, this, &MainWindow::handleLogout);
     userLayout->addWidget(logout);
-    side->addWidget(userCard);
+    return userCard;
+}
 
-    side->addSpacing(8);
-
-    // Khung thời gian thực phía dưới account
+QFrame *MainWindow::createTimeCardWidget()
+{
     QFrame *timeCard = new QFrame;
     timeCard->setObjectName("timeCard");
     timeCard->setStyleSheet(R"(
@@ -689,17 +661,76 @@ void MainWindow::setupShell()
     clockTimer->start(1000);
     updateClock();
 
-    side->addWidget(timeCard);
+    return timeCard;
+}
 
+QWidget *MainWindow::createSidebar()
+{
+    sidebar = new QFrame;
+    sidebar->setObjectName("sidebar");
+    sidebar->setFixedWidth(238);
+
+    auto *side = new QVBoxLayout(sidebar);
+    side->setContentsMargins(18, 22, 18, 16);
+    side->setSpacing(8);
+
+    // Tiêu đề thương hiệu chuẩn ✦ AN TÂM
+    auto *brand = new QLabel("✦  AN TÂM");
+    brand->setObjectName("brand");
+    auto *brandSub = new QLabel("PHÒNG KHÁM ĐA KHOA");
+    brandSub->setObjectName("brandSub");
+    side->addWidget(brand);
+    side->addWidget(brandSub);
+    side->addSpacing(27);
+
+    navButtons.clear();
+    const QStringList labels = {
+        "⌂   Tổng quan",
+        "＋   Đặt lịch khám",
+        "♡   Bệnh nhân",
+        "✚   Bác sĩ",
+        "▤   Quản lý lịch khám",
+        "📊   Thống kê"};
+    for (int i = 0; i < labels.size(); ++i)
+    {
+        auto *b = button(labels[i], "nav");
+        navButtons.push_back(b);
+        connect(b, &QPushButton::clicked, this, [this, i]
+        {
+            refreshPage(i);
+            setPage(i);
+        });
+        side->addWidget(b);
+    }
+
+    if (isAdministrator())
+    {
+        auto *b = button("♙   Quản lý tài khoản", "nav");
+        navButtons.push_back(b);
+        connect(b, &QPushButton::clicked, this, [this]
+        {
+            refreshPage(6);
+            setPage(6);
+        });
+        side->addWidget(b);
+    }
+
+    side->addStretch();
+    side->addWidget(createUserCardWidget());
+    side->addSpacing(8);
+    side->addWidget(createTimeCardWidget());
+
+    return sidebar;
+}
+
+void MainWindow::setupPages()
+{
     pages = new QStackedWidget;
-    outer->addWidget(sidebar);
-    outer->addWidget(pages, 1);
 
     // Khởi tạo các Views từ từng module
     appointmentView = new AppointmentView(this, this);
 
     pages->addWidget(appointmentView->createDashboardWidget(pages)); // index 0: Tổng quan
-
     pages->addWidget(appointmentView->createBookingWidget(pages)); // index 1: Đặt lịch khám
 
     patientView = new PatientView(this, pages);
@@ -718,6 +749,29 @@ void MainWindow::setupShell()
         accountView = new AccountView(this, pages);
         pages->addWidget(accountView); // index 6: Quản lý tài khoản
     }
+}
+
+// --- SHELL GIAO DIỆN CHÍNH ---
+void MainWindow::setupShell()
+{
+    if (root)
+    {
+        if (windowStack)
+            windowStack->removeWidget(root);
+        delete root;
+        root = nullptr;
+    }
+
+    root = new QWidget;
+    root->setObjectName("appRoot");
+
+    auto *outer = new QHBoxLayout(root);
+    outer->setContentsMargins(0, 0, 0, 0);
+    outer->setSpacing(0);
+
+    outer->addWidget(createSidebar());
+    setupPages();
+    outer->addWidget(pages, 1);
 
     if (windowStack)
     {
@@ -791,7 +845,7 @@ void MainWindow::saveAll()
               Appointment::saveToFile(appointmentPath, appointments);
     if (!ok)
     {
-        QMessageBox::warning(this, "Lỗi lưu dữ liệu", "Không thể lưu một hoặc nhiều tệp dữ liệu.");
+        UIHelper::showWarning(this, "Lỗi lưu dữ liệu", "Không thể lưu một hoặc nhiều tệp dữ liệu.");
     }
 }
 
@@ -838,7 +892,7 @@ bool MainWindow::initApp()
     bool ok = managers && patients && doctors && symptoms && symptomPatients && appointments;
     if (!ok)
     {
-        QMessageBox::critical(this, "Lỗi dữ liệu", "Không thể nạp dữ liệu từ thư mục Data/! Vui lòng đảm bảo tệp dữ liệu tồn tại và ứng dụng được khởi chạy từ đúng thư mục.");
+        UIHelper::showNoticeDialog(this, "Lỗi dữ liệu", "Không thể nạp dữ liệu từ thư mục Data/! Vui lòng đảm bảo tệp dữ liệu tồn tại và ứng dụng được khởi chạy từ đúng thư mục.", UIHelper::DialogType::Danger);
         return false;
     }
 

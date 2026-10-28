@@ -230,67 +230,9 @@ void StatisticView::setupUI() {
     rootLayout->addWidget(scrollArea);
 }
 
-void StatisticView::refresh() {
-    if (!mainWindow || !scrollArea) return;
-
-    // Xóa nội dung cũ một cách an toàn thông qua cấu trúc QObject
-    if (contentWidget) {
-        delete contentWidget;
-        contentWidget = nullptr;
-        contentLayout = nullptr;
-    }
-
-    contentWidget = new QWidget;
-    contentWidget->setStyleSheet("background-color: #f8fafc;");
-    contentLayout = new QVBoxLayout(contentWidget);
-    contentLayout->setContentsMargins(36, 28, 36, 32);
-    contentLayout->setSpacing(20);
-    scrollArea->setWidget(contentWidget);
-
-    auto *patients = mainWindow->getPatients();
-    auto *doctors = mainWindow->getDoctors();
-    auto *appts = mainWindow->getAppointments();
-
-    QDate curDate = QDate::currentDate();
-    QTime curTime = QTime::currentTime();
-    int curDay = curDate.day();
-    int curMonth = curDate.month();
-    int curYear = curDate.year();
-    int curHour = curTime.hour();
-    int curMin = curTime.minute();
-
-    // 1. Dữ liệu tính toán từ StatisticController
-    double totalRev = StatisticController::totalRevenue(appts, doctors);
-    double todayRev = StatisticController::todayRevenue(appts, doctors, curDay, curMonth, curYear);
-    int compDone = 0, compTotalUntilNow = 0;
-    double compRate = StatisticController::completionRate(appts, curDay, curMonth, curYear, curHour, curMin, compDone, compTotalUntilNow);
-
-    int completed = 0, pending = 0, delayed = 0;
-    StatisticController::appointmentStatusCounts(appts, completed, pending, delayed, curDay, curMonth, curYear, curHour, curMin);
-    int totalAppts = completed + pending + delayed;
-
-    int totalToday = 0, completedToday = 0, pendingToday = 0;
-    StatisticController::todayAppointmentCounts(appts, curDay, curMonth, curYear, totalToday, completedToday, pendingToday);
-
-    int male = 0, female = 0;
-    StatisticController::patientGenderCounts(patients, male, female);
-    int totalPatients = male + female;
-
-    int under18 = 0, from18to45 = 0, from46to60 = 0, over60 = 0;
-    StatisticController::patientAgeDistribution(patients, under18, from18to45, from46to60, over60);
-
-    // 2. Header Tiêu đề
-    auto *headerBox = new QVBoxLayout;
-    headerBox->setSpacing(4);
-    auto *title = new QLabel("Thống kê & Báo cáo");
-    title->setObjectName("pageTitle");
-    auto *subtitle = new QLabel("Phân tích tổng hợp hiệu suất khám bệnh, doanh thu và đặc điểm nhân khẩu học bệnh nhân.");
-    subtitle->setObjectName("pageSubtitle");
-    headerBox->addWidget(title);
-    headerBox->addWidget(subtitle);
-    contentLayout->addLayout(headerBox);
-
-    // 3. Hàng 4 Thẻ chỉ số nổi bật (Top KPI Cards)
+QGridLayout *StatisticView::buildKpiGrid(double totalRev, double todayRev, double compRate,
+                                         int compDone, int compTotalUntilNow, int totalToday,
+                                         int completedToday, int pendingToday, int pending) {
     auto *kpiGrid = new QGridLayout;
     kpiGrid->setSpacing(16);
 
@@ -337,9 +279,13 @@ void StatisticView::refresh() {
     QString pendStr = QStringLiteral("%1 ca").arg(pending);
     kpiGrid->addWidget(makeKpiCard(pendStr, "ĐANG CHỜ TIẾP NHẬN", "Lịch hẹn sắp tới chưa khám", "#ea580c"), 0, 3);
 
-    contentLayout->addLayout(kpiGrid);
+    return kpiGrid;
+}
 
-    // 4. Hàng 2 Card: Trạng thái lịch khám & Nhân khẩu học bệnh nhân
+QHBoxLayout *StatisticView::buildStatusAndDemographicsRow(int completed, int pending, int delayed,
+                                                         int totalAppts, int male, int female,
+                                                         int totalPatients, int under18,
+                                                         int from18to45, int from46to60, int over60) {
     auto *row1 = new QHBoxLayout;
     row1->setSpacing(16);
 
@@ -469,13 +415,17 @@ void StatisticView::refresh() {
     demoLayout->addLayout(ageSection);
 
     row1->addWidget(demoCard, 1);
-    contentLayout->addLayout(row1);
+    return row1;
+}
 
-    // 5. Hàng 2 Card: Nhu cầu theo Chuyên khoa & Bảng xếp hạng Bác sĩ
+QHBoxLayout *StatisticView::buildSpecialtyAndLeaderboardRow(int totalAppts) {
+    auto *appts = mainWindow->getAppointments();
+    auto *doctors = mainWindow->getDoctors();
+
     auto *row2 = new QHBoxLayout;
     row2->setSpacing(16);
 
-    // Card Nhu cầu Chuyên khoa (bỏ % theo yêu cầu)
+    // Card Nhu cầu Chuyên khoa
     auto *specCard = UIHelper::panel();
     specCard->setStyleSheet("QFrame#panel { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; }");
     auto *specLayout = new QVBoxLayout(specCard);
@@ -577,9 +527,11 @@ void StatisticView::refresh() {
     docLayout->addStretch();
     row2->addWidget(docCard, 1);
 
-    contentLayout->addLayout(row2);
+    return row2;
+}
 
-    // 6. Xu hướng lịch khám 7 ngày gần nhất (Weekly Trend)
+QFrame *StatisticView::buildWeeklyTrendCard(const QDate &curDate, int curDay, int curMonth, int curYear) {
+    auto *appts = mainWindow->getAppointments();
     auto *trendCard = UIHelper::panel();
     trendCard->setStyleSheet("QFrame#panel { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; }");
     auto *trendLayout = new QVBoxLayout(trendCard);
@@ -603,5 +555,72 @@ void StatisticView::refresh() {
     trendChart->setData(weekCounts, weekDates);
     trendLayout->addWidget(trendChart);
 
-    contentLayout->addWidget(trendCard);
+    return trendCard;
+}
+
+void StatisticView::refresh() {
+    if (!mainWindow || !scrollArea) return;
+
+    // Xóa nội dung cũ một cách an toàn thông qua cấu trúc QObject
+    if (contentWidget) {
+        delete contentWidget;
+        contentWidget = nullptr;
+        contentLayout = nullptr;
+    }
+
+    contentWidget = new QWidget;
+    contentWidget->setStyleSheet("background-color: #f8fafc;");
+    contentLayout = new QVBoxLayout(contentWidget);
+    contentLayout->setContentsMargins(36, 28, 36, 32);
+    contentLayout->setSpacing(20);
+    scrollArea->setWidget(contentWidget);
+
+    auto *patients = mainWindow->getPatients();
+    auto *doctors = mainWindow->getDoctors();
+    auto *appts = mainWindow->getAppointments();
+
+    QDate curDate = QDate::currentDate();
+    QTime curTime = QTime::currentTime();
+    int curDay = curDate.day();
+    int curMonth = curDate.month();
+    int curYear = curDate.year();
+    int curHour = curTime.hour();
+    int curMin = curTime.minute();
+
+    // 1. Dữ liệu tính toán từ StatisticController
+    double totalRev = StatisticController::totalRevenue(appts, doctors);
+    double todayRev = StatisticController::todayRevenue(appts, doctors, curDay, curMonth, curYear);
+    int compDone = 0, compTotalUntilNow = 0;
+    double compRate = StatisticController::completionRate(appts, curDay, curMonth, curYear, curHour, curMin, compDone, compTotalUntilNow);
+
+    int completed = 0, pending = 0, delayed = 0;
+    StatisticController::appointmentStatusCounts(appts, completed, pending, delayed, curDay, curMonth, curYear, curHour, curMin);
+    int totalAppts = completed + pending + delayed;
+
+    int totalToday = 0, completedToday = 0, pendingToday = 0;
+    StatisticController::todayAppointmentCounts(appts, curDay, curMonth, curYear, totalToday, completedToday, pendingToday);
+
+    int male = 0, female = 0;
+    StatisticController::patientGenderCounts(patients, male, female);
+    int totalPatients = male + female;
+
+    int under18 = 0, from18to45 = 0, from46to60 = 0, over60 = 0;
+    StatisticController::patientAgeDistribution(patients, under18, from18to45, from46to60, over60);
+
+    // 2. Header Tiêu đề
+    auto *headerBox = new QVBoxLayout;
+    headerBox->setSpacing(4);
+    auto *title = new QLabel("Thống kê & Báo cáo");
+    title->setObjectName("pageTitle");
+    auto *subtitle = new QLabel("Phân tích tổng hợp hiệu suất khám bệnh, doanh thu và đặc điểm nhân khẩu học bệnh nhân.");
+    subtitle->setObjectName("pageSubtitle");
+    headerBox->addWidget(title);
+    headerBox->addWidget(subtitle);
+    contentLayout->addLayout(headerBox);
+
+    // 3. Các phân vùng giao diện được tách thành hàm riêng biệt
+    contentLayout->addLayout(buildKpiGrid(totalRev, todayRev, compRate, compDone, compTotalUntilNow, totalToday, completedToday, pendingToday, pending));
+    contentLayout->addLayout(buildStatusAndDemographicsRow(completed, pending, delayed, totalAppts, male, female, totalPatients, under18, from18to45, from46to60, over60));
+    contentLayout->addLayout(buildSpecialtyAndLeaderboardRow(totalAppts));
+    contentLayout->addWidget(buildWeeklyTrendCard(curDate, curDay, curMonth, curYear));
 }

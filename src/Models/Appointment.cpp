@@ -7,8 +7,8 @@
 
 using namespace std;
 
-Appointment::Appointment(string id, string symptomPatientId, string doctorId, const Date &dateSet, const Date &dateGet, int state)
-    : id(id), symptomPatientId(symptomPatientId), doctorId(doctorId), dateSet(dateSet), dateGet(dateGet), state(state) {}
+Appointment::Appointment(string id, string symptomPatientId, string doctorId, const Date &dateSet, const Date &dateGet, int state, bool valid)
+    : id(id), symptomPatientId(symptomPatientId), doctorId(doctorId), dateSet(dateSet), dateGet(dateGet), state(state), valid(valid) {}
 
 string Appointment::getId() const { return id; }
 string Appointment::getSymptomPatientId() const { return symptomPatientId; }
@@ -16,6 +16,7 @@ string Appointment::getDoctorId() const { return doctorId; }
 Date Appointment::getDateSet() const { return dateSet; }
 Date Appointment::getDateGet() const { return dateGet; }
 int Appointment::getState() const { return state; }
+bool Appointment::getValid() const { return valid; }
 
 void Appointment::setId(const string &value) { id = value; }
 void Appointment::setSymptomPatientId(const string &value) { symptomPatientId = value; }
@@ -23,6 +24,7 @@ void Appointment::setDoctorId(const string &value) { doctorId = value; }
 void Appointment::setDateSet(const Date &value) { dateSet = value; }
 void Appointment::setDateGet(const Date &value) { dateGet = value; }
 void Appointment::setState(int value) { state = value; }
+void Appointment::setValid(bool value) { valid = value; }
 
 string Appointment::stateToString(int s) {
     switch (s) {
@@ -68,7 +70,8 @@ void Appointment::displayInfo() const {
          << "D_ID: " << doctorId << "\n"
          << "A_DateSet: " << dateSet.toString() << "\n"
          << "A_DateGet: " << dateGet.toString() << "\n"
-         << "A_State: " << state << "\n";
+         << "A_State: " << state << "\n"
+         << "A_Valid: " << (valid ? "1" : "0") << "\n";
 }
 
 bool Appointment::isDefault() const {
@@ -82,6 +85,7 @@ void Appointment::setDefault() {
     dateSet = Date();
     dateGet = Date();
     state = 0;
+    valid = true;
 }
 
 string Appointment::toString() const {
@@ -94,21 +98,34 @@ string Appointment::toString() const {
          + libPBL2::padRightUtf8(doctorId, 5) + " | "
          + libPBL2::padRightUtf8(dateSet.toString(), 16) + " | "
          + libPBL2::padRightUtf8(dateGet.toString(), 16) + " | "
-         + stStr;
+         + stStr + " |       "
+         + (valid ? "1" : "0");
 }
 
 Appointment Appointment::loadFromString(const string &str) {
     if (str.empty()) return Appointment();
     stringstream ss(str);
-    string id, spId, doctorId, dateSetStr, dateGetStr, stateStr;
+    string id, spId, doctorId, dateSetStr, dateGetStr, stateStr, validStr;
 
     if (!getline(ss, id, '|') ||
         !getline(ss, spId, '|') ||
         !getline(ss, doctorId, '|') ||
         !getline(ss, dateSetStr, '|') ||
-        !getline(ss, dateGetStr, '|') ||
-        !getline(ss, stateStr)) {
+        !getline(ss, dateGetStr, '|')) {
         return Appointment();
+    }
+
+    string rest;
+    if (!getline(ss, rest)) {
+        return Appointment();
+    }
+    auto pipePos = rest.find('|');
+    if (pipePos != string::npos) {
+        stateStr = rest.substr(0, pipePos);
+        validStr = rest.substr(pipePos + 1);
+    } else {
+        stateStr = rest;
+        validStr = "1";
     }
 
     libPBL2::trim(id);
@@ -117,6 +134,7 @@ Appointment Appointment::loadFromString(const string &str) {
     libPBL2::trim(dateSetStr);
     libPBL2::trim(dateGetStr);
     libPBL2::trim(stateStr);
+    libPBL2::trim(validStr);
 
     if (id.empty() || spId.empty() || doctorId.empty())
         return Appointment();
@@ -124,8 +142,9 @@ Appointment Appointment::loadFromString(const string &str) {
     Date dSet = Date::loadFromString(dateSetStr);
     Date dGet = Date::loadFromString(dateGetStr);
     int st = (!stateStr.empty() ? stoi(stateStr) : 0);
+    bool valid = validStr.empty() || (validStr == "1");
 
-    return Appointment(id, spId, doctorId, dSet, dGet, st);
+    return Appointment(id, spId, doctorId, dSet, dGet, st, valid);
 }
 
 LinkList<Appointment>* Appointment::loadFromFile(const string &path) {
@@ -164,8 +183,8 @@ bool Appointment::saveToFile(const string &path, const LinkList<Appointment> *li
     if (!f.is_open())
         return false;
 
-    f << "A_ID  | SP_ID  | D_ID  | A_DateSet        | A_DateGet        | A_State\n";
-    f << "------+--------+-------+------------------+------------------+---------\n";
+    f << "A_ID  | SP_ID  | D_ID  | A_DateSet        | A_DateGet        | A_State | A_Valid\n";
+    f << "------+--------+-------+------------------+------------------+---------+--------\n";
 
     LinkList<Appointment>::Node *tmp = list->getHeader()->next;
     while (tmp != nullptr && tmp->next != nullptr) {

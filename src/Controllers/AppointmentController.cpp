@@ -1,21 +1,31 @@
 #include "AppointmentController.h"
+#include "Appointment.h"
+#include "Date.h"
 #include "libPBL2.h"
+#include "UIHelper.h"
 #include <QDateTime>
-#include <QTime>
 #include <fstream>
 #include <sstream>
-#include <cstdio>
+#include <algorithm>
+#include <cctype>
 
 int AppointmentController::count(const LinkList<Appointment> *appointments) {
-    return appointments ? appointments->count : 0;
-}
-
-int AppointmentController::pendingCount(const LinkList<Appointment> *appointments) {
     if (!appointments || !appointments->getHeader()) return 0;
     int c = 0;
     auto *n = appointments->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.isDefault() && n->info.getState() == 0) {
+        if (!n->info.isDefault() && n->info.getValid()) c++;
+        n = n->next;
+    }
+    return c;
+}
+
+int AppointmentController::pendingAppointmentCount(const LinkList<Appointment> *appointments) {
+    if (!appointments || !appointments->getHeader()) return 0;
+    int c = 0;
+    auto *n = appointments->getHeader()->next;
+    while (n && n->next) {
+        if (!n->info.isDefault() && n->info.getValid() && n->info.getState() == 0) {
             c++;
         }
         n = n->next;
@@ -35,13 +45,7 @@ static bool compareAppointmentDates(const Appointment *a, const Appointment *b) 
 }
 
 void AppointmentController::sortAppointmentsByDate(QList<Appointment*> &list) {
-    for (int i = 0; i < list.size(); ++i) {
-        for (int j = i + 1; j < list.size(); ++j) {
-            if (compareAppointmentDates(list[j], list[i])) {
-                list.swapItemsAt(i, j);
-            }
-        }
-    }
+    UIHelper::quickSort(list, compareAppointmentDates);
 }
 
 QList<Appointment*> AppointmentController::getAppointmentsForDate(const LinkList<Appointment> *appointments, const QDate &targetDate) {
@@ -50,7 +54,7 @@ QList<Appointment*> AppointmentController::getAppointmentsForDate(const LinkList
 
     auto *n = appointments->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.isDefault()) {
+        if (!n->info.isDefault() && n->info.getValid()) {
             Date d = n->info.getDateGet();
             if (d.getYear() == targetDate.year() &&
                 d.getMonth() == targetDate.month() &&
@@ -72,7 +76,7 @@ QList<Appointment*> AppointmentController::getUpcomingAppointments(const LinkLis
 
     auto *n = appointments->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.isDefault()) {
+        if (!n->info.isDefault() && n->info.getValid()) {
             Date d = n->info.getDateGet();
             QDate appDay(d.getYear(), d.getMonth(), d.getDay());
             QTime appTime(d.getHour(), d.getMinute());
@@ -97,7 +101,7 @@ void AppointmentController::getMonthDayCounts(const LinkList<Appointment> *appoi
 
     auto *n = appointments->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.isDefault()) {
+        if (!n->info.isDefault() && n->info.getValid()) {
             Date d = n->info.getDateGet();
             if (d.getYear() == year && d.getMonth() == month) {
                 int day = d.getDay();
@@ -168,7 +172,6 @@ bool AppointmentController::isTetHoliday(const QDate &date, int holidayDays) {
     for (int y = date.year() - 1; y <= date.year() + 1; ++y) {
         QDate mung1 = getLunarNewYear(y);
         if (!mung1.isValid()) continue;
-        // 5 ngày nghỉ Tết theo quy chuẩn: từ 30 Tết (mung1 - 1 ngày) đến hết Mùng 4 Tết (mung1 + 3 ngày)
         QDate start = mung1.addDays(-1);
         QDate end = mung1.addDays(-1 + holidayDays - 1);
         if (date >= start && date <= end) {
@@ -178,53 +181,18 @@ bool AppointmentController::isTetHoliday(const QDate &date, int holidayDays) {
     return false;
 }
 
-bool AppointmentController::isHoliday(const QDate &date, const std::string &configPath) {
-    std::ifstream file(configPath);
-    if (!file.is_open()) return false;
-    std::string line;
-    while (std::getline(file, line)) {
-        libPBL2::trim(line);
-        if (line.empty()) continue;
-        auto separator = line.find('-');
-        std::string value = separator == std::string::npos ? line : line.substr(0, separator);
-        libPBL2::trim(value);
-        std::string rest = separator == std::string::npos ? "" : line.substr(separator + 1);
-        libPBL2::trim(rest);
-
-        // Kiểm tra dịp Tết Nguyên Đán
-        std::string lowerVal = value;
-        for (char &c : lowerVal) c = std::tolower(static_cast<unsigned char>(c));
-        if (lowerVal.rfind("tet", 0) == 0) {
-            int days = 5;
-            if (!rest.empty()) {
-                std::stringstream ss(rest);
-                int parsedDays = 0;
-                if (ss >> parsedDays && parsedDays > 0) {
-                    days = parsedDays;
-                }
-            }
-            if (isTetHoliday(date, days)) {
-                return true;
-            }
-            continue;
-        }
-
-        // Ngày nghỉ cố định dạng ngày/tháng (ví dụ: 1/1, 30/4, 1/5, 2/9, 10/3)
-        if (value.find('/') != std::string::npos) {
-            int day = 0, month = 0;
-            char slash = 0;
-            std::stringstream parsed(value);
-            if (parsed >> day >> slash >> month && slash == '/' && day == date.day() && month == date.month()) {
-                return true;
-            }
-        }
-    }
-    return false;
+static std::string resolveHolidayPath(const std::string &path) {
+    std::ifstream f(path);
+    if (f.is_open()) return path;
+    std::string alt = "../" + path;
+    std::ifstream f2(alt);
+    if (f2.is_open()) return alt;
+    return path;
 }
 
-QString AppointmentController::getHolidayNote(const QDate &date, const std::string &configPath) {
-    std::ifstream file(configPath);
-    if (!file.is_open()) return "Nghỉ lễ";
+static QString findHolidayNote(const QDate &date, const std::string &configPath) {
+    std::ifstream file(resolveHolidayPath(configPath));
+    if (!file.is_open()) return QString();
     std::string line;
     while (std::getline(file, line)) {
         libPBL2::trim(line);
@@ -246,7 +214,7 @@ QString AppointmentController::getHolidayNote(const QDate &date, const std::stri
                     days = parsedDays;
                 }
             }
-            if (isTetHoliday(date, days)) {
+            if (AppointmentController::isTetHoliday(date, days)) {
                 return QStringLiteral("Tết Nguyên Đán (Nghỉ %1 ngày)").arg(days);
             }
             continue;
@@ -260,22 +228,31 @@ QString AppointmentController::getHolidayNote(const QDate &date, const std::stri
                 if (!rest.empty()) {
                     return QString::fromUtf8(rest.c_str());
                 }
-                if (day == 1 && month == 1) return "Tết Dương Lịch";
-                if (day == 10 && month == 3) return "Giỗ Tổ Hùng Vương";
-                if (day == 30 && month == 4) return "Ngày Giải phóng miền Nam";
-                if (day == 1 && month == 5) return "Ngày Quốc tế Lao động";
-                if (day == 2 && month == 9) return "Quốc khánh Việt Nam";
-                if (day == 1 && month == 9) return "Nghỉ lễ Quốc khánh";
-                return "Nghỉ lễ";
+                if (day == 1 && month == 1) return QStringLiteral("Tết Dương Lịch");
+                if (day == 10 && month == 3) return QStringLiteral("Giỗ Tổ Hùng Vương");
+                if (day == 30 && month == 4) return QStringLiteral("Ngày Giải phóng miền Nam");
+                if (day == 1 && month == 5) return QStringLiteral("Ngày Quốc tế Lao động");
+                if (day == 2 && month == 9) return QStringLiteral("Quốc khánh Việt Nam");
+                if (day == 1 && month == 9) return QStringLiteral("Nghỉ lễ Quốc khánh");
+                return QStringLiteral("Nghỉ lễ");
             }
         }
     }
-    return "Nghỉ lễ";
+    return QString();
+}
+
+bool AppointmentController::isHoliday(const QDate &date, const std::string &configPath) {
+    return !findHolidayNote(date, configPath).isEmpty();
+}
+
+QString AppointmentController::getHolidayNote(const QDate &date, const std::string &configPath) {
+    QString note = findHolidayNote(date, configPath);
+    return note.isEmpty() ? QStringLiteral("Nghỉ lễ") : note;
 }
 
 QList<HolidayEntry> AppointmentController::loadHolidays(const std::string &configPath) {
     QList<HolidayEntry> list;
-    std::ifstream file(configPath);
+    std::ifstream file(resolveHolidayPath(configPath));
     if (!file.is_open()) return list;
     std::string line;
     while (std::getline(file, line)) {
@@ -292,7 +269,7 @@ QList<HolidayEntry> AppointmentController::loadHolidays(const std::string &confi
 }
 
 bool AppointmentController::saveHolidays(const std::string &configPath, const QList<HolidayEntry> &list) {
-    std::ofstream file(configPath);
+    std::ofstream file(resolveHolidayPath(configPath));
     if (!file.is_open()) return false;
     for (const auto &item : list) {
         file << item.date.toUtf8().toStdString() << " - " << item.note.toUtf8().toStdString() << "\n";

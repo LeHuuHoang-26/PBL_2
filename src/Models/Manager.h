@@ -22,7 +22,7 @@ class Manager: public Human {
         int state;
     public:
         Manager(std::ifstream &f);
-        Manager(std::string id, std::string fullName, std::string phone, bool gender, int age, std::string username, std::string password, ManagerRole role, int state);
+        Manager(std::string id, std::string fullName, std::string phone, bool gender, int age, std::string username, std::string password, ManagerRole role, int state, bool valid = true);
         Manager(const Manager &M);
         Manager();
         ~Manager();

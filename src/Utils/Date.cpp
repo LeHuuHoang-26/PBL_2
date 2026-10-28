@@ -1,4 +1,4 @@
-#include "Date.h"
+﻿#include "Date.h"
 #include <iomanip>
 #include <sstream>
 #include <ctime>
@@ -76,40 +76,6 @@ bool Date::isLeapYear(int yearVar) const {
     return 0;
 }
 
-Date Date::operator ++ (int) {
-    Date tmp = *this;
-    int dayinmonth = this->posofdayinmonth();
-    day++;
-    if (day > dayinmonth) {
-        day = 1;
-        month++;
-        if (month > 12) {
-            month = 1;
-            year++;
-        }
-    }
-    return tmp;
-}
-
-Date Date::operator -- (int) {
-    Date tmp = *this;
-    if (day == 1 && month == 1 && year == 1) {
-        cout << "Can't decrease this date!\nIt's not change!\n";
-        return tmp;
-    }
-    day--;
-    if (day <= 0) {
-        month--;
-        if (month <= 0) {
-            year--;
-            month = 12;
-        }
-        int dayinmonth = this->posofdayinmonth();
-        day = dayinmonth;
-    }
-    return tmp;
-}
-
 Date Date::operator ++ () {
     int dayinmonth = this->posofdayinmonth();
     day++;
@@ -122,6 +88,12 @@ Date Date::operator ++ () {
         }
     }
     return *this;
+}
+
+Date Date::operator ++ (int) {
+    Date tmp = *this;
+    ++(*this);
+    return tmp;
 }
 
 Date Date::operator -- () {
@@ -141,6 +113,13 @@ Date Date::operator -- () {
     }
     return *this;
 }
+
+Date Date::operator -- (int) {
+    Date tmp = *this;
+    --(*this);
+    return tmp;
+}
+
 
 Date Date::operator + (const int &value) {
     Date tmp = *this;
