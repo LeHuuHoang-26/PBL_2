@@ -32,7 +32,7 @@ private:
 
     int currentPage = 0;
     int sortColumn = -1;
-    Qt::SortOrder sortOrder = Qt::AscendingOrder;
+    bool sortAscending = true;
     static const int PAGE_SIZE = 8;
 
     void setupUI();

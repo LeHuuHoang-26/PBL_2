@@ -118,10 +118,6 @@ private:
 
     void updateNavigation();
     void setupShell();
-    QWidget *createSidebar();
-    QFrame *createUserCardWidget();
-    QFrame *createTimeCardWidget();
-    void setupPages();
 };
 
 #endif // MAINWINDOW_H

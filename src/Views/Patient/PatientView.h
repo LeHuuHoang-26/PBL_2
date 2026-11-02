@@ -33,9 +33,9 @@ private:
     QPushButton *nextBtn = nullptr;
     QLabel *pageStatus = nullptr;
     int currentPage = 0;
-    int sortColumn = -1;
-    Qt::SortOrder sortOrder = Qt::AscendingOrder;
     static const int PAGE_SIZE = 50;
+    int sortColumn = -1;
+    bool sortAscending = true;
 
     void setupUI();
     void addPatientDialog();

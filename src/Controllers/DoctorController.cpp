@@ -4,24 +4,17 @@
 #include <sstream>
 
 Doctor *DoctorController::findById(LinkList<Doctor> *doctors, const std::string &id) {
-    if (!doctors || !doctors->getHeader()) return nullptr;
+    if (id.empty() || !doctors || !doctors->getHeader()) return nullptr;
     auto *node = doctors->getHeader()->next;
     while (node && node->next) {
-        if (node->info.getID() == id) return &node->info;
+        if (!node->info.isDefault() && node->info.getID() == id) return &node->info;
         node = node->next;
     }
     return nullptr;
 }
 
 int DoctorController::count(const LinkList<Doctor> *doctors) {
-    if (!doctors || !doctors->getHeader()) return 0;
-    int c = 0;
-    auto *n = doctors->getHeader()->next;
-    while (n && n->next) {
-        if (!n->info.isDefault() && n->info.getValid()) c++;
-        n = n->next;
-    }
-    return c;
+    return doctors ? doctors->count : 0;
 }
 
 std::string DoctorController::generateNextId(const LinkList<Doctor> *doctors) {
@@ -29,12 +22,19 @@ std::string DoctorController::generateNextId(const LinkList<Doctor> *doctors) {
     if (doctors && doctors->getHeader()) {
         auto *n = doctors->getHeader()->next;
         while (n && n->next) {
-            std::string id = n->info.getID();
-            if (id.rfind("D_", 0) == 0) {
-                try {
-                    int val = std::stoi(id.substr(2));
-                    if (val > maxId) maxId = val;
-                } catch (...) {}
+            if (!n->info.isDefault()) {
+                std::string id = n->info.getID();
+                if (id.rfind("D_", 0) == 0) {
+                    try {
+                        int val = std::stoi(id.substr(2));
+                        if (val > maxId) maxId = val;
+                    } catch (...) {}
+                } else if (id.rfind("D", 0) == 0) {
+                    try {
+                        int val = std::stoi(id.substr(1));
+                        if (val > maxId) maxId = val;
+                    } catch (...) {}
+                }
             }
             n = n->next;
         }
@@ -44,16 +44,10 @@ std::string DoctorController::generateNextId(const LinkList<Doctor> *doctors) {
     return std::string(buf);
 }
 
-static QList<QPair<QString, QString>> s_specCache;
-static bool s_specCacheLoaded = false;
-
 QList<QPair<QString, QString>> DoctorController::getSpecializationList(const std::string &specPath) {
-    if (s_specCacheLoaded && !s_specCache.isEmpty()) {
-        return s_specCache;
-    }
-    s_specCache.clear();
+    QList<QPair<QString, QString>> result;
     std::ifstream file(specPath);
-    if (!file.is_open()) return s_specCache;
+    if (!file.is_open()) return result;
     std::string line;
     std::getline(file, line);
     std::getline(file, line);
@@ -64,10 +58,9 @@ QList<QPair<QString, QString>> DoctorController::getSpecializationList(const std
         std::string label = line.substr(separator + 1);
         libPBL2::trim(id);
         libPBL2::trim(label);
-        s_specCache.append(qMakePair(QString::fromUtf8(label.c_str()), QString::fromUtf8(id.c_str())));
+        result.append(qMakePair(QString::fromUtf8(label.c_str()), QString::fromUtf8(id.c_str())));
     }
-    s_specCacheLoaded = true;
-    return s_specCache;
+    return result;
 }
 
 QString DoctorController::getSpecialty(const std::string &id, const std::string &specPath) {

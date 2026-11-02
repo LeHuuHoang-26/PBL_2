@@ -32,7 +32,6 @@ qrc_*.cpp
 Thumbs.db
 *.res
 *.rc
-!src/Launcher/launcher.rc
 /.qmake.cache
 /.qmake.stash
 
@@ -65,6 +64,7 @@ CMakeLists.txt.user*
 # MinGW generated files
 *.Debug
 *.Release
+Makefile
 
 # Python byte code
 *.pyc
@@ -73,9 +73,6 @@ CMakeLists.txt.user*
 # --------
 *.dll
 *.exe
-bin/
-release/
-debug/
 
 # Directories with generated files
 .moc/
@@ -88,3 +85,6 @@ debug/
 # Test and capture artifacts
 login_render_*.png
 test_auth_results.txt
+
+# Log files
+logs/

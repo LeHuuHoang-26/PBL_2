@@ -1,4 +1,5 @@
 #include "AppointmentView.h"
+#include "libPBL2.h"
 #include "MainWindow.h"
 #include "AppointmentController.h"
 #include "DoctorController.h"
@@ -25,7 +26,6 @@
 #include <QScrollArea>
 #include <QCheckBox>
 #include <QAbstractButton>
-#include <QMessageBox>
 #include <QLocale>
 #include <QTime>
 #include <QListView>
@@ -38,8 +38,7 @@
 #include <QMap>
 #include <QStandardItemModel>
 #include <QBoxLayout>
-#include <QRegularExpression>
-#include <functional>
+#include <QProxyStyle>
 
 AppointmentView::AppointmentView(MainWindow *mainWindow, QObject *parent)
     : QObject(parent), mainWindow(mainWindow) {
@@ -138,100 +137,6 @@ protected:
         return QObject::eventFilter(obj, event);
     }
 };
-
-class CalendarPopupAligner : public QObject {
-public:
-    CalendarPopupAligner(QWidget *anchor, QCalendarWidget *cal, QObject *parent = nullptr)
-        : QObject(parent), m_anchor(anchor), m_cal(cal) {}
-
-protected:
-    bool eventFilter(QObject *obj, QEvent *event) override {
-        if (event->type() == QEvent::Show && obj == m_cal) {
-            auto alignPopup = [this]() {
-                if (!m_cal || !m_anchor) return;
-                QWidget *popup = m_cal->window();
-                if (!popup) return;
-                popup->setAttribute(Qt::WA_TranslucentBackground);
-                if (popup->layout()) {
-                    popup->layout()->setContentsMargins(0, 0, 0, 0);
-                    popup->layout()->setSpacing(0);
-                }
-                int targetW = m_anchor->width();
-                int targetH = 210;
-                m_cal->resize(targetW, targetH);
-                m_cal->setFixedWidth(targetW);
-                m_cal->setFixedHeight(targetH);
-                popup->resize(targetW, targetH);
-                popup->setFixedWidth(targetW);
-                popup->setFixedHeight(targetH);
-
-                // Căn lề trái của popup thẳng hàng với mép trái của ô dateEdit
-                QPoint anchorGlobal = m_anchor->mapToGlobal(QPoint(0, 0));
-                popup->move(anchorGlobal.x(), popup->y());
-            };
-            alignPopup();
-            QTimer::singleShot(0, m_cal, alignPopup);
-        }
-        return QObject::eventFilter(obj, event);
-    }
-
-private:
-    QWidget *m_anchor = nullptr;
-    QCalendarWidget *m_cal = nullptr;
-};
-
-// Hàm tiện ích: Loại bỏ hoàn toàn thanh trượt (slide bar) của combobox nhưng vẫn cuộn chuột mượt mà
-static void removeComboboxScrollbars(QComboBox *cb) {
-    if (!cb) return;
-    if (auto *v = cb->view()) {
-        v->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-        v->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    }
-}
-
-// Hàm tiện ích: Khởi tạo và đồng bộ kích thước / giao diện popup lịch cho QDateTimeEdit
-static void setupCalendarPopup(QDateTimeEdit *dateEdit, const QDate &minDate = QDate()) {
-    if (!dateEdit) return;
-    if (auto *cal = dateEdit->calendarWidget()) {
-        UIHelper::applyCalendarStyle(cal);
-        if (minDate.isValid()) {
-            cal->setMinimumDate(minDate);
-        }
-        QTextCharFormat weekdayHeaderFmt;
-        weekdayHeaderFmt.setForeground(QColor("#475569"));
-        weekdayHeaderFmt.setFontWeight(QFont::DemiBold);
-        weekdayHeaderFmt.setFontPointSize(8.0);
-        for (int dow = 1; dow <= 7; ++dow) {
-            cal->setWeekdayTextFormat(static_cast<Qt::DayOfWeek>(dow), weekdayHeaderFmt);
-        }
-        cal->installEventFilter(new CalendarPopupAligner(dateEdit, cal, dateEdit));
-    }
-}
-
-// Hàm tiện ích: Tạo widget các thẻ nhãn triệu chứng lâm sàng
-static QWidget *createSymptomBadgesWidget(const QString &symptomNamesStr) {
-    auto *container = new QWidget;
-    auto *layout = new QHBoxLayout(container);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(6);
-
-    if (symptomNamesStr.isEmpty() || symptomNamesStr == "Chưa ghi nhận") {
-        auto *emptyLbl = new QLabel("Chưa ghi nhận triệu chứng");
-        emptyLbl->setStyleSheet("background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; border-radius: 5px; padding: 3px 8px; font-size: 9.5px; font-weight: 600;");
-        layout->addWidget(emptyLbl);
-    } else {
-        QStringList symList = symptomNamesStr.split(',', Qt::SkipEmptyParts);
-        for (const QString &sym : symList) {
-            QString s = sym.trimmed();
-            if (s.isEmpty()) continue;
-            auto *chip = new QLabel(s);
-            chip->setStyleSheet("background: #f0fdfa; color: #0d9488; border: 1px solid #99f6e4; border-radius: 5px; padding: 2px 8px; font-size: 10px; font-weight: 700;");
-            layout->addWidget(chip);
-        }
-    }
-    layout->addStretch();
-    return container;
-}
 
 class ToggleSwitch : public QAbstractButton {
 public:
@@ -495,26 +400,26 @@ bool AppointmentView::showBookingDialog(const QDate &defaultDate) {
 
     QDialog dialog(mainWindow);
     dialog.setWindowTitle("Đặt lịch khám bệnh");
-    dialog.setFixedWidth(500);
+    dialog.setFixedWidth(540);
     dialog.setStyleSheet(R"(
         QDialog { background-color: #ffffff; border-radius: 12px; }
         QComboBox, QDateTimeEdit {
             background-color: #f8fafc;
             border: 1.5px solid #cbd5e1;
-            border-radius: 7px;
-            padding: 4px 10px;
-            font-size: 11px;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 13.5px;
             color: #0f172a;
-            min-height: 18px;
+            min-height: 22px;
         }
         QComboBox:focus, QDateTimeEdit:focus {
             border: 1.5px solid #0d9488;
             background: #ffffff;
         }
-        QComboBox::drop-down { border: none; width: 24px; }
+        QComboBox::drop-down { border: none; width: 28px; }
         QComboBox::down-arrow {
             image: url(:/assets/textures/arrow_down_dark.png);
-            width: 10px; height: 10px; margin-right: 6px;
+            width: 12px; height: 12px; margin-right: 8px;
         }
         QComboBox QAbstractItemView {
             background-color: #ffffff;
@@ -522,19 +427,25 @@ bool AppointmentView::showBookingDialog(const QDate &defaultDate) {
             selection-background-color: #0d9488;
             selection-color: #ffffff;
             border: 1.5px solid #cbd5e1;
-            border-radius: 7px;
+            border-radius: 8px;
             outline: none;
-            padding: 2px;
-            font-size: 10.5px;
+            padding: 4px;
+            font-size: 13.5px;
         }
         QComboBox QAbstractItemView::item {
-            min-height: 24px;
-            padding-left: 6px;
-            border-radius: 4px;
+            min-height: 32px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            color: #0f172a;
+            background-color: #ffffff;
         }
         QComboBox QAbstractItemView::item:hover {
             background-color: #f0fdfa;
-            color: #0d9488;
+            color: #0f766e;
+        }
+        QComboBox QAbstractItemView::item:selected {
+            background-color: #0d9488;
+            color: #ffffff;
         }
         QScrollBar:vertical, QScrollBar:horizontal {
             width: 0px;
@@ -542,42 +453,42 @@ bool AppointmentView::showBookingDialog(const QDate &defaultDate) {
             background: transparent;
             border: none;
         }
-        QDateTimeEdit { padding-right: 36px; }
+        QDateTimeEdit { padding-right: 44px; }
         QDateTimeEdit::drop-down {
             subcontrol-origin: border;
             subcontrol-position: top right;
-            width: 32px;
+            width: 42px;
             border-left: 1.5px solid #cbd5e1;
-            border-top-right-radius: 6px;
-            border-bottom-right-radius: 6px;
+            border-top-right-radius: 7px;
+            border-bottom-right-radius: 7px;
             background-color: #f1f5f9;
         }
         QDateTimeEdit::drop-down:hover { background-color: #0d9488; border-left-color: #0d9488; }
         QDateTimeEdit::drop-down:pressed { background-color: #0f766e; }
         QDateTimeEdit::down-arrow {
             image: url(:/assets/textures/arrow_down_dark.png);
-            width: 11px; height: 11px;
+            width: 14px; height: 14px;
         }
         QDateTimeEdit::down-arrow:hover { image: url(:/assets/textures/arrow_down_white.png); }
     )");
 
     auto *rootLayout = new QVBoxLayout(&dialog);
-    rootLayout->setContentsMargins(22, 18, 22, 18);
-    rootLayout->setSpacing(11);
+    rootLayout->setContentsMargins(28, 24, 28, 24);
+    rootLayout->setSpacing(14);
 
     auto *headerBox = new QHBoxLayout;
-    headerBox->setSpacing(10);
+    headerBox->setSpacing(14);
     auto *iconBadge = new QLabel("📅");
-    iconBadge->setFixedSize(38, 38);
+    iconBadge->setFixedSize(44, 44);
     iconBadge->setAlignment(Qt::AlignCenter);
-    iconBadge->setStyleSheet("background: #f0fdfa; color: #0d9488; border: 1.5px solid #99f6e4; border-radius: 9px; font-size: 18px;");
+    iconBadge->setStyleSheet("background: #f0fdfa; color: #0d9488; border: 1.5px solid #99f6e4; border-radius: 12px; font-size: 20px;");
 
     auto *titleBox = new QVBoxLayout;
-    titleBox->setSpacing(1);
+    titleBox->setSpacing(2);
     auto *dlgTitle = new QLabel("Tạo lịch khám bệnh mới");
-    dlgTitle->setStyleSheet("font-size: 14.5px; font-weight: 750; color: #0f172a;");
+    dlgTitle->setStyleSheet("font-size: 17px; font-weight: 750; color: #0f172a;");
     auto *dlgSub = new QLabel("Điền thông tin bệnh nhân, triệu chứng và bác sĩ phụ trách");
-    dlgSub->setStyleSheet("font-size: 10.5px; color: #64748b; font-weight: 500;");
+    dlgSub->setStyleSheet("font-size: 12.5px; color: #64748b; font-weight: 500;");
     titleBox->addWidget(dlgTitle);
     titleBox->addWidget(dlgSub);
     headerBox->addWidget(iconBadge);
@@ -590,26 +501,23 @@ bool AppointmentView::showBookingDialog(const QDate &defaultDate) {
     rootLayout->addWidget(divider);
 
     auto *form = new QFormLayout;
-    form->setSpacing(9);
+    form->setSpacing(11);
     form->setLabelAlignment(Qt::AlignLeft);
 
     auto makeLabel = [](const QString &t) {
         auto *l = new QLabel(t);
-        l->setStyleSheet("font-weight: 700; font-size: 9.5px; color: #475569; letter-spacing: 0.2px;");
+        l->setStyleSheet("font-weight: 600; font-size: 13px; color: #334155;");
         return l;
     };
 
     // 1. Patient: "Chọn hồ sơ bệnh nhân", bỏ mã bệnh nhân ra, tích hợp ô tìm kiếm bệnh nhân ở đầu dropdown
     auto *patient = new SearchablePatientComboBox;
-    removeComboboxScrollbars(patient);
     patient->addItem("Chọn hồ sơ bệnh nhân", "");
     auto *patients = mainWindow->getPatients();
     if (patients) {
         auto *p = patients->getHeader()->next;
         while (p && p->next) {
-            if (p->info.getValid()) {
-                patient->addItem(UIHelper::qs(p->info.getfullName()), UIHelper::qs(p->info.getID()));
-            }
+            patient->addItem(UIHelper::qs(p->info.getfullName()), UIHelper::qs(p->info.getID()));
             p = p->next;
         }
     }
@@ -622,7 +530,6 @@ bool AppointmentView::showBookingDialog(const QDate &defaultDate) {
 
     for (int i = 0; i < 5; ++i) {
         symptomCombos[i] = new NoWheelComboBox;
-        removeComboboxScrollbars(symptomCombos[i]);
         symptomCombos[i]->addItem("Chọn triệu chứng", "");
         if (symptoms) {
             auto *s = symptoms->getHeader()->next;
@@ -651,19 +558,18 @@ bool AppointmentView::showBookingDialog(const QDate &defaultDate) {
     // 3. Specialty: Luôn hiển thị sẵn từ đầu, hiển thị chuyên khoa cao nhất trong ô box đồng bộ
     auto *specialtyValue = new QLabel("—");
     specialtyValue->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    specialtyValue->setStyleSheet("background-color: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 7px; padding: 4px 10px; font-size: 11px; color: #0d9488; font-weight: 750; min-height: 18px;");
+    specialtyValue->setStyleSheet("background-color: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 8px 12px; font-size: 13.5px; color: #0d9488; font-weight: 750; min-height: 22px;");
     form->addRow(makeLabel("Chuyên khoa:"), specialtyValue);
 
     // 4. Doctor: "Chọn bác sĩ phụ trách", bỏ mã bác sĩ ra
     auto *doctor = new NoWheelComboBox;
-    removeComboboxScrollbars(doctor);
     doctor->addItem("Chọn bác sĩ phụ trách", "");
     form->addRow(makeLabel("Bác sĩ khám:"), doctor);
 
     // 5. Fee row: Hiển thị phí khám trực tiếp trong ô box đồng bộ
     auto *feeValue = new QLabel("—");
     feeValue->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    feeValue->setStyleSheet("background-color: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 7px; padding: 4px 10px; font-size: 11px; color: #0d9488; font-weight: 800; min-height: 18px;");
+    feeValue->setStyleSheet("background-color: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 8px 12px; font-size: 14.5px; color: #0d9488; font-weight: 800; min-height: 22px;");
     form->addRow(makeLabel("Phí khám:"), feeValue);
 
     // 5. Date & Time: Khóa thời gian trước lúc đặt lịch + calendar popup đẹp, sáng rõ
@@ -676,9 +582,8 @@ bool AppointmentView::showBookingDialog(const QDate &defaultDate) {
     auto *dateEdit = new QDateTimeEdit(initialDT);
     dateEdit->installEventFilter(FormNoWheelFilter::instance());
     dateEdit->setDisplayFormat("dd/MM/yyyy   HH:mm");
-    dateEdit->setCalendarPopup(true);
     dateEdit->setMinimumDateTime(now);
-    setupCalendarPopup(dateEdit, now.date());
+    UIHelper::setupCalendarPopup(dateEdit, now.date());
     form->addRow(makeLabel("Ngày giờ hẹn:"), dateEdit);
     rootLayout->addLayout(form);
 
@@ -786,7 +691,7 @@ bool AppointmentView::showBookingDialog(const QDate &defaultDate) {
             if (doctors) {
                 auto *d = doctors->getHeader()->next;
                 while (d && d->next) {
-                    if (d->info.getValid() && d->info.getState() && UIHelper::qs(d->info.getSpId()) == bestSpId) {
+                    if (d->info.getState() && UIHelper::qs(d->info.getSpId()) == bestSpId) {
                         QString roomStr = UIHelper::formatRoom(UIHelper::qs(d->info.getRoomId()));
                         doctor->addItem(QStringLiteral("BS. %1 · %2 (%3)")
                             .arg(UIHelper::qs(d->info.getfullName()), mainWindow->specialty(d->info.getSpId()), roomStr),
@@ -823,12 +728,12 @@ bool AppointmentView::showBookingDialog(const QDate &defaultDate) {
 
     auto *cancelBtn = new QPushButton("Hủy bỏ");
     cancelBtn->setCursor(Qt::PointingHandCursor);
-    cancelBtn->setStyleSheet("QPushButton { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 7px; padding: 6px 18px; font-size: 11px; font-weight: 600; color: #475569; } QPushButton:hover { background: #e2e8f0; color: #1e293b; }");
+    cancelBtn->setStyleSheet("QPushButton { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; padding: 9px 20px; font-size: 13px; font-weight: 600; color: #475569; } QPushButton:hover { background: #e2e8f0; color: #1e293b; }");
     connect(cancelBtn, &QPushButton::clicked, &dialog, &QDialog::reject);
 
     auto *confirmBtn = new QPushButton("＋  Xác nhận đặt lịch");
     confirmBtn->setCursor(Qt::PointingHandCursor);
-    confirmBtn->setStyleSheet("QPushButton { background: #0d9488; border: none; border-radius: 7px; padding: 6px 20px; font-size: 11px; font-weight: 700; color: white; } QPushButton:hover { background: #0f766e; }");
+    confirmBtn->setStyleSheet("QPushButton { background: #0d9488; border: none; border-radius: 8px; padding: 9px 22px; font-size: 13px; font-weight: 700; color: white; } QPushButton:hover { background: #0f766e; }");
 
     connect(confirmBtn, &QPushButton::clicked, &dialog, [this, &dialog, patient, symptomCombos, doctor, dateEdit] {
         if (patient->currentData().toString().isEmpty()) {
@@ -904,29 +809,60 @@ bool AppointmentView::showBookingDialog(const QDate &defaultDate) {
 
 namespace {
 
+class StepperComboStyle : public QProxyStyle {
+public:
+    QWidget *stepperBox = nullptr;
+    explicit StepperComboStyle(QWidget *sb, QStyle *baseStyle = nullptr)
+        : QProxyStyle(baseStyle), stepperBox(sb) {}
+
+    QRect subControlRect(ComplexControl cc, const QStyleOptionComplex *opt,
+                         SubControl sc, const QWidget *widget) const override {
+        if (cc == CC_ComboBox && sc == SC_ComboBoxListBoxPopup && stepperBox && widget) {
+            QRect baseRect = QProxyStyle::subControlRect(cc, opt, sc, widget);
+            QPoint sbGlobal = stepperBox->mapToGlobal(QPoint(0, 0));
+            QPoint wGlobal = widget->mapToGlobal(QPoint(0, 0));
+            int xOffset = sbGlobal.x() - wGlobal.x();
+            int targetWidth = stepperBox->width();
+            if (targetWidth < 120) targetWidth = 140;
+
+            int stepperBottom = sbGlobal.y() + stepperBox->height();
+            int widgetBottom = wGlobal.y() + widget->height();
+            int dy = (stepperBottom - widgetBottom) + 2;
+
+            return QRect(xOffset, baseRect.y() + dy, targetWidth, baseRect.height());
+        }
+        return QProxyStyle::subControlRect(cc, opt, sc, widget);
+    }
+};
+
 class StepperComboBox : public QComboBox {
 public:
     QWidget *stepperBox = nullptr;
+    StepperComboStyle *comboStyle = nullptr;
 
     explicit StepperComboBox(QWidget *parent = nullptr) : QComboBox(parent) {
         setView(new QListView(this));
         if (view()) {
             view()->setTextElideMode(Qt::ElideNone);
+            view()->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+            view()->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         }
     }
 
     void showPopup() override {
+        if (stepperBox && !comboStyle) {
+            comboStyle = new StepperComboStyle(stepperBox, style());
+            setStyle(comboStyle);
+        } else if (comboStyle) {
+            comboStyle->stepperBox = stepperBox;
+        }
         QComboBox::showPopup();
-        QWidget *popup = this->view() ? this->view()->parentWidget() : nullptr;
-        if (popup && stepperBox) {
-            int targetWidth = qMax(stepperBox->width(), 140);
-            QPoint pos = stepperBox->mapToGlobal(QPoint(0, stepperBox->height() + 2));
-            popup->setFixedWidth(targetWidth);
-            popup->move(pos);
-            QTimer::singleShot(0, popup, [popup, pos, targetWidth]() {
-                popup->setFixedWidth(targetWidth);
-                popup->move(pos);
-            });
+
+        if (view()) {
+            view()->scrollToTop();
+            if (auto *sb = view()->verticalScrollBar()) {
+                sb->setValue(0);
+            }
         }
     }
 
@@ -1059,7 +995,7 @@ public:
         : QObject(parent), appointment(a), view(v) {}
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override {
-        if (event->type() == QEvent::MouseButtonRelease) {
+        if (event->type() == QEvent::MouseButtonDblClick) {
             auto *me = static_cast<QMouseEvent*>(event);
             if (me->button() == Qt::LeftButton && view && appointment) {
                 view->showAppointmentDetailDialog(appointment);
@@ -1071,103 +1007,6 @@ protected:
 };
 
 } // namespace
-
-void AppointmentView::setupAppointmentCardRow(QTableWidget *table, int r, Appointment *a, const QString &dayText) {
-    if (!table || !a || !mainWindow) return;
-
-    Patient *p = mainWindow->findPatientForAppointment(*a);
-    Doctor *d = mainWindow->findDoctor(a->getDoctorId());
-    Date ad = a->getDateGet();
-
-    auto *pw = new QWidget;
-    auto *pwl = new QVBoxLayout(pw);
-    pwl->setContentsMargins(14, 4, 14, 4);
-    pwl->setSpacing(2);
-    auto *nl = new QLabel(p ? UIHelper::qs(p->getfullName()) : "—");
-    nl->setStyleSheet("font-weight: 700; font-size: 13px; color: #0f172a;");
-    nl->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-    QString pSub = p ? QStringLiteral("%1 tuổi (%2)").arg(p->getAge()).arg(p->getGender() ? "Nam" : "Nữ") : "";
-    auto *sl = new QLabel(pSub);
-    sl->setStyleSheet("font-size: 11.5px; color: #64748b;");
-    sl->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-    pwl->addWidget(nl);
-    pwl->addWidget(sl);
-    table->setCellWidget(r, 0, pw);
-
-    auto *dw = new QWidget;
-    auto *dwl = new QVBoxLayout(dw);
-    dwl->setContentsMargins(14, 4, 14, 4);
-    dwl->setSpacing(2);
-    auto *dnl = new QLabel(d ? QStringLiteral("BS. %1").arg(UIHelper::qs(d->getfullName())) : UIHelper::qs(a->getDoctorId()));
-    dnl->setStyleSheet("font-weight: 700; font-size: 13px; color: #0f172a;");
-    dnl->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-    QString dSub = d ? QStringLiteral("%1 · %2").arg(mainWindow->specialty(d->getSpId()), UIHelper::formatRoom(UIHelper::qs(d->getRoomId()))) : "";
-    auto *docSub = new QLabel(dSub);
-    docSub->setStyleSheet("font-size: 11.5px; color: #0284c7; font-weight: 600;");
-    docSub->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-    dwl->addWidget(dnl);
-    dwl->addWidget(docSub);
-    table->setCellWidget(r, 1, dw);
-
-    auto *tw = new QWidget;
-    auto *twl = new QVBoxLayout(tw);
-    twl->setContentsMargins(6, 4, 6, 4);
-    twl->setSpacing(2);
-    auto *hourLabel = new QLabel(QString::asprintf("%02d:%02d", ad.getHour(), ad.getMinute()));
-    hourLabel->setStyleSheet("font-weight: 700; font-size: 13px; color: #0f172a;");
-    hourLabel->setAlignment(Qt::AlignCenter);
-
-    auto *dayLabel = new QLabel(dayText);
-    dayLabel->setStyleSheet("font-size: 11.5px; color: #64748b;");
-    dayLabel->setAlignment(Qt::AlignCenter);
-    twl->addWidget(hourLabel);
-    twl->addWidget(dayLabel);
-    table->setCellWidget(r, 2, tw);
-
-    int st = a->getState();
-    if (st == 0) {
-        Date adg = a->getDateGet();
-        QDateTime now = QDateTime::currentDateTime();
-        QDateTime apptDt(QDate(adg.getYear(), adg.getMonth(), adg.getDay()), QTime(adg.getHour(), adg.getMinute()));
-        if (apptDt < now) {
-            st = -1;
-        }
-    }
-    QString badgeText = "● Chưa khám";
-    QString badgeStyle = "QLabel { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; border-radius: 12px; font-size: 11.5px; font-weight: 700; padding: 4px 10px; }";
-    if (st == 1) {
-        badgeText = "● Đã khám";
-        badgeStyle = "QLabel { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; border-radius: 12px; font-size: 11.5px; font-weight: 700; padding: 4px 10px; }";
-    } else if (st == -1) {
-        badgeText = "● Trễ hẹn";
-        badgeStyle = "QLabel { background: #fff7ed; color: #ea580c; border: 1px solid #ffedd5; border-radius: 12px; font-size: 11.5px; font-weight: 700; padding: 4px 10px; }";
-    }
-    auto *badge = new QLabel(badgeText);
-    badge->setStyleSheet(badgeStyle);
-    badge->setAlignment(Qt::AlignCenter);
-    badge->setFixedHeight(26);
-
-    auto *bb = new QWidget;
-    auto *bbl = new QHBoxLayout(bb);
-    bbl->setContentsMargins(6, 0, 6, 0);
-    bbl->setAlignment(Qt::AlignCenter);
-    bbl->addWidget(badge);
-    table->setCellWidget(r, 3, bb);
-
-    auto makeRowClickable = [&](QWidget *widget, Appointment *appt) {
-        widget->setCursor(Qt::PointingHandCursor);
-        widget->installEventFilter(new AppointmentRowClickFilter(appt, this, widget));
-        const auto children = widget->findChildren<QWidget*>();
-        for (auto *c : children) {
-            c->setCursor(Qt::PointingHandCursor);
-            c->installEventFilter(new AppointmentRowClickFilter(appt, this, c));
-        }
-    };
-    makeRowClickable(pw, a);
-    makeRowClickable(dw, a);
-    makeRowClickable(tw, a);
-    makeRowClickable(bb, a);
-}
 
 QWidget *AppointmentView::createDashboardWidget(QWidget *parent) {
     if (!mainWindow) return new QWidget(parent);
@@ -1309,6 +1148,12 @@ QWidget *AppointmentView::createDashboardWidget(QWidget *parent) {
             border-right: none;
         }
         QTableWidget::item:hover { background: #f0fdfa; }
+        QScrollBar:vertical, QScrollBar:horizontal {
+            width: 0px;
+            height: 0px;
+            background: transparent;
+            border: none;
+        }
     )");
     table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
     table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
@@ -1340,6 +1185,8 @@ QWidget *AppointmentView::createDashboardWidget(QWidget *parent) {
     // Trạng thái phân trang
     struct DashState {
         int pageNumber = 0;
+        int sortCol = -1;
+        bool sortAsc = true;
         enum { PAGE_SIZE = 8 };
     };
     auto *state = new DashState;
@@ -1347,6 +1194,37 @@ QWidget *AppointmentView::createDashboardWidget(QWidget *parent) {
     auto renderRows = [=, this]() {
         QDate today = QDate::currentDate();
         QList<Appointment*> all = AppointmentController::getUpcomingAppointments(mainWindow->getAppointments(), today);
+        if (state->sortCol >= 0) {
+            int col = state->sortCol;
+            bool asc = state->sortAsc;
+            libPBL2::qsort(all, [this, col, asc](const Appointment *a, const Appointment *b) -> bool {
+                if (!a || !b) return false;
+                int cmp = 0;
+                switch (col) {
+                    case 0: {
+                        Patient *pa = mainWindow ? mainWindow->findPatientForAppointment(*a) : nullptr;
+                        Patient *pb = mainWindow ? mainWindow->findPatientForAppointment(*b) : nullptr;
+                        cmp = libPBL2::compareVietnameseNames(pa ? pa->getfullName() : "", pb ? pb->getfullName() : "");
+                        break;
+                    }
+                    case 1: {
+                        Doctor *da = mainWindow ? mainWindow->findDoctor(a->getDoctorId()) : nullptr;
+                        Doctor *db = mainWindow ? mainWindow->findDoctor(b->getDoctorId()) : nullptr;
+                        cmp = libPBL2::compareVietnameseNames(da ? da->getfullName() : "", db ? db->getfullName() : "");
+                        break;
+                    }
+                    case 2:
+                        cmp = libPBL2::compareDates(a->getDateGet(), b->getDateGet());
+                        break;
+                    case 3:
+                        cmp = a->getState() - b->getState();
+                        break;
+                    default: break;
+                }
+                if (cmp == 0) cmp = libPBL2::compareNatural(a->getId(), b->getId());
+                return asc ? (cmp < 0) : (cmp > 0);
+            });
+        }
         table->setRowCount(0);
         int total = all.size();
         int totalPages = total == 0 ? 1 : (total + DashState::PAGE_SIZE - 1) / DashState::PAGE_SIZE;
@@ -1364,8 +1242,48 @@ QWidget *AppointmentView::createDashboardWidget(QWidget *parent) {
             table->insertRow(r);
             table->setRowHeight(r, 54);
 
+            Patient *p = mainWindow->findPatientForAppointment(*a);
+            Doctor *d = mainWindow->findDoctor(a->getDoctorId());
             Date ad = a->getDateGet();
             QDate appDate(ad.getYear(), ad.getMonth(), ad.getDay());
+
+            auto *pw = new QWidget;
+            auto *pwl = new QVBoxLayout(pw);
+            pwl->setContentsMargins(14, 4, 14, 4);
+            pwl->setSpacing(2);
+            auto *nl = new QLabel(p ? UIHelper::qs(p->getfullName()) : "—");
+            nl->setStyleSheet("font-weight: 700; font-size: 13px; color: #0f172a;");
+            nl->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+            QString pSub = p ? QStringLiteral("%1 tuổi (%2)").arg(p->getAge()).arg(p->getGender() ? "Nam" : "Nữ") : "";
+            auto *sl = new QLabel(pSub);
+            sl->setStyleSheet("font-size: 11.5px; color: #64748b;");
+            sl->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+            pwl->addWidget(nl);
+            pwl->addWidget(sl);
+            table->setCellWidget(r, 0, pw);
+
+            auto *dw = new QWidget;
+            auto *dwl = new QVBoxLayout(dw);
+            dwl->setContentsMargins(14, 4, 14, 4);
+            dwl->setSpacing(2);
+            auto *dnl = new QLabel(d ? QStringLiteral("BS. %1").arg(UIHelper::qs(d->getfullName())) : UIHelper::qs(a->getDoctorId()));
+            dnl->setStyleSheet("font-weight: 700; font-size: 13px; color: #0f172a;");
+            dnl->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+            QString dSub = d ? QStringLiteral("%1 · %2").arg(mainWindow->specialty(d->getSpId()), UIHelper::formatRoom(UIHelper::qs(d->getRoomId()))) : "";
+            auto *docSub = new QLabel(dSub);
+            docSub->setStyleSheet("font-size: 11.5px; color: #0284c7; font-weight: 600;");
+            docSub->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+            dwl->addWidget(dnl);
+            dwl->addWidget(docSub);
+            table->setCellWidget(r, 1, dw);
+
+            auto *tw = new QWidget;
+            auto *twl = new QVBoxLayout(tw);
+            twl->setContentsMargins(6, 4, 6, 4);
+            twl->setSpacing(2);
+            auto *hourLabel = new QLabel(QString::asprintf("%02d:%02d", ad.getHour(), ad.getMinute()));
+            hourLabel->setStyleSheet("font-weight: 700; font-size: 13px; color: #0f172a;");
+            hourLabel->setAlignment(Qt::AlignCenter);
 
             QString dayText;
             if (appDate == today) {
@@ -1375,12 +1293,60 @@ QWidget *AppointmentView::createDashboardWidget(QWidget *parent) {
             } else {
                 dayText = QString::asprintf("%02d/%02d/%04d", ad.getDay(), ad.getMonth(), ad.getYear());
             }
+            auto *dayLabel = new QLabel(dayText);
+            dayLabel->setStyleSheet("font-size: 11.5px; color: #64748b;");
+            dayLabel->setAlignment(Qt::AlignCenter);
+            twl->addWidget(hourLabel);
+            twl->addWidget(dayLabel);
+            table->setCellWidget(r, 2, tw);
 
-            setupAppointmentCardRow(table, r, a, dayText);
+            int st = a->getState();
+            if (st == 0) {
+                Date adg = a->getDateGet();
+                QDateTime now = QDateTime::currentDateTime();
+                QDateTime apptDt(QDate(adg.getYear(), adg.getMonth(), adg.getDay()), QTime(adg.getHour(), adg.getMinute()));
+                if (apptDt < now) {
+                    st = -1;
+                }
+            }
+            QString badgeText = "● Chưa khám";
+            QString badgeStyle = "QLabel { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; border-radius: 12px; font-size: 11.5px; font-weight: 700; padding: 4px 10px; }";
+            if (st == 1) {
+                badgeText = "● Đã khám";
+                badgeStyle = "QLabel { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; border-radius: 12px; font-size: 11.5px; font-weight: 700; padding: 4px 10px; }";
+            } else if (st == -1) {
+                badgeText = "● Trễ hẹn";
+                badgeStyle = "QLabel { background: #fff7ed; color: #ea580c; border: 1px solid #ffedd5; border-radius: 12px; font-size: 11.5px; font-weight: 700; padding: 4px 10px; }";
+            }
+            auto *badge = new QLabel(badgeText);
+            badge->setStyleSheet(badgeStyle);
+            badge->setAlignment(Qt::AlignCenter);
+            badge->setFixedHeight(26);
+
+            auto *bb = new QWidget;
+            auto *bbl = new QHBoxLayout(bb);
+            bbl->setContentsMargins(6, 0, 6, 0);
+            bbl->setAlignment(Qt::AlignCenter);
+            bbl->addWidget(badge);
+            table->setCellWidget(r, 3, bb);
+
+            auto makeRowClickable = [&](QWidget *widget, Appointment *appt) {
+                widget->setToolTip("Nháy đúp chuột để xem chi tiết lịch khám");
+                widget->installEventFilter(new AppointmentRowClickFilter(appt, this, widget));
+                const auto children = widget->findChildren<QWidget*>();
+                for (auto *c : children) {
+                    c->setToolTip("Nháy đúp chuột để xem chi tiết lịch khám");
+                    c->installEventFilter(new AppointmentRowClickFilter(appt, this, c));
+                }
+            };
+            makeRowClickable(pw, a);
+            makeRowClickable(dw, a);
+            makeRowClickable(tw, a);
+            makeRowClickable(bb, a);
         }
     };
 
-    connect(table, &QTableWidget::cellClicked, w, [=, this](int r, int) {
+    connect(table, &QTableWidget::cellDoubleClicked, w, [=, this](int r, int) {
         QDate today = QDate::currentDate();
         QList<Appointment*> all = AppointmentController::getUpcomingAppointments(mainWindow->getAppointments(), today);
         int idx = state->pageNumber * DashState::PAGE_SIZE + r;
@@ -1388,6 +1354,18 @@ QWidget *AppointmentView::createDashboardWidget(QWidget *parent) {
             showAppointmentDetailDialog(all[idx]);
             renderRows();
         }
+    });
+
+    connect(table->horizontalHeader(), &QHeaderView::sectionClicked, w, [state, renderRows](int logicalIndex) {
+        if (logicalIndex < 0 || logicalIndex > 3) return;
+        if (state->sortCol == logicalIndex) {
+            state->sortAsc = !state->sortAsc;
+        } else {
+            state->sortCol = logicalIndex;
+            state->sortAsc = true;
+        }
+        state->pageNumber = 0;
+        renderRows();
     });
 
     connect(prevBtn, &QPushButton::clicked, w, [=]() {
@@ -1413,7 +1391,9 @@ QWidget *AppointmentView::createBookingWidget(QWidget *parent) {
     auto *scroll = new QScrollArea(parent);
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
-    scroll->setStyleSheet("QScrollArea { background: transparent; border: none; } QScrollBar:vertical { width: 8px; background: transparent; } QScrollBar::handle:vertical { background: #cbd5e1; border-radius: 4px; }");
+    scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scroll->setStyleSheet("QScrollArea { background: transparent; border: none; } QScrollBar:vertical, QScrollBar:horizontal { width: 0px; height: 0px; background: transparent; border: none; }");
 
     auto *w = new QWidget;
     w->setStyleSheet("background: transparent;");
@@ -1511,6 +1491,8 @@ QWidget *AppointmentView::createBookingWidget(QWidget *parent) {
     auto *prevMonthBtn = makeStepperBtn("‹");
     auto *monthCombo = new StepperComboBox(monthGroup);
     monthCombo->stepperBox = monthGroup;
+    monthCombo->comboStyle = new StepperComboStyle(monthGroup, monthCombo->style());
+    monthCombo->setStyle(monthCombo->comboStyle);
     monthCombo->setFixedWidth(92);
     monthCombo->setMaxVisibleItems(12);
     for (int m = 1; m <= 12; ++m) {
@@ -1541,11 +1523,12 @@ QWidget *AppointmentView::createBookingWidget(QWidget *parent) {
             outline: none;
         }
         QComboBox QAbstractItemView::item {
-            min-height: 28px;
-            padding: 4px 10px;
-            border-radius: 6px;
+            min-height: 22px;
+            padding: 3px 8px;
+            border-radius: 5px;
             color: #0f172a;
             font-weight: 600;
+            font-size: 13px;
         }
         QComboBox QAbstractItemView::item:hover {
             background-color: #f0fdfa;
@@ -1556,19 +1539,22 @@ QWidget *AppointmentView::createBookingWidget(QWidget *parent) {
             color: #ffffff;
         }
         QScrollBar:vertical {
-            width: 6px;
+            width: 5px;
             background: transparent;
-            margin: 4px 2px 4px 0px;
+            margin: 2px 0px;
         }
         QScrollBar::handle:vertical {
             background: #cbd5e1;
-            border-radius: 3px;
+            border-radius: 2px;
             min-height: 20px;
         }
         QScrollBar::handle:vertical:hover {
             background: #94a3b8;
         }
-        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+            background: transparent;
+            border: none;
             height: 0px;
         }
     )");
@@ -1778,6 +1764,8 @@ QWidget *AppointmentView::createBookingWidget(QWidget *parent) {
         QDate selectedDate;
         QList<Appointment*> appointments;
         int pageNumber = 0;
+        int sortCol = -1;
+        bool sortAsc = true;
         enum { PAGE_SIZE = 8 };
     };
     auto *state = new BookingPageState;
@@ -1785,6 +1773,37 @@ QWidget *AppointmentView::createBookingWidget(QWidget *parent) {
 
     auto reloadDayView = [=, this]() {
         state->appointments = getAppointmentsForDate(state->selectedDate);
+        if (state->sortCol >= 0) {
+            int col = state->sortCol;
+            bool asc = state->sortAsc;
+            libPBL2::qsort(state->appointments, [this, col, asc](const Appointment *a, const Appointment *b) -> bool {
+                if (!a || !b) return false;
+                int cmp = 0;
+                switch (col) {
+                    case 0: {
+                        Patient *pa = mainWindow ? mainWindow->findPatientForAppointment(*a) : nullptr;
+                        Patient *pb = mainWindow ? mainWindow->findPatientForAppointment(*b) : nullptr;
+                        cmp = libPBL2::compareVietnameseNames(pa ? pa->getfullName() : "", pb ? pb->getfullName() : "");
+                        break;
+                    }
+                    case 1: {
+                        Doctor *da = mainWindow ? mainWindow->findDoctor(a->getDoctorId()) : nullptr;
+                        Doctor *db = mainWindow ? mainWindow->findDoctor(b->getDoctorId()) : nullptr;
+                        cmp = libPBL2::compareVietnameseNames(da ? da->getfullName() : "", db ? db->getfullName() : "");
+                        break;
+                    }
+                    case 2:
+                        cmp = libPBL2::compareDates(a->getDateGet(), b->getDateGet());
+                        break;
+                    case 3:
+                        cmp = a->getState() - b->getState();
+                        break;
+                    default: break;
+                }
+                if (cmp == 0) cmp = libPBL2::compareNatural(a->getId(), b->getId());
+                return asc ? (cmp < 0) : (cmp > 0);
+            });
+        }
         int total = state->appointments.size();
 
         static const char *weekdayNames[] = {"", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ Nhật"};
@@ -1860,13 +1879,101 @@ QWidget *AppointmentView::createBookingWidget(QWidget *parent) {
             t->insertRow(r);
             t->setRowHeight(r, 54);
 
+            Patient *p = mainWindow->findPatientForAppointment(*a);
+            Doctor *d = mainWindow->findDoctor(a->getDoctorId());
             Date ad = a->getDateGet();
-            QString dayText = (state->selectedDate == QDate::currentDate() ? QStringLiteral("Hôm nay, %1/%2").arg(ad.getDay()).arg(ad.getMonth()) : state->selectedDate.toString("dd/MM/yyyy"));
-            setupAppointmentCardRow(t, r, a, dayText);
+
+            auto *pw = new QWidget;
+            auto *pwl = new QVBoxLayout(pw);
+            pwl->setContentsMargins(14, 4, 14, 4);
+            pwl->setSpacing(2);
+            auto *nl = new QLabel(p ? UIHelper::qs(p->getfullName()) : "—");
+            nl->setStyleSheet("font-weight: 700; font-size: 13px; color: #0f172a;");
+            nl->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+            QString pSub = p ? QStringLiteral("%1 tuổi (%2)").arg(p->getAge()).arg(p->getGender() ? "Nam" : "Nữ") : "";
+            auto *sl = new QLabel(pSub);
+            sl->setStyleSheet("font-size: 11.5px; color: #64748b;");
+            sl->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+            pwl->addWidget(nl);
+            pwl->addWidget(sl);
+            t->setCellWidget(r, 0, pw);
+
+            auto *dw = new QWidget;
+            auto *dwl = new QVBoxLayout(dw);
+            dwl->setContentsMargins(14, 4, 14, 4);
+            dwl->setSpacing(2);
+            auto *dnl = new QLabel(d ? QStringLiteral("BS. %1").arg(UIHelper::qs(d->getfullName())) : UIHelper::qs(a->getDoctorId()));
+            dnl->setStyleSheet("font-weight: 700; font-size: 13px; color: #0f172a;");
+            dnl->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+            QString dSub = d ? QStringLiteral("%1 · %2").arg(mainWindow->specialty(d->getSpId()), UIHelper::formatRoom(UIHelper::qs(d->getRoomId()))) : "";
+            auto *docSub = new QLabel(dSub);
+            docSub->setStyleSheet("font-size: 11.5px; color: #0284c7; font-weight: 600;");
+            docSub->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+            dwl->addWidget(dnl);
+            dwl->addWidget(docSub);
+            t->setCellWidget(r, 1, dw);
+
+            auto *tw = new QWidget;
+            auto *twl = new QVBoxLayout(tw);
+            twl->setContentsMargins(6, 4, 6, 4);
+            twl->setSpacing(2);
+            auto *hourLabel = new QLabel(QString::asprintf("%02d:%02d", ad.getHour(), ad.getMinute()));
+            hourLabel->setStyleSheet("font-weight: 700; font-size: 13px; color: #0f172a;");
+            hourLabel->setAlignment(Qt::AlignCenter);
+            auto *dayLabel = new QLabel(state->selectedDate == QDate::currentDate() ? QStringLiteral("Hôm nay, %1/%2").arg(ad.getDay()).arg(ad.getMonth()) : state->selectedDate.toString("dd/MM/yyyy"));
+            dayLabel->setStyleSheet("font-size: 11.5px; color: #64748b;");
+            dayLabel->setAlignment(Qt::AlignCenter);
+            twl->addWidget(hourLabel);
+            twl->addWidget(dayLabel);
+            t->setCellWidget(r, 2, tw);
+
+            int st = a->getState();
+            if (st == 0) {
+                Date adg = a->getDateGet();
+                QDateTime now = QDateTime::currentDateTime();
+                QDateTime apptDt(QDate(adg.getYear(), adg.getMonth(), adg.getDay()), QTime(adg.getHour(), adg.getMinute()));
+                if (apptDt < now) {
+                    st = -1;
+                }
+            }
+            QString badgeText = "● Chưa khám";
+            QString badgeStyle = "background: #fffbeb; color: #d97706; border: 1px solid #fde68a; border-radius: 12px; font-size: 11.5px; font-weight: 700; padding: 4px 10px;";
+            if (st == 1) {
+                badgeText = "● Đã khám";
+                badgeStyle = "background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; border-radius: 12px; font-size: 11.5px; font-weight: 700; padding: 4px 10px;";
+            } else if (st == -1) {
+                badgeText = "● Trễ hẹn";
+                badgeStyle = "background: #fff7ed; color: #ea580c; border: 1px solid #ffedd5; border-radius: 12px; font-size: 11.5px; font-weight: 700; padding: 4px 10px;";
+            }
+            auto *badge = new QLabel(badgeText);
+            badge->setStyleSheet(badgeStyle);
+            badge->setAlignment(Qt::AlignCenter);
+            badge->setFixedHeight(26);
+
+            auto *bb = new QWidget;
+            auto *bbl = new QHBoxLayout(bb);
+            bbl->setContentsMargins(6, 0, 6, 0);
+            bbl->setAlignment(Qt::AlignCenter);
+            bbl->addWidget(badge);
+            t->setCellWidget(r, 3, bb);
+
+            auto makeRowClickable = [&](QWidget *widget, Appointment *appt) {
+                widget->setToolTip("Nháy đúp chuột để xem chi tiết lịch khám");
+                widget->installEventFilter(new AppointmentRowClickFilter(appt, this, widget));
+                const auto children = widget->findChildren<QWidget*>();
+                for (auto *c : children) {
+                    c->setToolTip("Nháy đúp chuột để xem chi tiết lịch khám");
+                    c->installEventFilter(new AppointmentRowClickFilter(appt, this, c));
+                }
+            };
+            makeRowClickable(pw, a);
+            makeRowClickable(dw, a);
+            makeRowClickable(tw, a);
+            makeRowClickable(bb, a);
         }
     };
 
-    connect(t, &QTableWidget::cellClicked, w, [=, this](int r, int) {
+    connect(t, &QTableWidget::cellDoubleClicked, w, [=, this](int r, int) {
         int idx = state->pageNumber * BookingPageState::PAGE_SIZE + r;
         if (idx >= 0 && idx < static_cast<int>(state->appointments.size())) {
             showAppointmentDetailDialog(state->appointments[idx]);
@@ -1892,6 +1999,18 @@ QWidget *AppointmentView::createBookingWidget(QWidget *parent) {
     cal->setSelectedDate(cur);
     highlightCalendarAppointments(cal, cur.year(), cur.month());
     reloadDayView();
+
+    connect(t->horizontalHeader(), &QHeaderView::sectionClicked, w, [state, reloadDayView](int logicalIndex) {
+        if (logicalIndex < 0 || logicalIndex > 3) return;
+        if (state->sortCol == logicalIndex) {
+            state->sortAsc = !state->sortAsc;
+        } else {
+            state->sortCol = logicalIndex;
+            state->sortAsc = true;
+        }
+        state->pageNumber = 0;
+        reloadDayView();
+    });
 
     connect(prevBtn, &QPushButton::clicked, w, [=]() {
         if (state->pageNumber > 0) {
@@ -2082,9 +2201,7 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
     if (doctors) {
         auto *d = doctors->getHeader()->next;
         while (d && d->next) {
-            if (d->info.getValid()) {
-                doctor->addItem(QStringLiteral("BS. %1").arg(UIHelper::qs(d->info.getfullName())), UIHelper::qs(d->info.getID()));
-            }
+            doctor->addItem(QStringLiteral("BS. %1").arg(UIHelper::qs(d->info.getfullName())), UIHelper::qs(d->info.getID()));
             d = d->next;
         }
     }
@@ -2105,16 +2222,9 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
     dateRow->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
 
     auto *date = new QDateEdit(QDate::currentDate());
-    date->setCalendarPopup(true);
     date->setDisplayFormat("dd/MM/yyyy");
     date->setFixedWidth(125);
-
-    // Hoàn thiện Calendar Widget cho input Date
-    if (auto *calPopup = date->calendarWidget()) {
-        UIHelper::applyCalendarStyle(calPopup);
-        calPopup->setHorizontalHeaderFormat(QCalendarWidget::ShortDayNames);
-        calPopup->setFixedSize(260, 210);
-    }
+    UIHelper::setupCalendarPopup(date);
 
     auto *allDates = new ToggleSwitch;
     allDates->setChecked(true);
@@ -2159,7 +2269,6 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
 
     // Table: Bỏ mã lịch, Bỏ triệu chứng, Tách Bác sĩ & Chuyên khoa, Đổi Ngày giờ hẹn thành Ngày khám, có cột hủy lịch
     auto *t = UIHelper::table({"BỆNH NHÂN", "BÁC SĨ", "CHUYÊN KHOA", "NGÀY KHÁM", "TRẠNG THÁI", ""});
-    t->setCursor(Qt::PointingHandCursor);
     t->setSelectionBehavior(QAbstractItemView::SelectRows);
     t->setSelectionMode(QAbstractItemView::SingleSelection);
     t->setFocusPolicy(Qt::StrongFocus);
@@ -2175,20 +2284,15 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
     // Tự động scale các cột sao cho tổng chiều rộng các cột luôn bằng chính xác chiều rộng bảng
     UIHelper::setupTableScaling(t, {0.23, 0.22, 0.20, 0.20, 0.15}, 56);
 
-    // Pagination: 50 stack 1 trang
-    const int PAGE_SIZE = 50;
-    auto currentPage = std::make_shared<int>(0);
-    auto sortColumn = std::make_shared<int>(3); // Mặc định sắp xếp theo NGÀY KHÁM (cột 3)
-    auto sortOrder = std::make_shared<Qt::SortOrder>(Qt::AscendingOrder);
-
-    // Kích hoạt tính năng click tiêu đề cột để QuickSort
-    t->horizontalHeader()->setSectionsClickable(true);
-    t->horizontalHeader()->setSortIndicatorShown(false);
-    t->horizontalHeader()->setCursor(Qt::PointingHandCursor);
-
     // Khung thẻ bo tròn hoàn thiện 4 góc, chống tràn viền
     auto *tableCard = UIHelper::createTableCard(t);
     layout->addWidget(tableCard, 1);
+
+    // Pagination: 50 stack 1 trang
+    const int PAGE_SIZE = 50;
+    auto currentPage = std::make_shared<int>(0);
+    auto sortColumn = std::make_shared<int>(3);
+    auto sortAscending = std::make_shared<bool>(true);
 
     auto *pagination = new QHBoxLayout;
     pagination->setContentsMargins(4, 4, 4, 0);
@@ -2209,14 +2313,22 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
     pagination->addWidget(nextBtn);
     layout->addLayout(pagination);
 
-    auto computeApptStatus = [](const Appointment &a) -> QString {
+    auto computeApptStatus = [](const Appointment &a, Doctor *d) -> QString {
+        (void)d;
+        if (a.getState() == 1) return QStringLiteral("Đã khám");
+        if (a.getState() == -1) return QStringLiteral("Trễ hẹn");
+        Date ad = a.getDateGet();
         QDateTime now = QDateTime::currentDateTime();
-        int st = a.computeEffectiveState(now.date().day(), now.date().month(), now.date().year(), now.time().hour(), now.time().minute());
-        return UIHelper::qs(Appointment::stateToString(st));
+        QDateTime apptDt(QDate(ad.getYear(), ad.getMonth(), ad.getDay()), QTime(ad.getHour(), ad.getMinute()));
+        if (apptDt < now) {
+            return QStringLiteral("Trễ hẹn");
+        }
+        return QStringLiteral("Chưa khám");
     };
 
-    std::function<void()> fill;
-    fill = [this, w, t, doctor, date, allDates, status, totalLabel, prevBtn, nextBtn, pageStatus, currentPage, sortColumn, sortOrder, PAGE_SIZE, computeApptStatus, &fill] {
+    auto fillPtr = std::make_shared<std::function<void()>>();
+    auto fill = [fillPtr]() { if (*fillPtr) (*fillPtr)(); };
+    *fillPtr = [this, w, t, doctor, date, allDates, status, totalLabel, prevBtn, nextBtn, pageStatus, currentPage, PAGE_SIZE, computeApptStatus, sortColumn, sortAscending, fill] {
         t->setRowCount(0);
         auto *appointments = mainWindow ? mainWindow->getAppointments() : nullptr;
         if (!appointments) {
@@ -2230,76 +2342,77 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
         QList<Appointment*> ordered;
         auto *n = appointments->getHeader()->next;
         while (n && n->next) {
-            if (!n->info.isDefault() && n->info.getValid()) ordered.append(&n->info);
+            if (!n->info.isDefault()) ordered.append(&n->info);
             n = n->next;
         }
+
+        int col = *sortColumn;
+        bool asc = *sortAscending;
+
+        libPBL2::qsort(ordered, [this, col, asc, &computeApptStatus](const Appointment *a, const Appointment *b) -> bool {
+            if (!a || !b) return false;
+            int cmp = 0;
+            switch (col) {
+                case 0: { // BỆNH NHÂN
+                    Patient *pa = mainWindow ? mainWindow->findPatientForAppointment(*a) : nullptr;
+                    Patient *pb = mainWindow ? mainWindow->findPatientForAppointment(*b) : nullptr;
+                    std::string na = pa ? pa->getfullName() : "";
+                    std::string nb = pb ? pb->getfullName() : "";
+                    cmp = libPBL2::compareVietnameseNames(na, nb);
+                    break;
+                }
+                case 1: { // BÁC SĨ
+                    Doctor *da = mainWindow ? mainWindow->findDoctor(a->getDoctorId()) : nullptr;
+                    Doctor *db = mainWindow ? mainWindow->findDoctor(b->getDoctorId()) : nullptr;
+                    std::string na = da ? da->getfullName() : "";
+                    std::string nb = db ? db->getfullName() : "";
+                    cmp = libPBL2::compareVietnameseNames(na, nb);
+                    break;
+                }
+                case 2: { // CHUYÊN KHOA
+                    Doctor *da = mainWindow ? mainWindow->findDoctor(a->getDoctorId()) : nullptr;
+                    Doctor *db = mainWindow ? mainWindow->findDoctor(b->getDoctorId()) : nullptr;
+                    QString sa = (da && mainWindow) ? mainWindow->specialty(da->getSpId()) : "";
+                    QString sb = (db && mainWindow) ? mainWindow->specialty(db->getSpId()) : "";
+                    cmp = QString::compare(sa, sb, Qt::CaseInsensitive);
+                    break;
+                }
+                case 3: { // NGÀY KHÁM
+                    cmp = libPBL2::compareDates(a->getDateGet(), b->getDateGet());
+                    break;
+                }
+                case 4: { // TRẠNG THÁI
+                    Doctor *da = mainWindow ? mainWindow->findDoctor(a->getDoctorId()) : nullptr;
+                    Doctor *db = mainWindow ? mainWindow->findDoctor(b->getDoctorId()) : nullptr;
+                    QString sa = computeApptStatus(*a, da);
+                    QString sb = computeApptStatus(*b, db);
+                    cmp = QString::compare(sa, sb, Qt::CaseInsensitive);
+                    break;
+                }
+                default:
+                    cmp = libPBL2::compareDates(a->getDateGet(), b->getDateGet());
+                    break;
+            }
+            if (cmp == 0) {
+                cmp = libPBL2::compareNatural(a->getId(), b->getId());
+            }
+            return asc ? (cmp < 0) : (cmp > 0);
+        });
 
         QList<Appointment*> filtered;
         for (auto *item : ordered) {
             auto &a = *item;
+            Doctor *d = mainWindow->findDoctor(a.getDoctorId());
             Date ad = a.getDateGet();
 
             bool matchesDoctor = doctor->currentData().toString().isEmpty() || UIHelper::qs(a.getDoctorId()) == doctor->currentData().toString();
             bool matchesDate = allDates->isChecked() || (ad.getYear() == date->date().year() && ad.getMonth() == date->date().month() && ad.getDay() == date->date().day());
-            QString sText = computeApptStatus(a);
+            QString sText = computeApptStatus(a, d);
             bool matchesStatus = (status->currentIndex() == 0) || (status->currentText() == sText);
 
             if (matchesDoctor && matchesDate && matchesStatus) {
                 filtered.append(item);
             }
-        }
-
-        // Sắp xếp danh sách lịch hẹn bằng QuickSort mẫu (Template QuickSort) theo từng cột được click
-        if (*sortColumn >= 0) {
-            UIHelper::quickSort(filtered, [this, sortColumn, sortOrder](const Appointment *a, const Appointment *b) -> bool {
-                if (a == b) return false;
-                bool asc = (*sortOrder == Qt::AscendingOrder);
-                switch (*sortColumn) {
-                    case 0: { // Cột 0: BỆNH NHÂN (Tên bệnh nhân từ database)
-                        Patient *pa = mainWindow ? mainWindow->findPatientForAppointment(*a) : nullptr;
-                        Patient *pb = mainWindow ? mainWindow->findPatientForAppointment(*b) : nullptr;
-                        QString nameA = pa ? UIHelper::qs(pa->getfullName()) : "";
-                        QString nameB = pb ? UIHelper::qs(pb->getfullName()) : "";
-                        int cmp = UIHelper::compareVietnameseNames(nameA, nameB);
-                        if (cmp != 0) return asc ? (cmp < 0) : (cmp > 0);
-                        break;
-                    }
-                    case 1: { // Cột 1: BÁC SĨ (Tên bác sĩ từ database)
-                        Doctor *da = mainWindow ? mainWindow->findDoctor(a->getDoctorId()) : nullptr;
-                        Doctor *db = mainWindow ? mainWindow->findDoctor(b->getDoctorId()) : nullptr;
-                        QString nameA = da ? UIHelper::qs(da->getfullName()) : "";
-                        QString nameB = db ? UIHelper::qs(db->getfullName()) : "";
-                        int cmp = UIHelper::compareVietnameseNames(nameA, nameB);
-                        if (cmp != 0) return asc ? (cmp < 0) : (cmp > 0);
-                        break;
-                    }
-                    case 2: { // Cột 2: CHUYÊN KHOA
-                        Doctor *da = mainWindow ? mainWindow->findDoctor(a->getDoctorId()) : nullptr;
-                        Doctor *db = mainWindow ? mainWindow->findDoctor(b->getDoctorId()) : nullptr;
-                        QString spA = (da && mainWindow) ? mainWindow->specialty(da->getSpId()) : "";
-                        QString spB = (db && mainWindow) ? mainWindow->specialty(db->getSpId()) : "";
-                        int cmp = QString::localeAwareCompare(spA, spB);
-                        if (cmp != 0) return asc ? (cmp < 0) : (cmp > 0);
-                        break;
-                    }
-                    case 3: { // Cột 3: NGÀY KHÁM (Dữ liệu Date_Get gốc từ database)
-                        Date da = a->getDateGet();
-                        Date db = b->getDateGet();
-                        QDateTime dta(QDate(da.getYear(), da.getMonth(), da.getDay()), QTime(da.getHour(), da.getMinute()));
-                        QDateTime dtb(QDate(db.getYear(), db.getMonth(), db.getDay()), QTime(db.getHour(), db.getMinute()));
-                        if (dta != dtb) return asc ? (dta < dtb) : (dta > dtb);
-                        break;
-                    }
-                    case 4: { // Cột 4: TRẠNG THÁI (Dữ liệu int App_State gốc từ database: -1 = Trễ hẹn, 0 = Chưa khám, 1 = Đã khám)
-                        if (a->getState() != b->getState())
-                            return asc ? (a->getState() < b->getState()) : (a->getState() > b->getState());
-                        break;
-                    }
-                    default:
-                        break;
-                }
-                return asc ? (a->getId() < b->getId()) : (a->getId() > b->getId());
-            });
         }
 
         totalLabel->setText(QStringLiteral("Tổng số: %1 lịch hẹn").arg(filtered.size()));
@@ -2321,7 +2434,7 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
             Doctor *d = mainWindow->findDoctor(a.getDoctorId());
             Patient *p = mainWindow->findPatientForAppointment(a);
             Date ad = a.getDateGet();
-            QString sText = computeApptStatus(a);
+            QString sText = computeApptStatus(a, d);
 
             int r = t->rowCount();
             t->insertRow(r);
@@ -2353,6 +2466,9 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
 
             // Cột 5: Nút hủy lịch khám (icon thùng rác đỏ)
             auto action = UIHelper::createActionCell(UIHelper::trashIcon(), "Hủy lịch khám");
+            if (mainWindow && !mainWindow->hasPermission("Per_4")) {
+                action.second->setToolTip("Bạn không có quyền hủy lịch khám (Yêu cầu quyền Per_4)");
+            }
             std::string aid = a.getId();
             connect(action.second, &QPushButton::clicked, w, [this, aid, &fill] {
                 if (!mainWindow) return;
@@ -2396,7 +2512,7 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
                 auto *cur = appointments->getHeader()->next;
                 while (cur && cur->next) {
                     if (cur->info.getId() == aid) {
-                        cur->info.setValid(false);
+                        appointments->remove(cur);
                         break;
                     }
                     cur = cur->next;
@@ -2427,6 +2543,18 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
         }
     };
 
+    connect(t->horizontalHeader(), &QHeaderView::sectionClicked, w, [fill, sortColumn, sortAscending, currentPage](int logicalIndex) {
+        if (logicalIndex < 0 || logicalIndex >= 5) return;
+        if (*sortColumn == logicalIndex) {
+            *sortAscending = !*sortAscending;
+        } else {
+            *sortColumn = logicalIndex;
+            *sortAscending = true;
+        }
+        *currentPage = 0;
+        fill();
+    });
+
     connect(doctor, qOverload<int>(&QComboBox::currentIndexChanged), w, [fill, currentPage] { *currentPage = 0; fill(); });
     connect(date, &QDateEdit::dateChanged, w, [fill, currentPage] { *currentPage = 0; fill(); });
     connect(allDates, &QAbstractButton::toggled, w, [fill, currentPage, date](bool c) {
@@ -2448,22 +2576,10 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
         fill();
     });
 
-    connect(t->horizontalHeader(), &QHeaderView::sectionClicked, w, [=, &fill](int logicalIndex) {
-        if (logicalIndex == 5) return; // Bỏ qua cột thao tác hủy
-        if (*sortColumn == logicalIndex) {
-            *sortOrder = (*sortOrder == Qt::AscendingOrder) ? Qt::DescendingOrder : Qt::AscendingOrder;
-        } else {
-            *sortColumn = logicalIndex;
-            *sortOrder = Qt::AscendingOrder;
-        }
-        *currentPage = 0;
-        fill();
-    });
-
     connect(invite, &QPushButton::clicked, w, [this, t, fill] {
         int row = t->currentRow();
         if (row < 0 || !t->item(row, 0)) {
-            UIHelper::showInfo(mainWindow, "Chưa chọn lịch", "Vui lòng chọn một lịch hẹn trong danh sách để mời khám.");
+            UIHelper::showInfo(mainWindow, "Chọn lịch", "Hãy chọn lịch hẹn cần mời.");
             return;
         }
         std::string id = UIHelper::ss(t->item(row, 0)->data(Qt::UserRole).toString());
@@ -2473,7 +2589,7 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
             while (n && n->next) {
                 if (n->info.getId() == id) {
                     if (n->info.getState()) {
-                        UIHelper::showInfo(mainWindow, "Lịch đã hoàn tất", "Lịch khám này đã hoàn tất (Đã khám).");
+                        UIHelper::showInfo(mainWindow, "Lịch đã hoàn tất", "Lịch này đã ở trạng thái đã khám.");
                         return;
                     }
                     Patient *p = mainWindow->findPatientForAppointment(n->info);
@@ -2482,7 +2598,7 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
                     QString patientName = p ? UIHelper::qs(p->getfullName()) : "Bệnh nhân";
                     QString room = d ? UIHelper::formatRoom(UIHelper::qs(d->getRoomId())) : QStringLiteral("chưa xác định");
 
-                    UIHelper::showNoticeDialog(mainWindow, "Mời bệnh nhân đến khám", QStringLiteral("Mời bệnh nhân \"%1\" đến phòng \"%2\" để khám bệnh.").arg(patientName, room), UIHelper::DialogType::Info);
+                    UIHelper::showSuccess(mainWindow, "Mời bệnh nhân đến khám", QStringLiteral("Mời bệnh nhân %1 đến phòng %2 để khám bệnh.").arg(patientName, room));
                     n->info.setState(1);
                     mainWindow->updatePatientSymptomStatus(patientId);
                     mainWindow->saveAll();
@@ -2497,7 +2613,7 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
 
 
     connect(t, &QTableWidget::cellDoubleClicked, w, [this, t, fill](int row, int col) {
-        if (col == 5) return; // Bỏ qua cột hủy lịch khi nháy đúp chuột
+        if (col == 5) return;
         if (row >= 0 && t->item(row, 0)) {
             std::string id = UIHelper::ss(t->item(row, 0)->data(Qt::UserRole).toString());
             auto *appointments = mainWindow ? mainWindow->getAppointments() : nullptr;
@@ -2522,46 +2638,55 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
 void AppointmentView::showAppointmentDetailDialog(Appointment *a) {
     if (!mainWindow || !a) return;
 
+    struct DialogGuard {
+        bool &flag;
+        DialogGuard(bool &f) : flag(f) { flag = true; }
+        ~DialogGuard() { flag = false; }
+    };
+    static bool isShowingDialog = false;
+    if (isShowingDialog) return;
+    DialogGuard guard(isShowingDialog);
+
     bool canEdit = mainWindow->hasPermission("Per_4");
 
     Patient *p = mainWindow->findPatientForAppointment(*a);
+    std::string patientId = mainWindow->getPatientIdForAppointment(*a);
     Doctor *d = mainWindow->findDoctor(a->getDoctorId());
     Date ad = a->getDateGet();
     Date sd = a->getDateSet();
 
     QDialog dialog(mainWindow);
     dialog.setWindowTitle("Chi tiết lịch khám bệnh");
-    dialog.setFixedWidth(580);
+    dialog.setFixedWidth(610);
     dialog.setStyleSheet(R"(
         QDialog {
             background-color: #f8fafc;
-            font-family: 'Segoe UI', sans-serif;
         }
         QComboBox, QDateTimeEdit {
             background: #ffffff;
             border: 1.5px solid #cbd5e1;
-            border-radius: 7px;
-            padding: 4px 22px 4px 8px;
-            font-size: 11px;
+            border-radius: 8px;
+            padding: 6px 28px 6px 10px;
+            font-size: 13px;
             color: #0f172a;
-            min-height: 18px;
+            min-height: 20px;
         }
         QComboBox:focus, QDateTimeEdit:focus {
             border: 1.5px solid #0d9488;
-            background: #ffffff;
+            background: #f0fdfa;
         }
         QComboBox::drop-down, QDateTimeEdit::drop-down {
             subcontrol-origin: border;
             subcontrol-position: top right;
-            width: 24px;
+            width: 26px;
             border: none;
             background: transparent;
         }
         QComboBox::down-arrow, QDateTimeEdit::down-arrow {
             image: url(:/assets/textures/arrow_down_dark.png);
-            width: 9px;
-            height: 9px;
-            margin-right: 5px;
+            width: 10px;
+            height: 10px;
+            margin-right: 6px;
         }
         QComboBox::down-arrow:hover, QDateTimeEdit::down-arrow:hover {
             image: url(:/assets/textures/arrow_down_teal.png);
@@ -2569,64 +2694,58 @@ void AppointmentView::showAppointmentDetailDialog(Appointment *a) {
         QComboBox QAbstractItemView {
             background: #ffffff;
             border: 1.5px solid #cbd5e1;
-            border-radius: 7px;
+            border-radius: 8px;
             selection-background-color: #0d9488;
             selection-color: #ffffff;
             outline: none;
-            padding: 2px;
-            font-size: 10.5px;
+            padding: 4px;
         }
         QComboBox QAbstractItemView::item {
-            min-height: 24px;
-            padding-left: 6px;
-            border-radius: 4px;
+            min-height: 28px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            color: #0f172a;
+            background-color: #ffffff;
         }
         QComboBox QAbstractItemView::item:hover {
-            background: #f0fdfa;
-            color: #0d9488;
+            background-color: #f0fdfa;
+            color: #0f766e;
         }
-        /* Loại bỏ hoàn toàn thanh trượt / slide bar */
-        QComboBox QAbstractItemView QScrollBar:vertical,
-        QComboBox QAbstractItemView QScrollBar:horizontal {
-            width: 0px !important;
-            height: 0px !important;
-            border: none;
-            background: transparent;
+        QComboBox QAbstractItemView::item:selected {
+            background-color: #0d9488;
+            color: #ffffff;
         }
         QScrollBar:vertical, QScrollBar:horizontal {
-            width: 0px !important;
-            height: 0px !important;
-            border: none;
+            width: 0px;
+            height: 0px;
             background: transparent;
+            border: none;
         }
     )");
 
     auto *root = new QVBoxLayout(&dialog);
-    root->setContentsMargins(22, 18, 22, 18);
-    root->setSpacing(12);
+    root->setContentsMargins(24, 20, 24, 20);
+    root->setSpacing(14);
 
     // 1. Header Banner
     auto *headerBox = new QHBoxLayout;
-    headerBox->setSpacing(10);
+    headerBox->setSpacing(12);
 
     auto *icon = new QLabel("📋");
-    icon->setFixedSize(38, 38);
+    icon->setFixedSize(46, 46);
     icon->setAlignment(Qt::AlignCenter);
-    icon->setStyleSheet("background: #f0fdfa; border: 1.5px solid #99f6e4; border-radius: 9px; font-size: 19px;");
+    icon->setStyleSheet("background: #f0fdfa; border: 1.5px solid #99f6e4; border-radius: 12px; font-size: 22px;");
 
     auto *titleCol = new QVBoxLayout;
-    titleCol->setSpacing(1);
+    titleCol->setSpacing(2);
     auto *title = new QLabel("Chi tiết lịch khám bệnh");
-    title->setStyleSheet("font-size: 14.5px; font-weight: 800; color: #0f172a;");
-    auto *sub = new QLabel(QString("Mã phiếu khám: %1").arg(QString::fromStdString(a->getId())));
-    sub->setStyleSheet("font-size: 10.5px; color: #0d9488; font-weight: 700;");
+    title->setStyleSheet("font-size: 18px; font-weight: 800; color: #0f172a;");
     titleCol->addWidget(title);
-    titleCol->addWidget(sub);
 
     auto *roleBadge = new QLabel(canEdit ? "● Có quyền sửa" : "● Chỉ xem");
     roleBadge->setStyleSheet(canEdit
-        ? "background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 9px; font-size: 9.5px; font-weight: 700; padding: 2px 7px;"
-        : "background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 9px; font-size: 9.5px; font-weight: 700; padding: 2px 7px;");
+        ? "background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 12px; font-size: 11.5px; font-weight: 700; padding: 4px 10px;"
+        : "background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 12px; font-size: 11.5px; font-weight: 700; padding: 4px 10px;");
 
     headerBox->addWidget(icon);
     headerBox->addLayout(titleCol, 1);
@@ -2635,14 +2754,14 @@ void AppointmentView::showAppointmentDetailDialog(Appointment *a) {
 
     auto makeSectionCard = [](const QString &iconTitle) {
         auto *f = new QFrame;
-        f->setStyleSheet("QFrame#card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 9px; }");
+        f->setStyleSheet("QFrame#card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; }");
         f->setObjectName("card");
         auto *fl = new QVBoxLayout(f);
-        fl->setContentsMargins(14, 10, 14, 10);
-        fl->setSpacing(6);
+        fl->setContentsMargins(16, 12, 16, 12);
+        fl->setSpacing(8);
 
         auto *h = new QLabel(iconTitle);
-        h->setStyleSheet("font-size: 9.5px; font-weight: 800; color: #0f766e; letter-spacing: 0.5px; text-transform: uppercase;");
+        h->setStyleSheet("font-size: 11.5px; font-weight: 800; color: #0f766e; letter-spacing: 0.6px; text-transform: uppercase;");
         fl->addWidget(h);
         return qMakePair(f, fl);
     };
@@ -2651,17 +2770,17 @@ void AppointmentView::showAppointmentDetailDialog(Appointment *a) {
         auto *col = new QVBoxLayout;
         col->setSpacing(2);
         auto *lbl = new QLabel(label);
-        lbl->setStyleSheet("font-size: 9px; font-weight: 700; color: #64748b; letter-spacing: 0.2px;");
+        lbl->setStyleSheet("font-size: 11px; font-weight: 600; color: #64748b;");
         auto *v = new QLabel(val);
         v->setStyleSheet(isBold
-            ? "font-size: 11.5px; font-weight: 700; color: #0f172a;"
-            : "font-size: 10.5px; font-weight: 600; color: #1e293b;");
+            ? "font-size: 13.5px; font-weight: 700; color: #0f172a;"
+            : "font-size: 13px; font-weight: 600; color: #1e293b;");
         col->addWidget(lbl);
         col->addWidget(v);
         return col;
     };
 
-    // 2. Card Thông tin bệnh nhân
+    // 2. Card Thông tin bệnh nhân (TRỪ MÃ RA)
     auto pCardPair = makeSectionCard("👤  Thông tin bệnh nhân");
     auto *pGrid = new QGridLayout;
     pGrid->setHorizontalSpacing(20);
@@ -2673,17 +2792,27 @@ void AppointmentView::showAppointmentDetailDialog(Appointment *a) {
 
     pGrid->addLayout(makeField("Họ và tên", pName, true), 0, 0);
     pGrid->addLayout(makeField("Tuổi & Giới tính", pGenderAge), 0, 1);
-    pGrid->addLayout(makeField("Số điện thoại liên hệ", pPhone), 1, 0);
-    pGrid->addLayout(makeField("Số CCCD / Định danh", pCccd), 1, 1);
-    pGrid->setColumnStretch(0, 1);
-    pGrid->setColumnStretch(1, 1);
+    pGrid->addLayout(makeField("Số điện thoại", pPhone), 1, 0);
+    pGrid->addLayout(makeField("Số CCCD", pCccd), 1, 1);
     pCardPair.second->addLayout(pGrid);
     root->addWidget(pCardPair.first);
 
-    // 3. Card Triệu chứng lâm sàng (Hiển thị thẻ nhãn tag đẹp mắt)
+    // 3. Card Triệu chứng lâm sàng
     auto sCardPair = makeSectionCard("🩺  Triệu chứng lâm sàng");
     QString apptSymptomName = mainWindow->getSymptomNamesForAppointment(*a);
-    sCardPair.second->addWidget(createSymptomBadgesWidget(apptSymptomName));
+    if (apptSymptomName.isEmpty()) {
+        apptSymptomName = "Chưa ghi nhận";
+    }
+
+    auto *allSymRow = new QHBoxLayout;
+    auto *allSymLbl = new QLabel("Các triệu chứng đã ghi nhận:");
+    allSymLbl->setStyleSheet("font-size: 11.5px; font-weight: 600; color: #64748b;");
+    auto *allSymVal = new QLabel(apptSymptomName);
+    allSymVal->setStyleSheet("font-size: 12.5px; font-weight: 600; color: #1e293b;");
+    allSymVal->setWordWrap(true);
+    allSymRow->addWidget(allSymLbl);
+    allSymRow->addWidget(allSymVal, 1);
+    sCardPair.second->addLayout(allSymRow);
     root->addWidget(sCardPair.first);
 
     // 4. Card Bác sĩ nhận ca & Thông tin bác sĩ
@@ -2691,25 +2820,23 @@ void AppointmentView::showAppointmentDetailDialog(Appointment *a) {
     auto *dGrid = new QGridLayout;
     dGrid->setHorizontalSpacing(20);
     dGrid->setVerticalSpacing(8);
-    dGrid->setColumnStretch(0, 1);
-    dGrid->setColumnStretch(1, 1);
 
     QLabel *dSpecVal = new QLabel(d ? mainWindow->specialty(d->getSpId()) : "—");
-    dSpecVal->setStyleSheet("font-size: 10.5px; font-weight: 600; color: #0d9488;");
+    dSpecVal->setStyleSheet("font-size: 13px; font-weight: 600; color: #1e293b;");
     QLabel *dRoomVal = new QLabel(d ? UIHelper::formatRoom(UIHelper::qs(d->getRoomId())) : "Chưa xác định");
-    dRoomVal->setStyleSheet("font-size: 11px; font-weight: 700; color: #0f172a;");
+    dRoomVal->setStyleSheet("font-size: 13.5px; font-weight: 700; color: #0f172a;");
     QLabel *dPhoneVal = new QLabel((d && !d->getPhone().empty()) ? UIHelper::qs(d->getPhone()) : "Chưa cập nhật");
-    dPhoneVal->setStyleSheet("font-size: 10.5px; font-weight: 600; color: #334155;");
+    dPhoneVal->setStyleSheet("font-size: 13px; font-weight: 600; color: #1e293b;");
     QLabel *dRatingVal = new QLabel(d ? QStringLiteral("⭐ %1 / 5.0").arg(QString::number(d->getRating(), 'f', 1)) : "—");
-    dRatingVal->setStyleSheet("font-size: 10.5px; font-weight: 700; color: #d97706;");
+    dRatingVal->setStyleSheet("font-size: 13px; font-weight: 600; color: #1e293b;");
     QLabel *dFeeVal = new QLabel(d ? (QLocale(QLocale::Vietnamese).toString(d->getFee(), 'f', 0) + " đ") : "—");
-    dFeeVal->setStyleSheet("font-size: 11px; font-weight: 800; color: #0d9488;");
+    dFeeVal->setStyleSheet("font-size: 13px; font-weight: 600; color: #1e293b;");
 
     auto wrapField = [](const QString &label, QLabel *valWidget) {
         auto *col = new QVBoxLayout;
         col->setSpacing(2);
         auto *lbl = new QLabel(label);
-        lbl->setStyleSheet("font-size: 9px; font-weight: 700; color: #64748b; letter-spacing: 0.2px;");
+        lbl->setStyleSheet("font-size: 11px; font-weight: 600; color: #64748b;");
         col->addWidget(lbl);
         col->addWidget(valWidget);
         return col;
@@ -2718,19 +2845,15 @@ void AppointmentView::showAppointmentDetailDialog(Appointment *a) {
     QComboBox *docCombo = nullptr;
     if (canEdit) {
         auto *docCol = new QVBoxLayout;
-        docCol->setSpacing(2);
+        docCol->setSpacing(3);
         auto *docLbl = new QLabel("Bác sĩ nhận ca");
-        docLbl->setStyleSheet("font-size: 9px; font-weight: 700; color: #334155; letter-spacing: 0.2px;");
+        docLbl->setStyleSheet("font-size: 11px; font-weight: 700; color: #334155;");
         docCombo = new QComboBox;
-        docCombo->setMaxVisibleItems(8);
-        removeComboboxScrollbars(docCombo);
         auto *doctors = mainWindow->getDoctors();
         if (doctors) {
             auto *docNode = doctors->getHeader()->next;
             while (docNode && docNode->next) {
-                if (docNode->info.getValid()) {
-                    docCombo->addItem(QStringLiteral("BS. %1").arg(UIHelper::qs(docNode->info.getfullName())), UIHelper::qs(docNode->info.getID()));
-                }
+                docCombo->addItem(QStringLiteral("BS. %1").arg(UIHelper::qs(docNode->info.getfullName())), UIHelper::qs(docNode->info.getID()));
                 docNode = docNode->next;
             }
         }
@@ -2770,43 +2893,56 @@ void AppointmentView::showAppointmentDetailDialog(Appointment *a) {
     dCardPair.second->addLayout(dGrid);
     root->addWidget(dCardPair.first);
 
-    // 5. Card Thời gian & Trạng thái lịch khám
+    // 5. Card Thời gian & Trạng thái appointment
     auto aCardPair = makeSectionCard("📅  Thời gian & Trạng thái lịch khám");
     auto *aGrid = new QGridLayout;
     aGrid->setHorizontalSpacing(20);
     aGrid->setVerticalSpacing(8);
-    aGrid->setColumnStretch(0, 1);
-    aGrid->setColumnStretch(1, 1);
 
     QString setDateStr = QString::asprintf("%02d/%02d/%04d %02d:%02d", sd.getDay(), sd.getMonth(), sd.getYear(), sd.getHour(), sd.getMinute());
     aGrid->addLayout(makeField("Ngày lên lịch hẹn", setDateStr), 0, 0);
 
     QDateTimeEdit *dateEdit = nullptr;
     QComboBox *statCombo = nullptr;
+    bool isPending = (a->getState() == 0); // Chỉ lịch khám ở trạng thái 'Chưa khám' mới được sửa thời gian
 
     if (canEdit) {
         auto *dateCol = new QVBoxLayout;
-        dateCol->setSpacing(2);
+        dateCol->setSpacing(3);
         auto *dateLbl = new QLabel("Ngày đi khám");
-        dateLbl->setStyleSheet("font-size: 9px; font-weight: 700; color: #334155; letter-spacing: 0.2px;");
-        dateEdit = new QDateTimeEdit(QDateTime(QDate(ad.getYear(), ad.getMonth(), ad.getDay()), QTime(ad.getHour(), ad.getMinute())));
-        dateEdit->setDisplayFormat("dd/MM/yyyy   HH:mm");
-        dateEdit->setCalendarPopup(true);
-        setupCalendarPopup(dateEdit);
+        dateLbl->setStyleSheet("font-size: 11px; font-weight: 700; color: #334155;");
+
+        QDateTime apptDT(QDate(ad.getYear(), ad.getMonth(), ad.getDay()), QTime(ad.getHour(), ad.getMinute()));
+        QDateTime now = QDateTime::currentDateTime();
+
+        if (isPending) {
+            // Lịch chưa khám: Cho phép sửa và khóa thời gian phía trước (từ thời điểm hiện tại trở đi)
+            QDateTime initDT = (apptDT > now) ? apptDT : now.addSecs(1800);
+            dateEdit = new QDateTimeEdit(initDT);
+            dateEdit->setDisplayFormat("dd/MM/yyyy HH:mm");
+            dateEdit->setMinimumDateTime(now);
+            UIHelper::setupCalendarPopup(dateEdit, now.date());
+        } else {
+            // Đã khám hoặc Trễ hẹn: Khóa cứng không cho sửa thời gian
+            dateEdit = new QDateTimeEdit(apptDT);
+            dateEdit->setDisplayFormat("dd/MM/yyyy HH:mm");
+            dateEdit->setEnabled(false);
+            dateEdit->setToolTip("Chỉ được phép chỉnh sửa thời gian đối với ca khám ở trạng thái 'Chưa khám'.");
+            UIHelper::setupCalendarPopup(dateEdit);
+        }
 
         dateCol->addWidget(dateLbl);
         dateCol->addWidget(dateEdit);
         aGrid->addLayout(dateCol, 0, 1);
 
         auto *statCol = new QVBoxLayout;
-        statCol->setSpacing(2);
+        statCol->setSpacing(3);
         auto *statLbl = new QLabel("Trạng thái ca khám");
-        statLbl->setStyleSheet("font-size: 9px; font-weight: 700; color: #334155; letter-spacing: 0.2px;");
+        statLbl->setStyleSheet("font-size: 11px; font-weight: 700; color: #334155;");
         statCombo = new QComboBox;
-        removeComboboxScrollbars(statCombo);
-        statCombo->addItem("Chưa khám (Đang chờ)", 0);
-        statCombo->addItem("Đã khám hoàn tất", 1);
-        statCombo->addItem("Trễ hẹn khám", -1);
+        statCombo->addItem("Chưa khám", 0);
+        statCombo->addItem("Đã khám", 1);
+        statCombo->addItem("Trễ hẹn", -1);
         int curSt = a->getState();
         int statIdx = statCombo->findData(curSt);
         if (statIdx >= 0) statCombo->setCurrentIndex(statIdx);
@@ -2817,8 +2953,8 @@ void AppointmentView::showAppointmentDetailDialog(Appointment *a) {
         QString apptDateStr = QString::asprintf("%02d:%02d · Ngày %02d/%02d/%04d", ad.getHour(), ad.getMinute(), ad.getDay(), ad.getMonth(), ad.getYear());
         aGrid->addLayout(makeField("Ngày đi khám", apptDateStr, true), 0, 1);
         QString stText = "Chưa khám (Đang chờ)";
-        if (a->getState() == 1) stText = "Đã khám hoàn tất";
-        else if (a->getState() == -1) stText = "Trễ hẹn khám";
+        if (a->getState() == 1) stText = "Đã khám";
+        else if (a->getState() == -1) stText = "Trễ hẹn";
         aGrid->addLayout(makeField("Trạng thái ca khám", stText), 1, 0);
     }
 
@@ -2828,104 +2964,44 @@ void AppointmentView::showAppointmentDetailDialog(Appointment *a) {
     // Footer Buttons
     auto *btnRow = new QHBoxLayout;
     btnRow->setSpacing(10);
+    btnRow->addStretch();
 
     if (canEdit) {
-        auto *delApptBtn = new QPushButton("Hủy lịch khám này");
-        delApptBtn->setCursor(Qt::PointingHandCursor);
-        delApptBtn->setStyleSheet(R"(
-            QPushButton {
-                background: #fef2f2;
-                color: #dc2626;
-                border: 1px solid #fecaca;
-                border-radius: 7px;
-                padding: 6px 14px;
-                font-weight: 700;
-                font-size: 11px;
-            }
-            QPushButton:hover {
-                background: #fee2e2;
-                color: #b91c1c;
-            }
-        )");
-
-        QObject::connect(delApptBtn, &QPushButton::clicked, &dialog, [this, &dialog, a] {
-            if (a->getState() == 1) {
-                UIHelper::showInfo(&dialog, "Lịch đã hoàn tất", "Lịch khám này đã hoàn tất (Đã khám), không thể thực hiện hủy.");
-                return;
-            }
-
-            Patient *p = mainWindow->findPatientForAppointment(*a);
-            Date ad = a->getDateGet();
-            QString patientName = p ? UIHelper::qs(p->getfullName()) : "bệnh nhân";
-            QString dateStr = QString::asprintf("%02d:%02d · %02d/%02d/%04d", ad.getHour(), ad.getMinute(), ad.getDay(), ad.getMonth(), ad.getYear());
-
-            QString confirmMsg = QStringLiteral("Bạn có chắc chắn muốn hủy lịch khám lúc %1 của bệnh nhân \"%2\"?\nLịch hẹn sau khi hủy sẽ không còn hiển thị trong danh sách chờ.")
-                .arg(dateStr, patientName);
-            if (!UIHelper::confirmCancel(&dialog, "Hủy lịch khám", confirmMsg, "Hủy lịch", "Không hủy")) {
-                return;
-            }
-
-            std::string aid = a->getId();
-            std::string patientId = mainWindow->getPatientIdForAppointment(*a);
-            std::string spId = a->getSymptomPatientId();
-
-            auto *appointments = mainWindow->getAppointments();
-            if (appointments) {
-                auto *cur = appointments->getHeader()->next;
-                while (cur && cur->next) {
-                    if (cur->info.getId() == aid) {
-                        cur->info.setValid(false);
-                        break;
-                    }
-                    cur = cur->next;
-                }
-            }
-
-            if (!patientId.empty()) {
-                auto *symptomPatients = mainWindow->getSymptomPatients();
-                if (symptomPatients && !spId.empty()) {
-                    auto *spNode = symptomPatients->getHeader()->next;
-                    while (spNode && spNode->next) {
-                        if (spNode->info.getSP_id() == spId) {
-                            spNode->info.setResolved(0);
-                            break;
-                        }
-                        spNode = spNode->next;
-                    }
-                }
-                mainWindow->updatePatientSymptomStatus(patientId);
-            }
-
-            mainWindow->saveAll();
-            mainWindow->refreshPage(0);
-            mainWindow->refreshPage(2);
-            dialog.accept();
-        });
-
-        auto *closeBtn = new QPushButton("Đóng");
-        closeBtn->setCursor(Qt::PointingHandCursor);
-        closeBtn->setStyleSheet("QPushButton { background: #ffffff; color: #475569; border: 1.5px solid #cbd5e1; border-radius: 7px; padding: 6px 18px; font-weight: 700; font-size: 11px; } QPushButton:hover { background: #f1f5f9; color: #0f172a; }");
-        QObject::connect(closeBtn, &QPushButton::clicked, &dialog, &QDialog::reject);
+        auto *cancelBtn = new QPushButton("Hủy");
+        cancelBtn->setCursor(Qt::PointingHandCursor);
+        cancelBtn->setStyleSheet("QPushButton { background: #ffffff; color: #475569; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 9px 22px; font-weight: 700; font-size: 13px; } QPushButton:hover { background: #f1f5f9; color: #0f172a; }");
+        QObject::connect(cancelBtn, &QPushButton::clicked, &dialog, &QDialog::reject);
 
         auto *saveBtn = new QPushButton("✓  Lưu thay đổi");
         saveBtn->setCursor(Qt::PointingHandCursor);
-        saveBtn->setStyleSheet("QPushButton { background: #0d9488; color: #ffffff; border: none; border-radius: 7px; padding: 6px 20px; font-weight: 700; font-size: 11px; } QPushButton:hover { background: #0f766e; }");
+        saveBtn->setStyleSheet("QPushButton { background: #0d9488; color: #ffffff; border: none; border-radius: 8px; padding: 9px 24px; font-weight: 700; font-size: 13px; } QPushButton:hover { background: #0f766e; }");
 
-        QObject::connect(saveBtn, &QPushButton::clicked, &dialog, [this, &dialog, a, docCombo, dateEdit, statCombo] {
+        QObject::connect(saveBtn, &QPushButton::clicked, &dialog, [this, &dialog, a, docCombo, dateEdit, statCombo, isPending] {
             if (docCombo && docCombo->currentIndex() < 0) {
-                UIHelper::showWarning(&dialog, "Thiếu thông tin", "Vui lòng chọn bác sĩ phụ trách.");
+                UIHelper::showWarning(&dialog, "Thiếu thông tin", "Hãy chọn bác sĩ phụ trách.");
                 return;
             }
-            if (dateEdit && mainWindow->isHoliday(dateEdit->date())) {
-                UIHelper::showWarning(&dialog, "Ngày nghỉ lễ", "Không thể xếp lịch vào ngày nghỉ lễ.");
-                return;
+
+            if (dateEdit && dateEdit->isEnabled()) {
+                if (!isPending) {
+                    UIHelper::showWarning(&dialog, "Không thể sửa thời gian", "Chỉ được phép chỉnh sửa thời gian đối với ca khám ở trạng thái 'Chưa khám'.");
+                    return;
+                }
+                if (dateEdit->dateTime() <= QDateTime::currentDateTime()) {
+                    UIHelper::showWarning(&dialog, "Thời gian không hợp lệ", "Thời gian khám phải từ thời điểm hiện tại trở đi.");
+                    return;
+                }
+                if (mainWindow->isHoliday(dateEdit->date())) {
+                    UIHelper::showWarning(&dialog, "Ngày nghỉ lễ", "Không thể xếp lịch vào ngày nghỉ lễ.");
+                    return;
+                }
             }
 
             if (docCombo) {
                 a->setDoctorId(UIHelper::ss(docCombo->currentData().toString()));
             }
 
-            if (dateEdit) {
+            if (dateEdit && isPending && dateEdit->isEnabled()) {
                 a->setDateGet(Date::loadFromString(UIHelper::ss(dateEdit->dateTime().toString("yyyy-MM-dd HH:mm"))));
             }
 
@@ -2946,14 +3022,12 @@ void AppointmentView::showAppointmentDetailDialog(Appointment *a) {
             dialog.accept();
         });
 
-        btnRow->addWidget(delApptBtn);
-        btnRow->addStretch();
-        btnRow->addWidget(closeBtn);
+        btnRow->addWidget(cancelBtn);
         btnRow->addWidget(saveBtn);
     } else {
         auto *closeBtn = new QPushButton("Đóng");
         closeBtn->setCursor(Qt::PointingHandCursor);
-        closeBtn->setStyleSheet("QPushButton { background: #0d9488; color: #ffffff; border: none; border-radius: 7px; padding: 6px 22px; font-weight: 700; font-size: 11.5px; } QPushButton:hover { background: #0f766e; }");
+        closeBtn->setStyleSheet("QPushButton { background: #0d9488; color: #ffffff; border: none; border-radius: 8px; padding: 9px 28px; font-weight: 700; font-size: 13px; } QPushButton:hover { background: #0f766e; }");
         QObject::connect(closeBtn, &QPushButton::clicked, &dialog, &QDialog::accept);
         btnRow->addWidget(closeBtn);
     }
@@ -2961,7 +3035,6 @@ void AppointmentView::showAppointmentDetailDialog(Appointment *a) {
     root->addLayout(btnRow);
     dialog.setFocusPolicy(Qt::StrongFocus);
     dialog.setFocus();
-    QTimer::singleShot(0, [&dialog]() { dialog.setFocus(); });
     dialog.exec();
 }
 
@@ -2999,8 +3072,7 @@ QWidget *AppointmentView::createHolidayWidget(QWidget *parent) {
     layout->addLayout(actions);
 
     auto *t = UIHelper::table({"NGÀY NGHỈ", "GHI CHÚ"});
-    UIHelper::setupTableScaling(t, {0.30, 0.70}, 0);
-    layout->addWidget(UIHelper::createTableCard(t), 1);
+    layout->addWidget(t, 1);
 
     auto fill = [t] {
         t->setRowCount(0);
@@ -3027,13 +3099,14 @@ QWidget *AppointmentView::createHolidayWidget(QWidget *parent) {
 
         QDialog dialog(mainWindow);
         dialog.setWindowTitle(isNew ? "Thêm ngày nghỉ" : "Chỉnh sửa ngày nghỉ");
+        dialog.setStyleSheet(UIHelper::dialogFormStyle());
 
         auto *v = new QVBoxLayout(&dialog);
         auto *f = new QFormLayout;
 
         auto *date = new QDateEdit(QDate::currentDate());
         date->setDisplayFormat("d/M");
-        date->setCalendarPopup(true);
+        UIHelper::setupCalendarPopup(date);
 
         if (!isNew) {
             auto parts = oldDate.split('/');
@@ -3081,7 +3154,11 @@ QWidget *AppointmentView::createHolidayWidget(QWidget *parent) {
     connect(remove, &QPushButton::clicked, w, [this, t, fill, persist] {
         int r = t->currentRow();
         if (r < 0) return;
-        if (!UIHelper::confirmDelete(mainWindow, "Xác nhận xóa ngày nghỉ", "Bạn có chắc chắn muốn xóa ngày nghỉ lễ này khỏi lịch phòng khám?", "Xóa", "Không xóa")) {
+        if (!mainWindow || !mainWindow->hasPermission("Per_5")) {
+            UIHelper::showWarning(mainWindow, "Không có quyền", "Bạn không có quyền xóa lịch nghỉ.");
+            return;
+        }
+        if (!UIHelper::confirmDelete(mainWindow, "Xóa ngày nghỉ", "Bạn có chắc chắn muốn xóa ngày nghỉ này khỏi lịch không?")) {
             return;
         }
         t->removeRow(r);
@@ -3099,28 +3176,26 @@ void AppointmentView::showHolidayManagementDialog(QWidget *parent) {
 
     QDialog dialog(parent ? parent : mainWindow);
     dialog.setWindowTitle("Quản lý lịch nghỉ lễ");
-    dialog.setFixedWidth(540);
-    dialog.setFixedHeight(385);
-    dialog.setStyleSheet(R"(
-        QDialog { background-color: #ffffff; border-radius: 12px; font-family: 'Segoe UI', -apple-system, sans-serif; }
-        QLabel#dialogTitle { font-size: 14.5px; font-weight: 800; color: #0f172a; }
-        QLabel#dialogSubtitle { font-size: 10.5px; color: #64748b; }
+    dialog.setMinimumWidth(660);
+    dialog.setMinimumHeight(460);
+    dialog.setStyleSheet(UIHelper::dialogFormStyle() + R"(
+        QLabel#dialogTitle { font-size: 18px; font-weight: 750; color: #0f172a; }
+        QLabel#dialogSubtitle { font-size: 13px; color: #64748b; }
         QTableWidget {
             background-color: #ffffff;
             border: 1.5px solid #cbd5e1;
-            border-radius: 8px;
+            border-radius: 10px;
             gridline-color: transparent;
-            outline: none;
         }
         QHeaderView { border: none; background: transparent; }
         QHeaderView::section {
             background: #f8fafc;
             color: #475569;
             font-weight: 700;
-            font-size: 9.5px;
-            padding: 6px 10px;
+            font-size: 11.5px;
+            padding: 10px 14px;
             border: none;
-            border-bottom: 1.5px solid #e2e8f0;
+            border-bottom: 2px solid #e2e8f0;
             border-left: none;
             border-right: none;
         }
@@ -3128,46 +3203,33 @@ void AppointmentView::showHolidayManagementDialog(QWidget *parent) {
             background: #ffffff;
             border: none;
             border-bottom: 1px solid #f1f5f9;
-            font-size: 10.5px;
-            color: #1e293b;
-            padding-left: 6px;
-            padding-right: 6px;
+            border-left: none;
+            border-right: none;
         }
         QTableWidget::item:hover { background: #f0fdfa; }
-        QScrollBar:vertical {
-            width: 5px;
-            background: transparent;
-            border: none;
-            margin: 2px 0px;
-        }
-        QScrollBar::handle:vertical {
-            background: #cbd5e1;
-            border-radius: 2px;
-            min-height: 20px;
-        }
-        QScrollBar::handle:vertical:hover { background: #94a3b8; }
-        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+        QScrollBar:vertical, QScrollBar:horizontal {
+            width: 0px;
             height: 0px;
+            background: transparent;
             border: none;
         }
     )");
 
     auto *rootLayout = new QVBoxLayout(&dialog);
-    rootLayout->setContentsMargins(18, 14, 18, 14);
-    rootLayout->setSpacing(10);
+    rootLayout->setContentsMargins(24, 20, 24, 20);
+    rootLayout->setSpacing(14);
 
     // Header layout
     auto *headerLayout = new QHBoxLayout;
     auto *titleCol = new QVBoxLayout;
-    titleCol->setSpacing(2);
+    titleCol->setSpacing(3);
     auto *title = new QLabel("Quản lý lịch nghỉ lễ", &dialog);
     title->setObjectName("dialogTitle");
     titleCol->addWidget(title);
     headerLayout->addLayout(titleCol, 1);
 
-    auto *addBtn = new QPushButton("＋  Thêm ngày nghỉ");
-    addBtn->setCursor(Qt::PointingHandCursor);
-    addBtn->setStyleSheet("QPushButton { background-color: #0d9488; color: white; border: none; border-radius: 6px; padding: 5px 12px; font-weight: 700; font-size: 11px; } QPushButton:hover { background-color: #0f766e; }");
+    auto *addBtn = UIHelper::button("＋  Thêm ngày nghỉ", "primary");
+    addBtn->setStyleSheet("QPushButton { background-color: #0d9488; color: white; border: none; border-radius: 8px; padding: 8px 16px; font-weight: 700; font-size: 13px; } QPushButton:hover { background-color: #0f766e; }");
     headerLayout->addWidget(addBtn, 0, Qt::AlignVCenter);
     rootLayout->addLayout(headerLayout);
 
@@ -3177,13 +3239,14 @@ void AppointmentView::showHolidayManagementDialog(QWidget *parent) {
     t->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
     t->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
     t->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Fixed);
-    t->setColumnWidth(0, 125);
-    t->setColumnWidth(2, 110);
-    t->verticalHeader()->setDefaultSectionSize(34);
-    rootLayout->addWidget(UIHelper::createTableCard(t), 1);
+    t->setColumnWidth(0, 160);
+    t->setColumnWidth(2, 140);
+    t->verticalHeader()->setDefaultSectionSize(48);
+    rootLayout->addWidget(t, 1);
 
-    std::function<void()> fill;
-    fill = [this, t, &dialog, &fill]() {
+    auto fillPtr = std::make_shared<std::function<void()>>();
+    auto fill = [fillPtr]() { if (*fillPtr) (*fillPtr)(); };
+    *fillPtr = [this, t, &dialog, fill]() {
         t->setRowCount(0);
         auto list = AppointmentController::loadHolidays("Config/Lichnghile.txt");
         for (int i = 0; i < list.size(); ++i) {
@@ -3199,16 +3262,7 @@ void AppointmentView::showHolidayManagementDialog(QWidget *parent) {
                 displayDate = "Tết Nguyên Đán";
                 int curYear = QDate::currentDate().year();
                 QDate mung1 = AppointmentController::getLunarNewYear(curYear);
-                int days = item.note.toInt();
-                if (days <= 0) days = 5;
-                displayNote = QStringLiteral("Nghỉ %1 ngày (Mùng 1 Tết: %2)").arg(days).arg(mung1.toString("dd/MM/yyyy"));
-            } else if (displayNote == "Nghỉ lễ" || displayNote.isEmpty()) {
-                if (displayDate == "1/1") displayNote = "Tết Dương Lịch";
-                else if (displayDate == "10/3") displayNote = "Giỗ Tổ Hùng Vương";
-                else if (displayDate == "30/4") displayNote = "Ngày Giải phóng miền Nam";
-                else if (displayDate == "1/5") displayNote = "Ngày Quốc tế Lao động";
-                else if (displayDate == "2/9") displayNote = "Quốc khánh Việt Nam";
-                else if (displayDate == "1/9") displayNote = "Nghỉ lễ Quốc khánh";
+                displayNote = QStringLiteral("Nghỉ 5 ngày (Mùng 1 Tết: %1)").arg(mung1.toString("dd/MM/yyyy"));
             }
 
             auto *dateItem = new QTableWidgetItem(displayDate);
@@ -3233,115 +3287,82 @@ void AppointmentView::showHolidayManagementDialog(QWidget *parent) {
             // Action widget
             auto *aw = new QWidget;
             auto *al = new QHBoxLayout(aw);
-            al->setContentsMargins(2, 2, 2, 2);
+            al->setContentsMargins(4, 4, 4, 4);
             al->setSpacing(6);
             al->setAlignment(Qt::AlignCenter);
 
             auto *editBtn = new QPushButton("Sửa");
             editBtn->setCursor(Qt::PointingHandCursor);
-            editBtn->setStyleSheet("QPushButton { background: #f1f5f9; color: #0d9488; border: 1px solid #cbd5e1; border-radius: 5px; padding: 2px 8px; font-weight: 700; font-size: 10px; } QPushButton:hover { background: #e2e8f0; }");
+            editBtn->setStyleSheet("QPushButton { background: #f1f5f9; color: #0d9488; border: 1px solid #cbd5e1; border-radius: 6px; padding: 4px 10px; font-weight: 700; font-size: 12px; } QPushButton:hover { background: #e2e8f0; }");
 
             auto *delBtn = new QPushButton("Xóa");
             delBtn->setCursor(Qt::PointingHandCursor);
-            delBtn->setStyleSheet("QPushButton { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; border-radius: 5px; padding: 2px 8px; font-weight: 700; font-size: 10px; } QPushButton:hover { background: #fecaca; }");
+            delBtn->setStyleSheet("QPushButton { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; border-radius: 6px; padding: 4px 10px; font-weight: 700; font-size: 12px; } QPushButton:hover { background: #fecaca; }");
+
+            bool canEditHoliday = mainWindow && mainWindow->hasPermission("Per_5");
+            if (!canEditHoliday) {
+                editBtn->setToolTip("Bạn không có quyền chỉnh sửa ngày nghỉ (Yêu cầu quyền Per_5)");
+                delBtn->setToolTip("Bạn không có quyền xóa ngày nghỉ (Yêu cầu quyền Per_5)");
+            }
 
             al->addWidget(editBtn);
             al->addWidget(delBtn);
             t->setCellWidget(r, 2, aw);
 
-            QObject::connect(editBtn, &QPushButton::clicked, &dialog, [this, &dialog, i, item, isTet, &fill]() {
+            QObject::connect(editBtn, &QPushButton::clicked, &dialog, [this, &dialog, i, item, isTet]() {
+                if (!mainWindow || !mainWindow->hasPermission("Per_5")) {
+                    UIHelper::showWarning(&dialog, "Không có quyền", "Bạn không có quyền chỉnh sửa lịch nghỉ.");
+                    return;
+                }
                 QDialog editDlg(&dialog);
                 editDlg.setWindowTitle("Chỉnh sửa ngày nghỉ");
-                editDlg.setFixedWidth(380);
-                editDlg.setStyleSheet(R"(
-                    QDialog { background-color: #ffffff; border-radius: 10px; font-family: 'Segoe UI', -apple-system, sans-serif; }
-                    QLabel { font-size: 10.5px; font-weight: 700; color: #475569; }
-                    QLineEdit {
-                        background-color: #f8fafc;
-                        border: 1.5px solid #cbd5e1;
-                        border-radius: 6px;
-                        padding: 5px 8px;
-                        font-size: 11px;
-                        color: #0f172a;
-                    }
-                    QLineEdit:focus { border-color: #0d9488; background-color: #ffffff; }
-                )");
+                editDlg.setMinimumWidth(380);
+                editDlg.setStyleSheet(UIHelper::dialogFormStyle());
                 auto *ev = new QVBoxLayout(&editDlg);
-                ev->setContentsMargins(18, 16, 18, 16);
-                ev->setSpacing(12);
+                ev->setContentsMargins(20, 20, 20, 20);
+                ev->setSpacing(14);
 
                 auto *ef = new QFormLayout;
-                ef->setSpacing(10);
                 auto *dateEdit = new QLineEdit(item.date);
                 auto *noteEdit = new QLineEdit(item.note);
                 if (isTet) {
                     dateEdit->setEnabled(false);
-                    noteEdit->setPlaceholderText("Số ngày nghỉ Tết (VD: 5)");
-                    ef->addRow("Dịp nghỉ lễ:", dateEdit);
-                    ef->addRow("Số ngày nghỉ Tết:", noteEdit);
-                } else {
-                    ef->addRow("Ngày nghỉ (ngày/tháng):", dateEdit);
-                    ef->addRow("Ghi chú ngày nghỉ:", noteEdit);
+                    noteEdit->setPlaceholderText("Số ngày nghỉ Tết (mặc định 5)");
                 }
+                ef->addRow("Mã / Ngày nghỉ:", dateEdit);
+                ef->addRow("Ghi chú / Số ngày:", noteEdit);
                 ev->addLayout(ef);
 
                 auto *btnBox = new QHBoxLayout;
-                btnBox->setSpacing(8);
                 btnBox->addStretch();
-                auto *cancelB = new QPushButton("Hủy");
-                cancelB->setCursor(Qt::PointingHandCursor);
-                cancelB->setStyleSheet("QPushButton { background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px 14px; font-weight: 700; font-size: 11px; } QPushButton:hover { background-color: #e2e8f0; }");
-                QObject::connect(cancelB, &QPushButton::clicked, &editDlg, &QDialog::reject);
-
-                auto *saveB = new QPushButton("✓  Lưu");
+                auto *saveB = new QPushButton("Lưu");
                 saveB->setCursor(Qt::PointingHandCursor);
-                saveB->setStyleSheet("QPushButton { background-color: #0d9488; color: white; border: none; border-radius: 6px; padding: 5px 16px; font-weight: 700; font-size: 11px; } QPushButton:hover { background-color: #0f766e; }");
-                btnBox->addWidget(cancelB);
+                saveB->setStyleSheet("QPushButton { background-color: #0d9488; color: white; border: none; border-radius: 7px; padding: 8px 18px; font-weight: 700; } QPushButton:hover { background-color: #0f766e; }");
                 btnBox->addWidget(saveB);
                 ev->addLayout(btnBox);
 
-                QObject::connect(saveB, &QPushButton::clicked, &editDlg, [&editDlg, dateEdit, noteEdit, i, isTet]() {
+                QObject::connect(saveB, &QPushButton::clicked, &editDlg, [&editDlg, dateEdit, noteEdit, i]() {
                     auto curList = AppointmentController::loadHolidays("Config/Lichnghile.txt");
-                    if (i >= curList.size()) {
-                        editDlg.reject();
-                        return;
+                    if (i < curList.size()) {
+                        curList[i].date = dateEdit->text().trimmed();
+                        curList[i].note = noteEdit->text().trimmed();
+                        AppointmentController::saveHolidays("Config/Lichnghile.txt", curList);
                     }
-                    if (isTet) {
-                        int days = noteEdit->text().trimmed().toInt();
-                        if (days <= 0) days = 5;
-                        curList[i].date = "Tet";
-                        curList[i].note = QString::number(days);
-                    } else {
-                        QString rawDate = dateEdit->text().trimmed();
-                        QRegularExpression re("^(\\d{1,2})[/\\-\\.](\\d{1,2})");
-                        auto match = re.match(rawDate);
-                        if (!match.hasMatch()) {
-                            UIHelper::showWarning(&editDlg, "Định dạng không hợp lệ", "Vui lòng nhập ngày/tháng hợp lệ (Ví dụ: 2/9, 30/4, 25/12).");
-                            return;
-                        }
-                        int d = match.captured(1).toInt();
-                        int m = match.captured(2).toInt();
-                        if (m < 1 || m > 12 || d < 1 || d > 31) {
-                            UIHelper::showWarning(&editDlg, "Ngày không hợp lệ", "Ngày hoặc tháng không tồn tại trên lịch (ngày: 1-31, tháng: 1-12).");
-                            return;
-                        }
-                        QString cleanDate = QString("%1/%2").arg(d).arg(m);
-                        QString note = noteEdit->text().trimmed();
-                        if (note.isEmpty()) note = "Nghỉ lễ";
-                        curList[i].date = cleanDate;
-                        curList[i].note = note;
-                    }
-                    AppointmentController::saveHolidays("Config/Lichnghile.txt", curList);
                     editDlg.accept();
                 });
 
                 if (editDlg.exec() == QDialog::Accepted) {
-                    fill();
+                    editDlg.close();
                 }
             });
 
-            QObject::connect(delBtn, &QPushButton::clicked, &dialog, [this, &dialog, i, item, &fill]() {
-                if (UIHelper::confirmDelete(&dialog, "Xác nhận xóa ngày nghỉ", QStringLiteral("Bạn có chắc chắn muốn xóa ngày nghỉ '%1' khỏi lịch phòng khám?").arg(item.date), "Xóa", "Không xóa")) {
+            QObject::connect(delBtn, &QPushButton::clicked, &dialog, [this, &dialog, i, item, fill]() {
+                if (!mainWindow || !mainWindow->hasPermission("Per_5")) {
+                    UIHelper::showWarning(&dialog, "Không có quyền", "Bạn không có quyền xóa lịch nghỉ.");
+                    return;
+                }
+                if (UIHelper::confirmDelete(&dialog, "Xác nhận xóa ngày nghỉ",
+                    QStringLiteral("Bạn có chắc chắn muốn xóa ngày nghỉ '%1' khỏi lịch phòng khám?").arg(item.date), "Xóa", "Không xóa")) {
                     auto curList = AppointmentController::loadHolidays("Config/Lichnghile.txt");
                     if (i < curList.size()) {
                         curList.removeAt(i);
@@ -3353,37 +3374,33 @@ void AppointmentView::showHolidayManagementDialog(QWidget *parent) {
         }
     };
 
-    QObject::connect(addBtn, &QPushButton::clicked, &dialog, [this, &dialog, &fill]() {
+    if (mainWindow && !mainWindow->hasPermission("Per_5")) {
+        addBtn->setToolTip("Bạn không có quyền thêm ngày nghỉ (Yêu cầu quyền Per_5)");
+    }
+
+    QObject::connect(addBtn, &QPushButton::clicked, &dialog, [this, &dialog, fill]() {
+        if (!mainWindow || !mainWindow->hasPermission("Per_5")) {
+            UIHelper::showWarning(&dialog, "Không có quyền", "Bạn không có quyền thêm ngày nghỉ.");
+            return;
+        }
         QDialog addDlg(&dialog);
         addDlg.setWindowTitle("Thêm ngày nghỉ mới");
-        addDlg.setFixedWidth(390);
-        addDlg.setStyleSheet(R"(
-            QDialog { background-color: #ffffff; border-radius: 10px; font-family: 'Segoe UI', -apple-system, sans-serif; }
-            QLabel { font-size: 10.5px; font-weight: 700; color: #475569; }
-            QComboBox, QLineEdit {
-                background-color: #f8fafc;
-                border: 1.5px solid #cbd5e1;
-                border-radius: 6px;
-                padding: 5px 8px;
-                font-size: 11px;
-                color: #0f172a;
-            }
-            QComboBox:focus, QLineEdit:focus { border-color: #0d9488; background-color: #ffffff; }
-        )");
+        addDlg.setMinimumWidth(380);
+        addDlg.setStyleSheet(UIHelper::dialogFormStyle());
         auto *ev = new QVBoxLayout(&addDlg);
-        ev->setContentsMargins(18, 16, 18, 16);
-        ev->setSpacing(12);
+        ev->setContentsMargins(20, 20, 20, 20);
+        ev->setSpacing(14);
 
         auto *ef = new QFormLayout;
-        ef->setSpacing(10);
         auto *dateType = new QComboBox;
-        dateType->addItem("Ngày lễ cố định (Dương lịch)");
-        dateType->addItem("Tết Nguyên Đán (Âm lịch)");
+        dateType->setView(new QListView(dateType));
+        dateType->addItem("Ngày lễ cố định (ngày/tháng)");
+        dateType->addItem("Tết Nguyên Đán (Âm lịch - 5 ngày)");
 
         auto *dateEdit = new QLineEdit;
-        dateEdit->setPlaceholderText("Ví dụ: 2/9, 30/4, 25/12...");
+        dateEdit->setPlaceholderText("Ví dụ: 2/9, 30/4, 1/1...");
         auto *noteEdit = new QLineEdit;
-        noteEdit->setPlaceholderText("Ghi chú ngày nghỉ lễ (Ví dụ: Tết Dương Lịch)");
+        noteEdit->setPlaceholderText("Ghi chú ngày nghỉ lễ");
 
         ef->addRow("Loại ngày nghỉ:", dateType);
         ef->addRow("Ngày nghỉ:", dateEdit);
@@ -3395,83 +3412,28 @@ void AppointmentView::showHolidayManagementDialog(QWidget *parent) {
                 dateEdit->setText("Tet");
                 dateEdit->setEnabled(false);
                 noteEdit->setText("5");
-                noteEdit->setPlaceholderText("Số ngày nghỉ Tết (mặc định: 5)");
             } else {
                 dateEdit->clear();
                 dateEdit->setEnabled(true);
                 noteEdit->clear();
-                noteEdit->setPlaceholderText("Ghi chú ngày nghỉ lễ (Ví dụ: Tết Dương Lịch)");
             }
         });
 
         auto *btnBox = new QHBoxLayout;
-        btnBox->setSpacing(8);
         btnBox->addStretch();
-        auto *cancelB = new QPushButton("Hủy");
-        cancelB->setCursor(Qt::PointingHandCursor);
-        cancelB->setStyleSheet("QPushButton { background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px 14px; font-weight: 700; font-size: 11px; } QPushButton:hover { background-color: #e2e8f0; }");
-        QObject::connect(cancelB, &QPushButton::clicked, &addDlg, &QDialog::reject);
-
-        auto *saveB = new QPushButton("✓  Thêm ngày nghỉ");
+        auto *saveB = new QPushButton("Thêm");
         saveB->setCursor(Qt::PointingHandCursor);
-        saveB->setStyleSheet("QPushButton { background-color: #0d9488; color: white; border: none; border-radius: 6px; padding: 5px 16px; font-weight: 700; font-size: 11px; } QPushButton:hover { background-color: #0f766e; }");
-        btnBox->addWidget(cancelB);
+        saveB->setStyleSheet("QPushButton { background-color: #0d9488; color: white; border: none; border-radius: 7px; padding: 8px 18px; font-weight: 700; } QPushButton:hover { background-color: #0f766e; }");
         btnBox->addWidget(saveB);
         ev->addLayout(btnBox);
 
-        QObject::connect(saveB, &QPushButton::clicked, &addDlg, [&addDlg, dateType, dateEdit, noteEdit]() {
-            auto curList = AppointmentController::loadHolidays("Config/Lichnghile.txt");
-            if (dateType->currentIndex() == 1) {
-                // Tết Nguyên Đán
-                for (const auto &item : curList) {
-                    if (item.date.compare("Tet", Qt::CaseInsensitive) == 0) {
-                        UIHelper::showWarning(&addDlg, "Trùng lặp", "Lịch nghỉ Tết Nguyên Đán đã tồn tại trong hệ thống.\nVui lòng nhấn nút 'Sửa' tại dòng Tết để điều chỉnh số ngày nghỉ.");
-                        return;
-                    }
-                }
-                int days = noteEdit->text().trimmed().toInt();
-                if (days <= 0) days = 5;
-                curList.append({"Tet", QString::number(days)});
-            } else {
-                // Fixed solar holiday
-                QString rawDate = dateEdit->text().trimmed();
-                if (rawDate.isEmpty()) {
-                    UIHelper::showWarning(&addDlg, "Thiếu thông tin", "Vui lòng nhập ngày nghỉ.");
-                    return;
-                }
-                QRegularExpression re("^(\\d{1,2})[/\\-\\.](\\d{1,2})");
-                auto match = re.match(rawDate);
-                if (!match.hasMatch()) {
-                    UIHelper::showWarning(&addDlg, "Định dạng không hợp lệ", "Vui lòng nhập ngày/tháng hợp lệ (Ví dụ: 2/9, 30/4, 25/12).");
-                    return;
-                }
-                int d = match.captured(1).toInt();
-                int m = match.captured(2).toInt();
-                if (m < 1 || m > 12 || d < 1 || d > 31) {
-                    UIHelper::showWarning(&addDlg, "Ngày không hợp lệ", "Ngày hoặc tháng không tồn tại trên lịch (ngày: 1-31, tháng: 1-12).");
-                    return;
-                }
-                QString cleanDate = QString("%1/%2").arg(d).arg(m);
-                for (const auto &item : curList) {
-                    if (item.date.compare(cleanDate, Qt::CaseInsensitive) == 0) {
-                        UIHelper::showWarning(&addDlg, "Trùng lặp", QStringLiteral("Ngày nghỉ '%1' đã tồn tại trong danh sách!").arg(cleanDate));
-                        return;
-                    }
-                }
-                QString note = noteEdit->text().trimmed();
-                if (note.isEmpty()) {
-                    if (d == 1 && m == 1) note = "Tết Dương Lịch";
-                    else if (d == 10 && m == 3) note = "Giỗ Tổ Hùng Vương";
-                    else if (d == 30 && m == 4) note = "Giải phóng miền Nam";
-                    else if (d == 1 && m == 5) note = "Quốc tế Lao động";
-                    else if (d == 2 && m == 9) note = "Quốc khánh Việt Nam";
-                    else if (d == 1 && m == 9) note = "Nghỉ lễ Quốc khánh";
-                    else if (d == 20 && m == 11) note = "Ngày Nhà giáo Việt Nam";
-                    else if (d == 25 && m == 12) note = "Lễ Giáng sinh (Noel)";
-                    else note = "Nghỉ lễ";
-                }
-                curList.append({cleanDate, note});
+        QObject::connect(saveB, &QPushButton::clicked, &addDlg, [&addDlg, dateEdit, noteEdit]() {
+            if (dateEdit->text().trimmed().isEmpty()) {
+                UIHelper::showWarning(&addDlg, "Thiếu thông tin", "Vui lòng nhập ngày nghỉ.");
+                return;
             }
+            auto curList = AppointmentController::loadHolidays("Config/Lichnghile.txt");
+            curList.append({dateEdit->text().trimmed(), noteEdit->text().trimmed()});
             AppointmentController::saveHolidays("Config/Lichnghile.txt", curList);
             addDlg.accept();
         });

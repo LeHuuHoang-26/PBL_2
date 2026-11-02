@@ -1,6 +1,10 @@
 #include "UIHelper.h"
 #include <QDialog>
+#include <QMessageBox>
 #include <QLineEdit>
+#include <QDateTimeEdit>
+#include <QTableView>
+#include <QHeaderView>
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
 #include <QGraphicsDropShadowEffect>
@@ -87,9 +91,11 @@ private:
     bool m_isScaling = false;
 };
 
-class PhoneInputFilter : public QObject {
+class DigitsOnlyFilter : public QObject {
 public:
-    using QObject::QObject;
+    explicit DigitsOnlyFilter(int maxLen, QObject *parent = nullptr)
+        : QObject(parent), m_maxLen(maxLen) {}
+
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override {
         if (event->type() == QEvent::FocusIn || event->type() == QEvent::Show) {
@@ -99,8 +105,8 @@ protected:
                 HWND hwnd = (HWND)w->winId();
                 if (hwnd) {
                     LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
-                    if ((style & (ES_PASSWORD | ES_NUMBER)) != (ES_PASSWORD | ES_NUMBER)) {
-                        SetWindowLongPtr(hwnd, GWL_STYLE, style | ES_PASSWORD | ES_NUMBER);
+                    if ((style & ES_NUMBER) != ES_NUMBER) {
+                        SetWindowLongPtr(hwnd, GWL_STYLE, style | ES_NUMBER);
                     }
                 }
             }
@@ -143,13 +149,87 @@ protected:
                     return true; // Chặn mọi ký tự không phải số, không cho bộ gõ xóa số phía trước
                 }
                 auto *le = qobject_cast<QLineEdit*>(obj);
-                if (le && le->text().length() >= 10 && !le->hasSelectedText()) {
-                    return true; // Chặn nhập quá 10 số
+                if (le && le->text().length() >= m_maxLen && !le->hasSelectedText()) {
+                    return true; // Chặn nhập quá số ký tự quy định
                 }
             }
         }
         return QObject::eventFilter(obj, event);
     }
+
+private:
+    int m_maxLen = 10;
+};
+
+class CalendarNoTriggerFilter : public QObject {
+public:
+    using QObject::QObject;
+protected:
+    bool eventFilter(QObject *obj, QEvent *ev) override {
+        if (ev->type() == QEvent::MouseButtonPress ||
+            ev->type() == QEvent::MouseButtonRelease ||
+            ev->type() == QEvent::MouseButtonDblClick ||
+            ev->type() == QEvent::ContextMenu) {
+            return true; // Nuốt sự kiện chuột hoàn toàn, không kích hoạt popup danh sách tháng
+        }
+        return QObject::eventFilter(obj, ev);
+    }
+};
+
+class CalendarPopupAligner : public QObject {
+public:
+    CalendarPopupAligner(QWidget *anchor, QCalendarWidget *cal, QObject *parent = nullptr)
+        : QObject(parent), m_anchor(anchor), m_cal(cal) {}
+
+    void align() {
+        if (!m_cal || !m_anchor) return;
+        QWidget *popup = m_cal->window();
+        if (!popup) return;
+
+        popup->setAttribute(Qt::WA_TranslucentBackground, true);
+        popup->setStyleSheet("background: transparent; border: none;");
+
+        if (popup->layout()) {
+            popup->layout()->setContentsMargins(0, 0, 0, 0);
+            popup->layout()->setSpacing(0);
+        }
+
+        int targetW = m_anchor->width();
+        if (targetW < 220) targetW = 220;
+        int targetH = 220;
+
+        m_cal->resize(targetW, targetH);
+        m_cal->setFixedWidth(targetW);
+        m_cal->setFixedHeight(targetH);
+        popup->resize(targetW, targetH);
+        popup->setFixedWidth(targetW);
+        popup->setFixedHeight(targetH);
+
+        if (auto *view = m_cal->findChild<QTableView*>("qt_calendar_calendarview")) {
+            if (view->horizontalHeader()) {
+                view->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+            }
+        }
+
+        // Căn lề trái của popup thẳng hàng với mép trái của ô dateEdit
+        QPoint anchorGlobal = m_anchor->mapToGlobal(QPoint(0, m_anchor->height() + 2));
+        int py = popup->y();
+        if (py <= 10) py = anchorGlobal.y();
+        popup->move(anchorGlobal.x(), py);
+    }
+
+protected:
+    bool eventFilter(QObject *obj, QEvent *event) override {
+        if (event->type() == QEvent::Show) {
+            align();
+            QTimer::singleShot(0, this, [this]() { align(); });
+        }
+        return QObject::eventFilter(obj, event);
+    }
+
+private:
+    QWidget *m_anchor = nullptr;
+    QCalendarWidget *m_cal = nullptr;
 };
 
 } // namespace
@@ -202,6 +282,14 @@ QTableWidget *UIHelper::table(const QStringList &headers) {
     t->setShowGrid(false);
     t->setAlternatingRowColors(false);
     t->horizontalHeader()->setStretchLastSection(false);
+    t->horizontalHeader()->setSectionsClickable(true);
+    t->horizontalHeader()->setSortIndicatorShown(false);
+    t->horizontalHeader()->setHighlightSections(false);
+    t->horizontalHeader()->setCursor(Qt::ArrowCursor);
+    t->setCursor(Qt::ArrowCursor);
+    if (t->viewport()) {
+        t->viewport()->setCursor(Qt::ArrowCursor);
+    }
     t->setFocusPolicy(Qt::NoFocus);
     t->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     t->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -243,8 +331,6 @@ QTableWidget *UIHelper::table(const QStringList &headers) {
             image: none;
             width: 0px;
             height: 0px;
-            padding: 0px;
-            margin: 0px;
         }
         QTableWidget::item {
             background: transparent;
@@ -574,8 +660,11 @@ QString UIHelper::dialogFormStyle() {
         QComboBox::down-arrow:disabled {
             image: none;
         }
-        QComboBox QAbstractItemView {
-            background: #ffffff;
+        QComboBox QAbstractItemView,
+        QComboBox QAbstractItemView:viewport,
+        QListView {
+            background-color: #ffffff;
+            color: #0f172a;
             border: 1.5px solid #cbd5e1;
             border-radius: 8px;
             selection-background-color: #0d9488;
@@ -583,14 +672,37 @@ QString UIHelper::dialogFormStyle() {
             outline: none;
             padding: 4px;
         }
-        QComboBox QAbstractItemView::item {
+        QComboBox QAbstractItemView::item, QListView::item {
             min-height: 28px;
-            padding-left: 8px;
+            padding: 4px 10px;
             border-radius: 6px;
+            color: #0f172a;
+            background-color: #ffffff;
         }
-        QComboBox QAbstractItemView::item:hover {
-            background: #f0fdfa;
-            color: #0d9488;
+        QComboBox QAbstractItemView::item:hover, QListView::item:hover {
+            background-color: #f0fdfa;
+            color: #0f766e;
+        }
+        QComboBox QAbstractItemView::item:selected, QListView::item:selected {
+            background-color: #0d9488;
+            color: #ffffff;
+        }
+        QScrollBar:vertical, QScrollBar:horizontal {
+            width: 0px;
+            height: 0px;
+            background: transparent;
+            border: none;
+        }
+        QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
+            background: transparent;
+            border: none;
+        }
+        QScrollBar::add-line, QScrollBar::sub-line,
+        QScrollBar::add-page, QScrollBar::sub-page {
+            background: transparent;
+            border: none;
+            width: 0px;
+            height: 0px;
         }
         QMessageBox {
             background-color: #ffffff;
@@ -664,11 +776,10 @@ void UIHelper::applyCalendarStyle(QCalendarWidget *cal) {
     cal->setHorizontalHeaderFormat(QCalendarWidget::ShortDayNames);
     cal->setVerticalHeaderFormat(QCalendarWidget::NoVerticalHeader);
 
-    // 1. Tối ưu thanh điều hướng: Bỏ spacer thừa giữa Month và Year, bỏ mọi khoảng trống thừa thãi
+    // 1. Tối ưu thanh điều hướng: Bỏ spacer thừa giữa Month và Year, gom gọn vào giữa
     if (auto *navBar = cal->findChild<QWidget*>("qt_calendar_navigationbar")) {
         if (auto *lay = qobject_cast<QHBoxLayout*>(navBar->layout())) {
             // Layout chuẩn của Qt: prev(0), spacer(1), month(2), spacer(3), year(4), spacer(5), next(6)
-            // Xóa spacer số 3 để Month và Year liền kề nhau như một dòng chữ thống nhất "October 2026"
             if (lay->count() == 7) {
                 auto *midSpacer = lay->itemAt(3);
                 if (midSpacer && midSpacer->spacerItem()) {
@@ -693,18 +804,26 @@ void UIHelper::applyCalendarStyle(QCalendarWidget *cal) {
         nextBtn->setCursor(Qt::PointingHandCursor);
     }
 
-    // 3. Bỏ hiển thị danh sách 12 tháng & bỏ hoàn toàn ô spinbox chỉnh năm thừa thãi
+    // 3. Bỏ trigger phần tháng (bỏ menu hiển thị 12 tháng) & bỏ spinbox năm
     if (auto *monthBtn = cal->findChild<QToolButton*>("qt_calendar_monthbutton")) {
         monthBtn->setMenu(nullptr);
         monthBtn->setPopupMode(QToolButton::DelayedPopup);
         monthBtn->setCursor(Qt::ArrowCursor);
+        monthBtn->setFocusPolicy(Qt::NoFocus);
+        monthBtn->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+        monthBtn->installEventFilter(new CalendarNoTriggerFilter(monthBtn));
     }
     if (auto *monthMenu = cal->findChild<QMenu*>("qt_calendar_monthmenu")) {
         monthMenu->clear();
+        monthMenu->setEnabled(false);
+        monthMenu->hide();
     }
     if (auto *yearBtn = cal->findChild<QToolButton*>("qt_calendar_yearbutton")) {
-        yearBtn->disconnect(); // Ngắt click mở spinbox năm
+        yearBtn->disconnect(SIGNAL(clicked()));
         yearBtn->setCursor(Qt::ArrowCursor);
+        yearBtn->setFocusPolicy(Qt::NoFocus);
+        yearBtn->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+        yearBtn->installEventFilter(new CalendarNoTriggerFilter(yearBtn));
     }
     if (auto *yearEdit = cal->findChild<QSpinBox*>("qt_calendar_yearedit")) {
         yearEdit->hide();
@@ -715,64 +834,81 @@ void UIHelper::applyCalendarStyle(QCalendarWidget *cal) {
     QTextCharFormat weekdayFmt;
     weekdayFmt.setForeground(QColor("#475569"));
     weekdayFmt.setFontWeight(QFont::DemiBold);
-    weekdayFmt.setFontPointSize(8.0);
+    weekdayFmt.setFontPointSize(8.5);
     for (int dow = 1; dow <= 7; ++dow) {
         cal->setWeekdayTextFormat(static_cast<Qt::DayOfWeek>(dow), weekdayFmt);
+    }
+
+    // 5. Cấu hình bảng ngày: kéo dãn đều 7 cột theo bề rộng của lịch
+    if (auto *view = cal->findChild<QTableView*>("qt_calendar_calendarview")) {
+        if (view->horizontalHeader()) {
+            view->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+        }
     }
 
     cal->setStyleSheet(R"(
         QCalendarWidget {
             background-color: #ffffff;
             border: 1.5px solid #cbd5e1;
-            border-radius: 9px;
+            border-radius: 8px;
             font-family: 'Segoe UI', -apple-system, sans-serif;
-            font-size: 10px;
+            font-size: 11px;
+        }
+        QCalendarWidget QWidget {
+            alternate-background-color: #ffffff;
         }
         QCalendarWidget QWidget#qt_calendar_navigationbar {
             background-color: #f8fafc;
-            border-top-left-radius: 8px;
-            border-top-right-radius: 8px;
+            border-top-left-radius: 7px;
+            border-top-right-radius: 7px;
             border-bottom: 1px solid #e2e8f0;
-            min-height: 28px;
-            max-height: 28px;
+            min-height: 30px;
+            max-height: 30px;
         }
         QCalendarWidget QToolButton {
             color: #0f172a;
             font-weight: 700;
-            font-size: 10px;
+            font-size: 11px;
             background: transparent;
             border: none;
-            padding: 1px 3px;
+            padding: 2px 4px;
             margin: 0px;
         }
         QCalendarWidget QToolButton#qt_calendar_prevmonth,
         QCalendarWidget QToolButton#qt_calendar_nextmonth {
-            font-size: 13px;
+            font-size: 16px;
             font-weight: bold;
             color: #0d9488;
-            min-width: 20px;
-            max-width: 20px;
-            min-height: 20px;
-            max-height: 20px;
+            min-width: 24px;
+            max-width: 24px;
+            min-height: 22px;
+            max-height: 22px;
             border-radius: 4px;
         }
         QCalendarWidget QToolButton#qt_calendar_prevmonth:hover,
         QCalendarWidget QToolButton#qt_calendar_nextmonth:hover {
-            background-color: #0d9488;
-            color: #ffffff;
+            background-color: #e6fffa;
+            color: #0f766e;
         }
         QCalendarWidget QToolButton#qt_calendar_monthbutton,
         QCalendarWidget QToolButton#qt_calendar_yearbutton {
             color: #0f172a;
-            font-weight: 750;
-            font-size: 10.5px;
-            padding: 0px 2px;
+            font-weight: 700;
+            font-size: 12px;
+            padding: 0px 3px;
             background: transparent;
             border: none;
         }
+        QCalendarWidget QToolButton#qt_calendar_monthbutton:hover,
+        QCalendarWidget QToolButton#qt_calendar_yearbutton:hover {
+            background: transparent;
+            color: #0f172a;
+        }
+        QCalendarWidget QToolButton::menu-indicator,
         QCalendarWidget QToolButton#qt_calendar_monthbutton::menu-indicator {
             image: none;
             width: 0px;
+            height: 0px;
         }
         QCalendarWidget QSpinBox#qt_calendar_yearedit {
             display: none;
@@ -785,25 +921,28 @@ void UIHelper::applyCalendarStyle(QCalendarWidget *cal) {
             selection-background-color: #0d9488;
             selection-color: #ffffff;
             color: #1e293b;
-            font-size: 10px;
+            font-size: 11px;
             font-weight: 600;
             outline: none;
             border: none;
+            gridline-color: transparent;
         }
         QCalendarWidget QTableView QHeaderView::section {
             background-color: #f8fafc;
             color: #475569;
             font-weight: 700;
-            font-size: 8px;
+            font-size: 9.5px;
             border: none;
             border-bottom: 1px solid #e2e8f0;
-            padding: 1px 0px;
+            padding: 2px 0px;
             margin: 0px;
         }
         QCalendarWidget QTableView::item {
             border-radius: 4px;
-            padding: 0px;
-            margin: 0px;
+            padding: 1px;
+            margin: 1px;
+            color: #1e293b;
+            background-color: #ffffff;
         }
         QCalendarWidget QTableView::item:hover {
             background-color: #ccfbf1;
@@ -814,11 +953,32 @@ void UIHelper::applyCalendarStyle(QCalendarWidget *cal) {
             color: #ffffff;
             font-weight: bold;
         }
+        QCalendarWidget QTableView::item:disabled {
+            color: #94a3b8;
+            background-color: #ffffff;
+        }
         QCalendarWidget QWidget#qt_calendar_calendarview {
-            border-bottom-left-radius: 8px;
-            border-bottom-right-radius: 8px;
+            background-color: #ffffff;
+            border-bottom-left-radius: 7px;
+            border-bottom-right-radius: 7px;
         }
     )");
+}
+
+void UIHelper::setupCalendarPopup(QDateTimeEdit *dateEdit, const QDate &minDate) {
+    if (!dateEdit) return;
+    dateEdit->setCalendarPopup(true);
+    if (auto *cal = dateEdit->calendarWidget()) {
+        UIHelper::applyCalendarStyle(cal);
+        if (minDate.isValid()) {
+            cal->setMinimumDate(minDate);
+        }
+        auto *aligner = new CalendarPopupAligner(dateEdit, cal, dateEdit);
+        cal->installEventFilter(aligner);
+        if (auto *pop = cal->window()) {
+            pop->installEventFilter(aligner);
+        }
+    }
 }
 
 void UIHelper::setupPhoneInput(QLineEdit *lineEdit) {
@@ -826,13 +986,13 @@ void UIHelper::setupPhoneInput(QLineEdit *lineEdit) {
     lineEdit->setMaxLength(10);
     lineEdit->setAttribute(Qt::WA_InputMethodEnabled, false);
     lineEdit->setInputMethodHints(Qt::ImhDigitsOnly | Qt::ImhNoPredictiveText);
-    lineEdit->installEventFilter(new PhoneInputFilter(lineEdit));
+    lineEdit->installEventFilter(new DigitsOnlyFilter(10, lineEdit));
 
 #ifdef _WIN32
     HWND hwnd = (HWND)lineEdit->winId();
     if (hwnd) {
         LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
-        SetWindowLongPtr(hwnd, GWL_STYLE, style | ES_PASSWORD | ES_NUMBER);
+        SetWindowLongPtr(hwnd, GWL_STYLE, style | ES_NUMBER);
     }
 #endif
 
@@ -852,334 +1012,208 @@ void UIHelper::setupPhoneInput(QLineEdit *lineEdit) {
     });
 }
 
-static QPixmap createDialogPixmap(UIHelper::DialogType type, int size = 36) {
-    qreal dpr = qApp ? qApp->devicePixelRatio() : 1.0;
-    int pxSize = qRound(size * dpr);
-    QPixmap pix(pxSize, pxSize);
-    pix.fill(Qt::transparent);
-    {
-        QPainter p(&pix);
-        p.setRenderHint(QPainter::Antialiasing);
+void UIHelper::setupCccdInput(QLineEdit *lineEdit) {
+    if (!lineEdit) return;
+    lineEdit->setMaxLength(12);
+    lineEdit->setAttribute(Qt::WA_InputMethodEnabled, false);
+    lineEdit->setInputMethodHints(Qt::ImhDigitsOnly | Qt::ImhNoPredictiveText);
+    lineEdit->installEventFilter(new DigitsOnlyFilter(12, lineEdit));
 
-        QColor bgColor, fgColor;
-        switch (type) {
-            case UIHelper::DialogType::Danger:
-                bgColor = QColor("#fee2e2");
-                fgColor = QColor("#dc2626");
-                break;
-            case UIHelper::DialogType::Warning:
-                bgColor = QColor("#fef3c7");
-                fgColor = QColor("#d97706");
-                break;
-            case UIHelper::DialogType::Success:
-                bgColor = QColor("#dcfce7");
-                fgColor = QColor("#16a34a");
-                break;
-            case UIHelper::DialogType::Info:
-            default:
-                bgColor = QColor("#ccfbf1");
-                fgColor = QColor("#0d9488");
-                break;
-        }
-
-        // Vòng tròn nền
-        p.setPen(Qt::NoPen);
-        p.setBrush(bgColor);
-        p.drawEllipse(QRectF(1.0 * dpr, 1.0 * dpr, (size - 2.0) * dpr, (size - 2.0) * dpr));
-
-        // Vẽ biểu tượng vector sắc nét
-        qreal c = size * dpr / 2.0;
-        if (type == UIHelper::DialogType::Danger) {
-            // Dấu nhân "X"
-            p.setPen(QPen(fgColor, 2.2 * dpr, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-            p.setBrush(Qt::NoBrush);
-            qreal r = 5.5 * dpr;
-            p.drawLine(QPointF(c - r, c - r), QPointF(c + r, c + r));
-            p.drawLine(QPointF(c + r, c - r), QPointF(c - r, c + r));
-        } else if (type == UIHelper::DialogType::Success) {
-            // Dấu tích "V"
-            p.setPen(QPen(fgColor, 2.2 * dpr, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-            p.setBrush(Qt::NoBrush);
-            QPainterPath check;
-            check.moveTo(c - 6.0 * dpr, c + 0.2 * dpr);
-            check.lineTo(c - 1.5 * dpr, c + 4.8 * dpr);
-            check.lineTo(c + 6.5 * dpr, c - 4.5 * dpr);
-            p.drawPath(check);
-        } else if (type == UIHelper::DialogType::Warning) {
-            // Dấu chấm than "!"
-            p.setPen(QPen(fgColor, 2.2 * dpr, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-            p.setBrush(Qt::NoBrush);
-            p.drawLine(QPointF(c, c - 6.5 * dpr), QPointF(c, c + 1.5 * dpr));
-            p.setBrush(fgColor);
-            p.setPen(Qt::NoPen);
-            p.drawEllipse(QRectF(c - 1.3 * dpr, c + 4.2 * dpr, 2.6 * dpr, 2.6 * dpr));
-        } else {
-            // Chữ "i"
-            p.setBrush(fgColor);
-            p.setPen(Qt::NoPen);
-            p.drawEllipse(QRectF(c - 1.3 * dpr, c - 6.8 * dpr, 2.6 * dpr, 2.6 * dpr));
-            p.setPen(QPen(fgColor, 2.2 * dpr, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-            p.setBrush(Qt::NoBrush);
-            p.drawLine(QPointF(c, c - 2.0 * dpr), QPointF(c, c + 6.0 * dpr));
-            p.drawLine(QPointF(c - 2.0 * dpr, c - 2.0 * dpr), QPointF(c, c - 2.0 * dpr));
-            p.drawLine(QPointF(c - 2.8 * dpr, c + 6.0 * dpr), QPointF(c + 2.8 * dpr, c + 6.0 * dpr));
-        }
+#ifdef _WIN32
+    HWND hwnd = (HWND)lineEdit->winId();
+    if (hwnd) {
+        LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
+        SetWindowLongPtr(hwnd, GWL_STYLE, style | ES_NUMBER);
     }
-    pix.setDevicePixelRatio(dpr);
-    return pix;
+#endif
+
+    QObject::connect(lineEdit, &QLineEdit::textChanged, lineEdit, [lineEdit](const QString &text) {
+        QString digits;
+        for (const QChar &ch : text) {
+            if (ch.isDigit()) {
+                digits.append(ch);
+                if (digits.length() == 12) break;
+            }
+        }
+        if (digits != text) {
+            int pos = lineEdit->cursorPosition();
+            lineEdit->setText(digits);
+            lineEdit->setCursorPosition(qMin(pos, digits.length()));
+        }
+    });
 }
 
-bool UIHelper::showConfirmDialog(QWidget *parent,
-                                 const QString &title,
-                                 const QString &message,
-                                 const QString &confirmBtnText,
-                                 const QString &cancelBtnText,
-                                 DialogType type) {
-    QDialog dialog(parent);
-    dialog.setWindowTitle("Xác nhận");
-    dialog.setWindowFlags(dialog.windowFlags() & ~Qt::WindowContextHelpButtonHint);
-    dialog.setFixedWidth(380);
-    dialog.setStyleSheet(R"(
-        QDialog {
+bool UIHelper::isValidPhone(const QString &phone) {
+    QString p = phone.trimmed();
+    if (p.length() != 10) return false;
+    if (!p.startsWith('0')) return false;
+    for (const QChar &c : p) {
+        if (!c.isDigit()) return false;
+    }
+    return true;
+}
+
+bool UIHelper::isValidCccd(const QString &cccd) {
+    QString c = cccd.trimmed();
+    if (c.length() != 12) return false;
+    if (!c.startsWith('0')) return false;
+    for (const QChar &ch : c) {
+        if (!ch.isDigit()) return false;
+    }
+    return true;
+}
+
+void UIHelper::showWarning(QWidget *parent, const QString &title, const QString &message) {
+    QMessageBox box(QMessageBox::Warning, title, message, QMessageBox::Ok, parent);
+    box.setStyleSheet(R"(
+        QMessageBox {
             background-color: #ffffff;
         }
-    )");
-
-    auto *rootLayout = new QVBoxLayout(&dialog);
-    rootLayout->setContentsMargins(20, 18, 20, 16);
-    rootLayout->setSpacing(14);
-
-    auto *contentRow = new QHBoxLayout;
-    contentRow->setSpacing(12);
-    contentRow->setAlignment(Qt::AlignTop);
-
-    auto *iconBox = new QLabel;
-    iconBox->setFixedSize(36, 36);
-    iconBox->setPixmap(createDialogPixmap(type, 36));
-    contentRow->addWidget(iconBox, 0, Qt::AlignTop);
-
-    auto *textCol = new QVBoxLayout;
-    textCol->setSpacing(4);
-
-    auto *titleLabel = new QLabel(title);
-    titleLabel->setStyleSheet("font-family: 'Segoe UI', -apple-system, sans-serif; font-size: 14.5px; font-weight: 700; color: #0f172a; background: transparent; border: none;");
-
-    auto *descLabel = new QLabel(message);
-    descLabel->setStyleSheet("font-family: 'Segoe UI', -apple-system, sans-serif; font-size: 12.5px; color: #475569; background: transparent; border: none;");
-    descLabel->setWordWrap(true);
-
-    textCol->addWidget(titleLabel);
-    textCol->addWidget(descLabel);
-    contentRow->addLayout(textCol, 1);
-    rootLayout->addLayout(contentRow);
-
-    // Buttons
-    auto *btnRow = new QHBoxLayout;
-    btnRow->setSpacing(8);
-    btnRow->addStretch();
-
-    auto *cancelBtn = new QPushButton(cancelBtnText);
-    cancelBtn->setCursor(Qt::PointingHandCursor);
-    cancelBtn->setStyleSheet(R"(
+        QLabel {
+            color: #0f172a;
+            font-size: 13.5px;
+            background: transparent;
+        }
         QPushButton {
+            background-color: #0d9488;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 18px;
+            font-size: 13px;
+            font-weight: 700;
+            min-width: 75px;
+            min-height: 22px;
+        }
+        QPushButton:hover {
+            background-color: #0f766e;
+        }
+    )");
+    box.exec();
+}
+
+void UIHelper::showInfo(QWidget *parent, const QString &title, const QString &message) {
+    QMessageBox box(QMessageBox::Information, title, message, QMessageBox::Ok, parent);
+    box.setStyleSheet(R"(
+        QMessageBox {
+            background-color: #ffffff;
+        }
+        QLabel {
+            color: #0f172a;
+            font-size: 13.5px;
+            background: transparent;
+        }
+        QPushButton {
+            background-color: #0d9488;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 18px;
+            font-size: 13px;
+            font-weight: 700;
+            min-width: 75px;
+            min-height: 22px;
+        }
+        QPushButton:hover {
+            background-color: #0f766e;
+        }
+    )");
+    box.exec();
+}
+
+void UIHelper::showSuccess(QWidget *parent, const QString &title, const QString &message) {
+    showInfo(parent, title, message);
+}
+
+bool UIHelper::confirmDelete(QWidget *parent, const QString &title, const QString &message,
+                             const QString &confirmText, const QString &cancelText) {
+    QMessageBox box(QMessageBox::Question, title, message, QMessageBox::NoButton, parent);
+    QPushButton *confirmBtn = box.addButton(confirmText, QMessageBox::AcceptRole);
+    QPushButton *cancelBtn = box.addButton(cancelText, QMessageBox::RejectRole);
+    box.setDefaultButton(cancelBtn);
+    box.setStyleSheet(R"(
+        QMessageBox {
+            background-color: #ffffff;
+        }
+        QLabel {
+            color: #0f172a;
+            font-size: 13.5px;
+            background: transparent;
+        }
+        QPushButton {
+            border-radius: 6px;
+            padding: 6px 18px;
+            font-size: 13px;
+            font-weight: 700;
+            min-width: 75px;
+            min-height: 22px;
+        }
+        QPushButton[text="Xóa"], QPushButton[text="Hủy lịch"], QPushButton[text="Hủy lịch hẹn"] {
+            background-color: #dc2626;
+            color: #ffffff;
+            border: none;
+        }
+        QPushButton[text="Xóa"]:hover, QPushButton[text="Hủy lịch"]:hover, QPushButton[text="Hủy lịch hẹn"]:hover {
+            background-color: #b91c1c;
+        }
+        QPushButton[text="Không xóa"], QPushButton[text="Không hủy"], QPushButton[text="Quay lại"] {
             background-color: #f1f5f9;
             color: #475569;
             border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            font-family: 'Segoe UI', -apple-system, sans-serif;
-            font-size: 12.5px;
-            font-weight: 600;
-            padding: 6px 16px;
-            min-height: 18px;
-            outline: none;
         }
-        QPushButton:hover {
+        QPushButton[text="Không xóa"]:hover, QPushButton[text="Không hủy"]:hover, QPushButton[text="Quay lại"]:hover {
             background-color: #e2e8f0;
-            color: #0f172a;
-            border-color: #94a3b8;
-        }
-        QPushButton:pressed {
-            background-color: #cbd5e1;
-        }
-        QPushButton:focus {
-            outline: none;
         }
     )");
-    QObject::connect(cancelBtn, &QPushButton::clicked, &dialog, &QDialog::reject);
-
-    QString confirmBtnBg;
-    QString confirmBtnHover;
-    QString confirmBtnPressed;
-
-    switch (type) {
-        case DialogType::Danger:
-            confirmBtnBg = "#dc2626";
-            confirmBtnHover = "#b91c1c";
-            confirmBtnPressed = "#991b1b";
-            break;
-        case DialogType::Warning:
-            confirmBtnBg = "#d97706";
-            confirmBtnHover = "#b45309";
-            confirmBtnPressed = "#92400e";
-            break;
-        case DialogType::Success:
-            confirmBtnBg = "#16a34a";
-            confirmBtnHover = "#15803d";
-            confirmBtnPressed = "#166534";
-            break;
-        case DialogType::Info:
-        default:
-            confirmBtnBg = "#0d9488";
-            confirmBtnHover = "#0f766e";
-            confirmBtnPressed = "#115e59";
-            break;
-    }
-
-    auto *confirmBtn = new QPushButton(confirmBtnText);
-    confirmBtn->setCursor(Qt::PointingHandCursor);
-    confirmBtn->setStyleSheet(QString(R"(
-        QPushButton {
-            background-color: %1;
-            color: #ffffff;
-            border: none;
-            border-radius: 6px;
-            font-family: 'Segoe UI', -apple-system, sans-serif;
-            font-size: 12.5px;
-            font-weight: 700;
-            padding: 6px 18px;
-            min-height: 18px;
-            outline: none;
-        }
-        QPushButton:hover {
-            background-color: %2;
-        }
-        QPushButton:pressed {
-            background-color: %3;
-        }
-        QPushButton:focus {
-            outline: none;
-        }
-    )").arg(confirmBtnBg, confirmBtnHover, confirmBtnPressed));
-    QObject::connect(confirmBtn, &QPushButton::clicked, &dialog, &QDialog::accept);
-
-    btnRow->addWidget(cancelBtn);
-    btnRow->addWidget(confirmBtn);
-    rootLayout->addLayout(btnRow);
-
-    confirmBtn->setDefault(true);
-    confirmBtn->setFocus();
-
-    dialog.adjustSize();
-    return dialog.exec() == QDialog::Accepted;
+    box.exec();
+    return box.clickedButton() == confirmBtn;
 }
 
-void UIHelper::showNoticeDialog(QWidget *parent,
-                                const QString &title,
-                                const QString &message,
-                                DialogType type) {
-    QDialog dialog(parent);
-    dialog.setWindowTitle("Thông báo");
-    dialog.setWindowFlags(dialog.windowFlags() & ~Qt::WindowContextHelpButtonHint);
-    dialog.setFixedWidth(360);
-    dialog.setStyleSheet(R"(
-        QDialog {
+bool UIHelper::confirmWarning(QWidget *parent, const QString &title, const QString &message,
+                              const QString &confirmText, const QString &cancelText) {
+    QMessageBox box(QMessageBox::Warning, title, message, QMessageBox::NoButton, parent);
+    QPushButton *confirmBtn = box.addButton(confirmText, QMessageBox::AcceptRole);
+    QPushButton *cancelBtn = box.addButton(cancelText, QMessageBox::RejectRole);
+    box.setDefaultButton(cancelBtn);
+    box.setStyleSheet(R"(
+        QMessageBox {
             background-color: #ffffff;
         }
-    )");
-
-    auto *rootLayout = new QVBoxLayout(&dialog);
-    rootLayout->setContentsMargins(18, 16, 18, 16);
-    rootLayout->setSpacing(14);
-
-    auto *contentRow = new QHBoxLayout;
-    contentRow->setSpacing(12);
-    contentRow->setAlignment(Qt::AlignTop);
-
-    auto *iconBox = new QLabel;
-    iconBox->setFixedSize(36, 36);
-    iconBox->setPixmap(createDialogPixmap(type, 36));
-    contentRow->addWidget(iconBox, 0, Qt::AlignTop);
-
-    auto *textCol = new QVBoxLayout;
-    textCol->setSpacing(4);
-
-    auto *titleLabel = new QLabel(title);
-    titleLabel->setStyleSheet("font-family: 'Segoe UI', -apple-system, sans-serif; font-size: 14.5px; font-weight: 700; color: #0f172a; background: transparent; border: none;");
-
-    auto *descLabel = new QLabel(message);
-    descLabel->setStyleSheet("font-family: 'Segoe UI', -apple-system, sans-serif; font-size: 12.5px; color: #475569; background: transparent; border: none;");
-    descLabel->setWordWrap(true);
-
-    textCol->addWidget(titleLabel);
-    textCol->addWidget(descLabel);
-    contentRow->addLayout(textCol, 1);
-    rootLayout->addLayout(contentRow);
-
-    // Button
-    auto *btnRow = new QHBoxLayout;
-    btnRow->addStretch();
-
-    QString btnBg = "#0d9488";
-    QString btnHover = "#0f766e";
-    QString btnPressed = "#115e59";
-
-    switch (type) {
-        case DialogType::Danger:
-            btnBg = "#dc2626";
-            btnHover = "#b91c1c";
-            btnPressed = "#991b1b";
-            break;
-        case DialogType::Warning:
-            btnBg = "#d97706";
-            btnHover = "#b45309";
-            btnPressed = "#92400e";
-            break;
-        case DialogType::Success:
-            btnBg = "#16a34a";
-            btnHover = "#15803d";
-            btnPressed = "#166534";
-            break;
-        case DialogType::Info:
-        default:
-            btnBg = "#0d9488";
-            btnHover = "#0f766e";
-            btnPressed = "#115e59";
-            break;
-    }
-
-    auto *okBtn = new QPushButton("Đã hiểu");
-    okBtn->setCursor(Qt::PointingHandCursor);
-    okBtn->setStyleSheet(QString(R"(
+        QLabel {
+            color: #0f172a;
+            font-size: 13.5px;
+            background: transparent;
+        }
         QPushButton {
-            background-color: %1;
+            border-radius: 6px;
+            padding: 6px 18px;
+            font-size: 13px;
+            font-weight: 700;
+            min-width: 75px;
+            min-height: 22px;
+        }
+        QPushButton[text="Tiếp tục"] {
+            background-color: #d97706;
             color: #ffffff;
             border: none;
-            border-radius: 6px;
-            font-family: 'Segoe UI', -apple-system, sans-serif;
-            font-size: 12.5px;
-            font-weight: 700;
-            padding: 6px 20px;
-            min-height: 18px;
-            outline: none;
         }
-        QPushButton:hover {
-            background-color: %2;
+        QPushButton[text="Tiếp tục"]:hover {
+            background-color: #b45309;
         }
-        QPushButton:pressed {
-            background-color: %3;
+        QPushButton[text="Quay lại"] {
+            background-color: #f1f5f9;
+            color: #475569;
+            border: 1px solid #cbd5e1;
         }
-        QPushButton:focus {
-            outline: none;
+        QPushButton[text="Quay lại"]:hover {
+            background-color: #e2e8f0;
         }
-    )").arg(btnBg, btnHover, btnPressed));
-    QObject::connect(okBtn, &QPushButton::clicked, &dialog, &QDialog::accept);
+    )");
+    box.exec();
+    return box.clickedButton() == confirmBtn;
+}
 
-    btnRow->addWidget(okBtn);
-    rootLayout->addLayout(btnRow);
-
-    okBtn->setDefault(true);
-    okBtn->setFocus();
-
-    dialog.adjustSize();
-    dialog.exec();
+bool UIHelper::confirmCancel(QWidget *parent, const QString &title, const QString &message,
+                             const QString &confirmText, const QString &cancelText) {
+    return confirmDelete(parent, title, message, confirmText, cancelText);
 }

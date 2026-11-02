@@ -1,4 +1,5 @@
 #include "DoctorView.h"
+#include "libPBL2.h"
 #include "MainWindow.h"
 #include "DoctorController.h"
 #include "UIHelper.h"
@@ -9,12 +10,12 @@
 #include <QComboBox>
 #include <QSpinBox>
 #include <QDoubleSpinBox>
-#include <QMessageBox>
 #include <QLocale>
 #include <QHeaderView>
 #include <QLabel>
 #include <QFrame>
 #include <QTimer>
+#include <QDebug>
 
 DoctorView::DoctorView(MainWindow *mainWindow, QWidget *parent)
     : QWidget(parent), mainWindow(mainWindow) {
@@ -49,7 +50,6 @@ void DoctorView::setupUI() {
 
     // Table: không hiển thị mã bác sĩ, có cột xóa không tiêu đề
     table = UIHelper::table({"BÁC SĨ", "CHUYÊN KHOA", "PHÒNG", "PHÍ KHÁM", "ĐÁNH GIÁ", "TRẠNG THÁI", ""});
-    table->setCursor(Qt::PointingHandCursor);
     table->setWordWrap(false);
     table->setTextElideMode(Qt::ElideRight);
     table->verticalHeader()->setDefaultSectionSize(48);
@@ -66,20 +66,31 @@ void DoctorView::setupUI() {
     // Tự động scale các cột sao cho tổng chiều rộng các cột luôn bằng chính xác chiều rộng bảng
     UIHelper::setupTableScaling(table, {0.24, 0.22, 0.13, 0.15, 0.11, 0.15}, 56);
 
-    // Kích hoạt tính năng click tiêu đề cột để QuickSort (ẩn mũi tên chỉ báo theo yêu cầu)
-    table->horizontalHeader()->setSectionsClickable(true);
-    table->horizontalHeader()->setSortIndicatorShown(false);
-    table->horizontalHeader()->setCursor(Qt::PointingHandCursor);
     connect(table->horizontalHeader(), &QHeaderView::sectionClicked, this, [this](int logicalIndex) {
-        if (logicalIndex == 6) return; // Bỏ qua cột thao tác xóa
+        if (logicalIndex < 0 || logicalIndex >= 6) return;
         if (sortColumn == logicalIndex) {
-            sortOrder = (sortOrder == Qt::AscendingOrder) ? Qt::DescendingOrder : Qt::AscendingOrder;
+            sortAscending = !sortAscending;
         } else {
             sortColumn = logicalIndex;
-            sortOrder = Qt::AscendingOrder;
+            sortAscending = true;
         }
-        currentPage = 0;
-        refresh();
+
+        libPBL2::DoctorSortBy criteria = libPBL2::DoctorSortBy::Name;
+        switch (logicalIndex) {
+            case 0: criteria = libPBL2::DoctorSortBy::Name; break;
+            case 1: criteria = libPBL2::DoctorSortBy::Specialty; break;
+            case 2: criteria = libPBL2::DoctorSortBy::Room; break;
+            case 3: criteria = libPBL2::DoctorSortBy::Fee; break;
+            case 4: criteria = libPBL2::DoctorSortBy::Rating; break;
+            case 5: criteria = libPBL2::DoctorSortBy::State; break;
+            default: return;
+        }
+
+        if (mainWindow && mainWindow->getDoctors()) {
+            libPBL2::sortDoctors(mainWindow->getDoctors(), criteria, sortAscending);
+            currentPage = 0;
+            refresh();
+        }
     });
 
     // Khung thẻ bo tròn hoàn thiện 4 góc, chống tràn viền
@@ -138,8 +149,10 @@ void DoctorView::setupUI() {
         if (!item) return;
         std::string id = UIHelper::ss(item->data(Qt::UserRole).toString());
         if (id.empty()) return;
-        editDoctorDialog(id);
-        refresh();
+        QTimer::singleShot(0, this, [this, id]() {
+            editDoctorDialog(id);
+            refresh();
+        });
     });
 }
 
@@ -167,7 +180,7 @@ void DoctorView::refresh() {
 
     auto *n = doctors->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.getValid()) {
+        if (n->info.isDefault()) {
             n = n->next;
             continue;
         }
@@ -183,52 +196,6 @@ void DoctorView::refresh() {
             }
         }
         n = n->next;
-    }
-
-    // Sắp xếp danh sách bác sĩ bằng QuickSort mẫu (Template QuickSort)
-    if (sortColumn >= 0) {
-        UIHelper::quickSort(matched, [this](const Doctor *a, const Doctor *b) -> bool {
-            if (a == b) return false;
-            bool asc = (sortOrder == Qt::AscendingOrder);
-            switch (sortColumn) {
-                case 0: { // Cột 0: BÁC SĨ (Họ và tên gốc D_FullName từ database)
-                    int cmp = UIHelper::compareVietnameseNames(UIHelper::qs(a->getfullName()), UIHelper::qs(b->getfullName()));
-                    if (cmp != 0) return asc ? (cmp < 0) : (cmp > 0);
-                    break;
-                }
-                case 1: { // Cột 1: CHUYÊN KHOA (Chuyên khoa từ mã Sp_ID gốc)
-                    QString specA = mainWindow ? mainWindow->specialty(a->getSpId()) : UIHelper::qs(a->getSpId());
-                    QString specB = mainWindow ? mainWindow->specialty(b->getSpId()) : UIHelper::qs(b->getSpId());
-                    int cmp = QString::localeAwareCompare(specA, specB);
-                    if (cmp != 0) return asc ? (cmp < 0) : (cmp > 0);
-                    break;
-                }
-                case 2: { // Cột 2: PHÒNG (Mã phòng Room_ID gốc từ database)
-                    int cmp = QString::localeAwareCompare(UIHelper::qs(a->getRoomId()), UIHelper::qs(b->getRoomId()));
-                    if (cmp != 0) return asc ? (cmp < 0) : (cmp > 0);
-                    break;
-                }
-                case 3: { // Cột 3: PHÍ KHÁM (Giá trị Consultation_Fee double gốc từ database)
-                    if (a->getFee() != b->getFee())
-                        return asc ? (a->getFee() < b->getFee()) : (a->getFee() > b->getFee());
-                    break;
-                }
-                case 4: { // Cột 4: ĐÁNH GIÁ (Giá trị Rating double gốc từ database)
-                    if (a->getRating() != b->getRating())
-                        return asc ? (a->getRating() < b->getRating()) : (a->getRating() > b->getRating());
-                    break;
-                }
-                case 5: { // Cột 5: TRẠNG THÁI (Giá trị bool D_State gốc từ database: 1 = Hoạt động, 0 = Ngừng hoạt động)
-                    if (a->getState() != b->getState())
-                        return asc ? (static_cast<int>(a->getState()) < static_cast<int>(b->getState()))
-                                   : (static_cast<int>(a->getState()) > static_cast<int>(b->getState()));
-                    break;
-                }
-                default:
-                    break;
-            }
-            return asc ? (a->getID() < b->getID()) : (a->getID() > b->getID());
-        });
     }
 
     int total = matched.size();
@@ -293,7 +260,7 @@ void DoctorView::refresh() {
         item4->setToolTip("Nháy đúp chuột để sửa thông tin bác sĩ");
         table->setItem(r, 4, item4);
 
-        auto *item5 = new QTableWidgetItem(working ? "Hoạt động" : "Ngừng hoạt động");
+        auto *item5 = new QTableWidgetItem(working ? "Đang nhận khám" : "Tạm nghỉ");
         item5->setTextAlignment(Qt::AlignCenter);
         item5->setForeground(working ? QColor("#059669") : QColor("#dc2626"));
         item5->setToolTip("Nháy đúp chuột để sửa thông tin bác sĩ");
@@ -301,6 +268,9 @@ void DoctorView::refresh() {
 
         // Cột 6: Nút xóa hồ sơ bác sĩ (icon thùng rác đỏ)
         auto action = UIHelper::createActionCell(UIHelper::trashIcon(), "Xóa bác sĩ");
+        if (mainWindow && !mainWindow->hasPermission("Per_2")) {
+            action.second->setToolTip("Bạn không có quyền xóa bác sĩ (Yêu cầu quyền Per_2)");
+        }
         connect(action.second, &QPushButton::clicked, this, [this, d]() {
             if (!mainWindow) return;
             if (!mainWindow->hasPermission("Per_2")) {
@@ -309,7 +279,7 @@ void DoctorView::refresh() {
             }
             QString name = UIHelper::qs(d->getfullName());
             if (!UIHelper::confirmDelete(this, "Xác nhận xóa bác sĩ",
-                QStringLiteral("Bạn có chắc chắn muốn xóa bác sĩ \"%1\" khỏi hệ thống?\nThông tin bác sĩ sau khi xóa sẽ được ẩn khỏi danh sách phân công.").arg(name),
+                QStringLiteral("Bạn có chắc chắn muốn xóa bác sĩ \"%1\" khỏi hệ thống?\nThông tin bác sĩ sau khi xóa sẽ được loại bỏ khỏi danh sách.").arg(name),
                 "Xóa bác sĩ", "Không xóa")) {
                 return;
             }
@@ -320,7 +290,7 @@ void DoctorView::refresh() {
             if (appointments) {
                 auto *an = appointments->getHeader()->next;
                 while (an && an->next) {
-                    if (an->info.getValid() && an->info.getDoctorId() == did && an->info.getState() == 0) {
+                    if (an->info.getDoctorId() == did && an->info.getState() == 0) {
                         hasUpcoming = true;
                         break;
                     }
@@ -340,7 +310,7 @@ void DoctorView::refresh() {
                 auto *n = doctors->getHeader()->next;
                 while (n && n->next) {
                     if (n->info.getID() == did) {
-                        n->info.setValid(false);
+                        doctors->remove(n);
                         break;
                     }
                     n = n->next;
@@ -355,37 +325,168 @@ void DoctorView::refresh() {
     }
 }
 
-namespace {
-
-bool validateDoctorFields(QWidget *parent, const QString &name, const QString &phone) {
-    if (name.trimmed().isEmpty() || phone.trimmed().isEmpty()) {
-        UIHelper::showWarning(parent, "Thiếu thông tin", "Vui lòng nhập đầy đủ họ tên và số điện thoại.");
-        return false;
+void DoctorView::editDoctorDialog(const std::string &id) {
+    if (!mainWindow) return;
+    Doctor *doctor = mainWindow->findDoctor(id);
+    if (!doctor) return;
+    if (!mainWindow->hasPermission("Per_2")) {
+        UIHelper::showWarning(this, "Không có quyền", "Bạn không có quyền chỉnh sửa thông tin bác sĩ.");
+        return;
     }
-    if (phone.trimmed().length() != 10) {
-        UIHelper::showWarning(parent, "Số điện thoại không hợp lệ", "Số điện thoại phải gồm đúng 10 chữ số.");
-        return false;
-    }
-    return true;
-}
 
-struct DoctorFormData {
-    QLineEdit *name = nullptr;
-    QLineEdit *phone = nullptr;
-    QLineEdit *room = nullptr;
-    QSpinBox *age = nullptr;
-    QComboBox *gender = nullptr;
-    QComboBox *specialtyBox = nullptr;
-    QComboBox *state = nullptr;
-    QDoubleSpinBox *fee = nullptr;
-    QDoubleSpinBox *rating = nullptr;
-};
+    QDialog dialog(this);
+    dialog.setWindowTitle("Chỉnh sửa thông tin bác sĩ");
+    dialog.setFixedWidth(560);
+    dialog.setStyleSheet(R"(
+        QDialog {
+            background-color: #f8fafc;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {
+            background: #ffffff;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 13px;
+            color: #0f172a;
+            min-height: 20px;
+        }
+        QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {
+            border: 1.5px solid #0d9488;
+            background: #ffffff;
+        }
+        QSpinBox, QDoubleSpinBox {
+            padding-right: 30px;
+        }
+        QSpinBox::up-button, QDoubleSpinBox::up-button {
+            subcontrol-origin: border;
+            subcontrol-position: top right;
+            width: 25px;
+            border-left: 1.5px solid #94a3b8;
+            border-bottom: 1px solid #94a3b8;
+            border-top-right-radius: 7px;
+            background: #e2e8f0;
+        }
+        QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {
+            background: #0d9488;
+        }
+        QSpinBox::up-button:hover QSpinBox::up-arrow,
+        QDoubleSpinBox::up-button:hover QDoubleSpinBox::up-arrow {
+            image: url(:/assets/textures/arrow_up_white.png);
+        }
+        QSpinBox::up-button:pressed, QDoubleSpinBox::up-button:pressed {
+            background: #0f766e;
+        }
+        QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
+            image: url(:/assets/textures/arrow_up_dark.png);
+            width: 9px;
+            height: 9px;
+        }
+        QSpinBox::down-button, QDoubleSpinBox::down-button {
+            subcontrol-origin: border;
+            subcontrol-position: bottom right;
+            width: 25px;
+            border-left: 1.5px solid #94a3b8;
+            border-bottom-right-radius: 7px;
+            background: #e2e8f0;
+        }
+        QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
+            background: #0d9488;
+        }
+        QSpinBox::down-button:hover QSpinBox::down-arrow,
+        QDoubleSpinBox::down-button:hover QDoubleSpinBox::down-arrow {
+            image: url(:/assets/textures/arrow_down_white.png);
+        }
+        QSpinBox::down-button:pressed, QDoubleSpinBox::down-button:pressed {
+            background: #0f766e;
+        }
+        QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
+            image: url(:/assets/textures/arrow_down_dark.png);
+            width: 9px;
+            height: 9px;
+        }
+        QComboBox {
+            padding-right: 28px;
+        }
+        QComboBox:disabled {
+            background: #f1f5f9;
+            color: #94a3b8;
+            border-color: #e2e8f0;
+        }
+        QComboBox::drop-down {
+            subcontrol-origin: border;
+            subcontrol-position: top right;
+            width: 28px;
+            border: none;
+            background: transparent;
+        }
+        QComboBox::drop-down:disabled {
+            width: 0px;
+            border: none;
+        }
+        QComboBox::down-arrow {
+            image: url(:/assets/textures/arrow_down_dark.png);
+            width: 11px;
+            height: 11px;
+            margin-right: 8px;
+        }
+        QComboBox::down-arrow:disabled {
+            image: none;
+        }
+        QComboBox QAbstractItemView {
+            background-color: #ffffff;
+            color: #0f172a;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 8px;
+            selection-background-color: #0d9488;
+            selection-color: #ffffff;
+            outline: none;
+            padding: 4px;
+        }
+        QComboBox QAbstractItemView::item {
+            min-height: 28px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            color: #0f172a;
+            background-color: #ffffff;
+        }
+        QComboBox QAbstractItemView::item:hover {
+            background-color: #f0fdfa;
+            color: #0f766e;
+        }
+        QComboBox QAbstractItemView::item:selected {
+            background-color: #0d9488;
+            color: #ffffff;
+        }
+    )");
 
-QFrame *createDoctorFormCard(DoctorFormData &form,
-                             const QString &initName = "", const QString &initPhone = "",
-                             const QString &initRoom = "", int initAge = 32,
-                             bool initGender = true, const QString &initSpId = "",
-                             bool initState = true, double initFee = 200000.0, double initRating = 5.0) {
+    auto *root = new QVBoxLayout(&dialog);
+    root->setContentsMargins(24, 22, 24, 22);
+    root->setSpacing(16);
+
+    // 1. Header Banner
+    auto *headerBox = new QHBoxLayout;
+    headerBox->setSpacing(12);
+
+    auto *icon = new QLabel("👨‍⚕️");
+    icon->setFixedSize(46, 46);
+    icon->setAlignment(Qt::AlignCenter);
+    icon->setStyleSheet("background: #f0fdfa; border: 1.5px solid #99f6e4; border-radius: 12px; font-size: 22px;");
+
+    auto *titleCol = new QVBoxLayout;
+    titleCol->setSpacing(2);
+    auto *title = new QLabel("Chỉnh sửa thông tin bác sĩ");
+    title->setStyleSheet("font-size: 18px; font-weight: 800; color: #0f172a;");
+    auto *sub = new QLabel("Cập nhật chuyên khoa, phòng khám và thông tin làm việc");
+    sub->setStyleSheet("font-size: 12.5px; color: #64748b;");
+    titleCol->addWidget(title);
+    titleCol->addWidget(sub);
+
+    headerBox->addWidget(icon);
+    headerBox->addLayout(titleCol, 1);
+    root->addLayout(headerBox);
+
+    // 2. Card Container
     auto *card = new QFrame;
     card->setObjectName("doctorCard");
     card->setStyleSheet("QFrame#doctorCard { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; }");
@@ -403,107 +504,70 @@ QFrame *createDoctorFormCard(DoctorFormData &form,
         return col;
     };
 
-    form.name = new QLineEdit(initName);
-    form.name->setPlaceholderText("Ví dụ: Nguyễn Văn An");
-    cardLayout->addLayout(makeField("Họ và tên bác sĩ", form.name));
+    auto *name = new QLineEdit(UIHelper::qs(doctor->getfullName()));
+    cardLayout->addLayout(makeField("Họ và tên bác sĩ", name));
 
     auto *row1 = new QHBoxLayout;
     row1->setSpacing(14);
-    form.phone = new QLineEdit(initPhone);
-    form.phone->setPlaceholderText("Ví dụ: 0905123456");
-    UIHelper::setupPhoneInput(form.phone);
-    form.room = new QLineEdit(initRoom);
-    form.room->setPlaceholderText("Ví dụ: Room 101");
-    row1->addLayout(makeField("Số điện thoại liên hệ", form.phone), 1);
-    row1->addLayout(makeField("Phòng khám (ví dụ: Room 101)", form.room), 1);
+    auto *phone = new QLineEdit(UIHelper::qs(doctor->getPhone()));
+    UIHelper::setupPhoneInput(phone);
+    auto *room = new QLineEdit(UIHelper::qs(doctor->getRoomId()));
+    row1->addLayout(makeField("Số điện thoại liên hệ", phone), 1);
+    row1->addLayout(makeField("Phòng khám (ví dụ: Room 101)", room), 1);
     cardLayout->addLayout(row1);
 
     auto *row2 = new QHBoxLayout;
     row2->setSpacing(14);
-    form.age = new QSpinBox;
-    form.age->setRange(18, 120);
-    form.age->setValue(initAge);
-    form.gender = new QComboBox;
-    form.gender->addItems({"Nam", "Nữ"});
-    form.gender->setCurrentIndex(initGender ? 0 : 1);
-    row2->addLayout(makeField("Tuổi", form.age), 1);
-    row2->addLayout(makeField("Giới tính", form.gender), 1);
+    auto *age = new QSpinBox;
+    age->setRange(18, 120);
+    age->setValue(doctor->getAge());
+
+    auto *gender = new QComboBox;
+    gender->addItems({"Nam", "Nữ"});
+    gender->setCurrentIndex(doctor->getGender() ? 0 : 1);
+
+    row2->addLayout(makeField("Tuổi", age), 1);
+    row2->addLayout(makeField("Giới tính", gender), 1);
     cardLayout->addLayout(row2);
 
     auto *row3 = new QHBoxLayout;
     row3->setSpacing(14);
-    form.specialtyBox = new QComboBox;
+    auto *specialtyBox = new QComboBox;
     auto specList = DoctorController::getSpecializationList("Data/Doctor/Specialization.txt");
     for (const auto &item : specList) {
-        form.specialtyBox->addItem(item.first, item.second);
+        specialtyBox->addItem(item.first, item.second);
     }
-    if (!initSpId.isEmpty()) {
-        int idx = form.specialtyBox->findData(initSpId);
-        if (idx >= 0) form.specialtyBox->setCurrentIndex(idx);
-    }
-    form.state = new QComboBox;
-    form.state->addItems({"Đang làm việc", "Đã nghỉ việc"});
-    form.state->setCurrentIndex(initState ? 0 : 1);
-    row3->addLayout(makeField("Chuyên khoa", form.specialtyBox), 1);
-    row3->addLayout(makeField("Trạng thái công tác", form.state), 1);
+    specialtyBox->setCurrentIndex(specialtyBox->findData(UIHelper::qs(doctor->getSpId())));
+
+    auto *state = new QComboBox;
+    state->addItems({"Đang làm việc", "Đã nghỉ việc"});
+    state->setCurrentIndex(doctor->getState() ? 0 : 1);
+
+    row3->addLayout(makeField("Chuyên khoa", specialtyBox), 1);
+    row3->addLayout(makeField("Trạng thái công tác", state), 1);
     cardLayout->addLayout(row3);
 
     auto *row4 = new QHBoxLayout;
     row4->setSpacing(14);
-    form.fee = new QDoubleSpinBox;
-    form.fee->setRange(0, 100000000);
-    form.fee->setDecimals(0);
-    form.fee->setValue(initFee);
-    form.fee->setSuffix(" đ");
+    auto *fee = new QDoubleSpinBox;
+    fee->setRange(0, 100000000);
+    fee->setDecimals(0);
+    fee->setValue(doctor->getFee());
+    fee->setSuffix(" đ");
 
-    form.rating = new QDoubleSpinBox;
-    form.rating->setRange(0, 5);
-    form.rating->setSingleStep(0.1);
-    form.rating->setValue(initRating);
-    form.rating->setSuffix(" ★");
+    auto *rating = new QDoubleSpinBox;
+    rating->setRange(0, 5);
+    rating->setSingleStep(0.1);
+    rating->setValue(doctor->getRating());
+    rating->setSuffix(" ★");
 
-    row4->addLayout(makeField("Phí khám tham chiếu", form.fee), 1);
-    row4->addLayout(makeField("Đánh giá chuyên môn", form.rating), 1);
+    row4->addLayout(makeField("Phí khám tham chiếu", fee), 1);
+    row4->addLayout(makeField("Đánh giá chuyên môn", rating), 1);
     cardLayout->addLayout(row4);
 
-    return card;
-}
+    root->addWidget(card);
 
-} // namespace
-
-void DoctorView::editDoctorDialog(const std::string &id) {
-    if (!mainWindow) return;
-    Doctor *doctor = mainWindow->findDoctor(id);
-    if (!doctor) return;
-    if (!mainWindow->hasPermission("Per_2")) {
-        UIHelper::showWarning(this, "Không có quyền", "Bạn không có quyền chỉnh sửa thông tin bác sĩ.");
-        return;
-    }
-
-    QDialog dialog(this);
-    dialog.setWindowTitle("Chỉnh sửa thông tin bác sĩ");
-    dialog.setFixedWidth(560);
-    dialog.setStyleSheet(UIHelper::dialogFormStyle());
-
-    auto *root = new QVBoxLayout(&dialog);
-    root->setContentsMargins(24, 22, 24, 22);
-    root->setSpacing(16);
-
-    root->addLayout(UIHelper::createDialogHeader("👨‍⚕️", "Chỉnh sửa thông tin bác sĩ", "Cập nhật chuyên khoa, phòng khám và thông tin làm việc"));
-
-    DoctorFormData form;
-    root->addWidget(createDoctorFormCard(form,
-                                         UIHelper::qs(doctor->getfullName()),
-                                         UIHelper::qs(doctor->getPhone()),
-                                         UIHelper::qs(doctor->getRoomId()),
-                                         doctor->getAge(),
-                                         doctor->getGender(),
-                                         UIHelper::qs(doctor->getSpId()),
-                                         doctor->getState(),
-                                         doctor->getFee(),
-                                         doctor->getRating()));
-
-    // Footer Buttons
+    // 3. Footer Buttons
     auto *btnRow = new QHBoxLayout;
     btnRow->setSpacing(10);
     btnRow->addStretch();
@@ -521,28 +585,34 @@ void DoctorView::editDoctorDialog(const std::string &id) {
     root->addLayout(btnRow);
 
     connect(cancel, &QPushButton::clicked, &dialog, &QDialog::reject);
-    connect(save, &QPushButton::clicked, &dialog, [this, &dialog, doctor, &form] {
-        if (!validateDoctorFields(&dialog, form.name->text(), form.phone->text())) {
+    connect(save, &QPushButton::clicked, &dialog, [this, &dialog, doctor, name, phone, room, fee, rating, age, gender, specialtyBox, state] {
+        QString nameStr = name->text().trimmed();
+        QString phoneStr = phone->text().trimmed();
+        if (nameStr.isEmpty() || phoneStr.isEmpty()) {
+            UIHelper::showWarning(&dialog, "Thiếu thông tin", "Vui lòng nhập họ tên và điện thoại.");
             return;
         }
-        doctor->setfullName(UIHelper::ss(form.name->text().trimmed()));
-        doctor->setPhone(UIHelper::ss(form.phone->text().trimmed()));
-        doctor->setAge(form.age->value());
-        doctor->setGender(form.gender->currentIndex() == 0);
-        doctor->setSpId(UIHelper::ss(form.specialtyBox->currentData().toString()));
-        doctor->setRoomId(UIHelper::ss(form.room->text().trimmed()));
-        doctor->setFee(form.fee->value());
-        doctor->setRating(form.rating->value());
-        doctor->setState(form.state->currentIndex() == 0);
+        if (!UIHelper::isValidPhone(phoneStr)) {
+            UIHelper::showWarning(&dialog, "Số điện thoại không hợp lệ", "Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng số 0 (Ví dụ: 0912345678).");
+            phone->setFocus();
+            return;
+        }
+        doctor->setfullName(UIHelper::ss(nameStr));
+        doctor->setPhone(UIHelper::ss(phoneStr));
+        doctor->setAge(age->value());
+        doctor->setGender(gender->currentIndex() == 0);
+        doctor->setSpId(UIHelper::ss(specialtyBox->currentData().toString()));
+        doctor->setRoomId(UIHelper::ss(room->text().trimmed()));
+        doctor->setFee(fee->value());
+        doctor->setRating(rating->value());
+        doctor->setState(state->currentIndex() == 0);
 
         mainWindow->saveAll();
-        refresh();
+        qInfo() << "Cập nhật thông tin bác sĩ thành công:" << UIHelper::qs(doctor->getID()) << "-" << UIHelper::qs(doctor->getfullName());
         dialog.accept();
     });
-
     dialog.setFocusPolicy(Qt::StrongFocus);
     dialog.setFocus();
-    QTimer::singleShot(0, [&dialog]() { dialog.setFocus(); });
     dialog.exec();
 }
 
@@ -556,19 +626,248 @@ void DoctorView::addDoctorDialog() {
     QDialog dialog(this);
     dialog.setWindowTitle("Thêm bác sĩ mới");
     dialog.setFixedWidth(560);
-    dialog.setStyleSheet(UIHelper::dialogFormStyle());
+    dialog.setStyleSheet(R"(
+        QDialog {
+            background-color: #f8fafc;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {
+            background: #ffffff;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 13px;
+            color: #0f172a;
+            min-height: 20px;
+        }
+        QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {
+            border: 1.5px solid #0d9488;
+            background: #ffffff;
+        }
+        QSpinBox, QDoubleSpinBox {
+            padding-right: 30px;
+        }
+        QSpinBox::up-button, QDoubleSpinBox::up-button {
+            subcontrol-origin: border;
+            subcontrol-position: top right;
+            width: 25px;
+            border-left: 1.5px solid #94a3b8;
+            border-bottom: 1px solid #94a3b8;
+            border-top-right-radius: 7px;
+            background: #e2e8f0;
+        }
+        QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {
+            background: #0d9488;
+        }
+        QSpinBox::up-button:hover QSpinBox::up-arrow,
+        QDoubleSpinBox::up-button:hover QDoubleSpinBox::up-arrow {
+            image: url(:/assets/textures/arrow_up_white.png);
+        }
+        QSpinBox::up-button:pressed, QDoubleSpinBox::up-button:pressed {
+            background: #0f766e;
+        }
+        QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
+            image: url(:/assets/textures/arrow_up_dark.png);
+            width: 9px;
+            height: 9px;
+        }
+        QSpinBox::down-button, QDoubleSpinBox::down-button {
+            subcontrol-origin: border;
+            subcontrol-position: bottom right;
+            width: 25px;
+            border-left: 1.5px solid #94a3b8;
+            border-bottom-right-radius: 7px;
+            background: #e2e8f0;
+        }
+        QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
+            background: #0d9488;
+        }
+        QSpinBox::down-button:hover QSpinBox::down-arrow,
+        QDoubleSpinBox::down-button:hover QDoubleSpinBox::down-arrow {
+            image: url(:/assets/textures/arrow_down_white.png);
+        }
+        QSpinBox::down-button:pressed, QDoubleSpinBox::down-button:pressed {
+            background: #0f766e;
+        }
+        QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
+            image: url(:/assets/textures/arrow_down_dark.png);
+            width: 9px;
+            height: 9px;
+        }
+        QComboBox {
+            padding-right: 28px;
+        }
+        QComboBox:disabled {
+            background: #f1f5f9;
+            color: #94a3b8;
+            border-color: #e2e8f0;
+        }
+        QComboBox::drop-down {
+            subcontrol-origin: border;
+            subcontrol-position: top right;
+            width: 28px;
+            border: none;
+            background: transparent;
+        }
+        QComboBox::drop-down:disabled {
+            width: 0px;
+            border: none;
+        }
+        QComboBox::down-arrow {
+            image: url(:/assets/textures/arrow_down_dark.png);
+            width: 11px;
+            height: 11px;
+            margin-right: 8px;
+        }
+        QComboBox::down-arrow:disabled {
+            image: none;
+        }
+        QComboBox QAbstractItemView {
+            background-color: #ffffff;
+            color: #0f172a;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 8px;
+            selection-background-color: #0d9488;
+            selection-color: #ffffff;
+            outline: none;
+            padding: 4px;
+        }
+        QComboBox QAbstractItemView::item {
+            min-height: 28px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            color: #0f172a;
+            background-color: #ffffff;
+        }
+        QComboBox QAbstractItemView::item:hover {
+            background-color: #f0fdfa;
+            color: #0f766e;
+        }
+        QComboBox QAbstractItemView::item:selected {
+            background-color: #0d9488;
+            color: #ffffff;
+        }
+    )");
 
     auto *root = new QVBoxLayout(&dialog);
     root->setContentsMargins(24, 22, 24, 22);
     root->setSpacing(16);
 
-    root->addLayout(UIHelper::createDialogHeader("👨‍⚕️", "Thêm bác sĩ mới", "Tạo hồ sơ và thông tin công tác cho bác sĩ mới"));
+    // 1. Header Banner
+    auto *headerBox = new QHBoxLayout;
+    headerBox->setSpacing(12);
+
+    auto *icon = new QLabel("👨‍⚕️");
+    icon->setFixedSize(46, 46);
+    icon->setAlignment(Qt::AlignCenter);
+    icon->setStyleSheet("background: #f0fdfa; border: 1.5px solid #99f6e4; border-radius: 12px; font-size: 22px;");
+
+    auto *titleCol = new QVBoxLayout;
+    titleCol->setSpacing(2);
+    auto *title = new QLabel("Thêm bác sĩ mới");
+    title->setStyleSheet("font-size: 18px; font-weight: 800; color: #0f172a;");
+    auto *sub = new QLabel("Tạo hồ sơ và thông tin công tác cho bác sĩ mới");
+    sub->setStyleSheet("font-size: 12.5px; color: #64748b;");
+    titleCol->addWidget(title);
+    titleCol->addWidget(sub);
+
+    headerBox->addWidget(icon);
+    headerBox->addLayout(titleCol, 1);
+    root->addLayout(headerBox);
+
+    // 2. Card Container
+    auto *card = new QFrame;
+    card->setObjectName("doctorCard");
+    card->setStyleSheet("QFrame#doctorCard { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; }");
+    auto *cardLayout = new QVBoxLayout(card);
+    cardLayout->setContentsMargins(20, 18, 20, 20);
+    cardLayout->setSpacing(14);
+
+    auto makeField = [](const QString &labelText, QWidget *inputWidget) {
+        auto *col = new QVBoxLayout;
+        col->setSpacing(5);
+        auto *lbl = new QLabel(labelText);
+        lbl->setStyleSheet("font-size: 12px; font-weight: 700; color: #334155;");
+        col->addWidget(lbl);
+        col->addWidget(inputWidget);
+        return col;
+    };
 
     std::string newId = DoctorController::generateNextId(mainWindow->getDoctors());
-    DoctorFormData form;
-    root->addWidget(createDoctorFormCard(form));
+    auto *idRow = new QHBoxLayout;
+    idRow->setSpacing(14);
+    auto *idInput = new QLineEdit(UIHelper::qs(newId));
+    idInput->setReadOnly(true);
+    idInput->setStyleSheet("QLineEdit { background: #f1f5f9; color: #0d9488; font-weight: 700; border: 1.5px solid #cbd5e1; }");
+    idRow->addLayout(makeField("Mã bác sĩ (Tự động cấp)", idInput), 1);
 
-    // Footer Buttons
+    auto *name = new QLineEdit;
+    name->setPlaceholderText("Ví dụ: Nguyễn Văn An");
+    idRow->addLayout(makeField("Họ và tên bác sĩ", name), 2);
+    cardLayout->addLayout(idRow);
+
+    auto *row1 = new QHBoxLayout;
+    row1->setSpacing(14);
+    auto *phone = new QLineEdit;
+    phone->setPlaceholderText("Ví dụ: 0912345678");
+    UIHelper::setupPhoneInput(phone);
+    auto *room = new QLineEdit;
+    room->setPlaceholderText("Ví dụ: Room 101");
+    row1->addLayout(makeField("Số điện thoại liên hệ", phone), 1);
+    row1->addLayout(makeField("Phòng khám (ví dụ: Room 101)", room), 1);
+    cardLayout->addLayout(row1);
+
+    auto *row2 = new QHBoxLayout;
+    row2->setSpacing(14);
+    auto *age = new QSpinBox;
+    age->setRange(18, 120);
+    age->setValue(32);
+
+    auto *gender = new QComboBox;
+    gender->addItems({"Nam", "Nữ"});
+    gender->setCurrentIndex(0);
+
+    row2->addLayout(makeField("Tuổi", age), 1);
+    row2->addLayout(makeField("Giới tính", gender), 1);
+    cardLayout->addLayout(row2);
+
+    auto *row3 = new QHBoxLayout;
+    row3->setSpacing(14);
+    auto *specialtyBox = new QComboBox;
+    auto specList = DoctorController::getSpecializationList("Data/Doctor/Specialization.txt");
+    for (const auto &item : specList) {
+        specialtyBox->addItem(item.first, item.second);
+    }
+
+    auto *state = new QComboBox;
+    state->addItems({"Đang làm việc", "Đã nghỉ việc"});
+    state->setCurrentIndex(0);
+
+    row3->addLayout(makeField("Chuyên khoa", specialtyBox), 1);
+    row3->addLayout(makeField("Trạng thái công tác", state), 1);
+    cardLayout->addLayout(row3);
+
+    auto *row4 = new QHBoxLayout;
+    row4->setSpacing(14);
+    auto *fee = new QDoubleSpinBox;
+    fee->setRange(0, 100000000);
+    fee->setDecimals(0);
+    fee->setValue(200000);
+    fee->setSuffix(" đ");
+
+    auto *rating = new QDoubleSpinBox;
+    rating->setRange(0, 5);
+    rating->setSingleStep(0.1);
+    rating->setValue(5.0);
+    rating->setSuffix(" ★");
+
+    row4->addLayout(makeField("Phí khám tham chiếu", fee), 1);
+    row4->addLayout(makeField("Đánh giá ban đầu", rating), 1);
+    cardLayout->addLayout(row4);
+
+    root->addWidget(card);
+
+    // 3. Footer Buttons
     auto *btnRow = new QHBoxLayout;
     btnRow->setSpacing(10);
     btnRow->addStretch();
@@ -586,39 +885,46 @@ void DoctorView::addDoctorDialog() {
     root->addLayout(btnRow);
 
     connect(cancel, &QPushButton::clicked, &dialog, &QDialog::reject);
-    connect(save, &QPushButton::clicked, &dialog, [this, &dialog, newId, &form] {
-        if (!validateDoctorFields(&dialog, form.name->text(), form.phone->text())) {
+    connect(save, &QPushButton::clicked, &dialog, [this, &dialog, newId, name, phone, room, fee, rating, age, gender, specialtyBox, state] {
+        QString nameStr = name->text().trimmed();
+        QString phoneStr = phone->text().trimmed();
+        QString roomStr = room->text().trimmed();
+        if (nameStr.isEmpty() || phoneStr.isEmpty()) {
+            UIHelper::showWarning(&dialog, "Thiếu thông tin", "Vui lòng nhập đầy đủ họ tên và số điện thoại.");
             return;
         }
-
-        QString roomStr = form.room->text().trimmed();
+        if (!UIHelper::isValidPhone(phoneStr)) {
+            UIHelper::showWarning(&dialog, "Số điện thoại không hợp lệ", "Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng số 0 (Ví dụ: 0912345678).");
+            phone->setFocus();
+            return;
+        }
         if (roomStr.isEmpty()) {
             roomStr = "Room 101";
         }
 
         Doctor newDoctor(
             newId,
-            UIHelper::ss(form.name->text().trimmed()),
-            UIHelper::ss(form.phone->text().trimmed()),
-            form.gender->currentIndex() == 0,
-            form.age->value(),
-            UIHelper::ss(form.specialtyBox->currentData().toString()),
-            form.state->currentIndex() == 0,
+            UIHelper::ss(nameStr),
+            UIHelper::ss(phoneStr),
+            gender->currentIndex() == 0,
+            age->value(),
+            UIHelper::ss(specialtyBox->currentData().toString()),
+            state->currentIndex() == 0,
             UIHelper::ss(roomStr),
-            form.fee->value(),
-            form.rating->value()
+            fee->value(),
+            rating->value()
         );
 
         auto *docList = mainWindow->getDoctors();
         if (docList) {
             docList->insert(newDoctor);
             mainWindow->saveAll();
+            qInfo() << "Thêm bác sĩ mới thành công:" << UIHelper::qs(newDoctor.getID()) << "-" << UIHelper::qs(newDoctor.getfullName());
         }
         dialog.accept();
     });
 
     dialog.setFocusPolicy(Qt::StrongFocus);
     dialog.setFocus();
-    QTimer::singleShot(0, [&dialog]() { dialog.setFocus(); });
     dialog.exec();
 }

@@ -1,37 +1,17 @@
 #include "StatisticController.h"
 #include "DoctorController.h"
+#include "libPBL2.h"
 
 int StatisticController::patientCount(const LinkList<Patient> *items) {
-    if (!items || !items->getHeader()) return 0;
-    int c = 0;
-    auto *n = items->getHeader()->next;
-    while (n && n->next) {
-        if (!n->info.isDefault() && n->info.getValid()) c++;
-        n = n->next;
-    }
-    return c;
+    return items ? items->count : 0;
 }
 
 int StatisticController::doctorCount(const LinkList<Doctor> *items) {
-    if (!items || !items->getHeader()) return 0;
-    int c = 0;
-    auto *n = items->getHeader()->next;
-    while (n && n->next) {
-        if (!n->info.isDefault() && n->info.getValid()) c++;
-        n = n->next;
-    }
-    return c;
+    return items ? items->count : 0;
 }
 
 int StatisticController::appointmentCount(const LinkList<Appointment> *items) {
-    if (!items || !items->getHeader()) return 0;
-    int c = 0;
-    auto *n = items->getHeader()->next;
-    while (n && n->next) {
-        if (!n->info.isDefault() && n->info.getValid()) c++;
-        n = n->next;
-    }
-    return c;
+    return items ? items->count : 0;
 }
 
 int StatisticController::pendingAppointmentCount(const LinkList<Appointment> *items) {
@@ -39,7 +19,7 @@ int StatisticController::pendingAppointmentCount(const LinkList<Appointment> *it
     int c = 0;
     auto *n = items->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.isDefault() && n->info.getValid() && n->info.getState() == 0) {
+        if (!n->info.isDefault() && n->info.getState() == 0) {
             c++;
         }
         n = n->next;
@@ -53,9 +33,9 @@ double StatisticController::totalRevenue(const LinkList<Appointment> *appts, con
     auto *docList = const_cast<LinkList<Doctor>*>(docs);
     auto *n = appts->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.isDefault() && n->info.getValid() && n->info.getState() == 1) { // 1 = Da kham
+        if (!n->info.isDefault() && n->info.getState() == 1) { // 1 = Da kham
             Doctor *d = DoctorController::findById(docList, n->info.getDoctorId());
-            if (d && d->getValid()) {
+            if (d) {
                 total += d->getFee();
             }
         }
@@ -70,11 +50,11 @@ double StatisticController::todayRevenue(const LinkList<Appointment> *appts, con
     auto *docList = const_cast<LinkList<Doctor>*>(docs);
     auto *n = appts->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.isDefault() && n->info.getValid() && n->info.getState() == 1) {
+        if (!n->info.isDefault() && n->info.getState() == 1) {
             Date dt = n->info.getDateGet();
             if (dt.getDay() == day && dt.getMonth() == month && dt.getYear() == year) {
                 Doctor *d = DoctorController::findById(docList, n->info.getDoctorId());
-                if (d && d->getValid()) {
+                if (d) {
                     total += d->getFee();
                 }
             }
@@ -91,7 +71,7 @@ double StatisticController::completionRate(const LinkList<Appointment> *appts, i
 
     auto *n = appts->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.isDefault() && n->info.getValid()) {
+        if (!n->info.isDefault()) {
             int st = n->info.computeEffectiveState(currentDay, currentMonth, currentYear, currentHour, currentMinute);
             // Các ca tính đến thời điểm hiện tại: Đã khám (1), Trễ hẹn (-1)
             if (st == 1 || st == -1) {
@@ -122,7 +102,7 @@ void StatisticController::appointmentStatusCounts(const LinkList<Appointment> *a
 
     auto *n = appts->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.isDefault() && n->info.getValid()) {
+        if (!n->info.isDefault()) {
             int st = n->info.computeEffectiveState(currentDay, currentMonth, currentYear, currentHour, currentMinute);
             switch (st) {
                 case 1: completed++; break;
@@ -148,7 +128,7 @@ void StatisticController::todayAppointmentCounts(const LinkList<Appointment> *ap
 
     auto *n = appts->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.isDefault() && n->info.getValid()) {
+        if (!n->info.isDefault()) {
             Date dt = n->info.getDateGet();
             if (dt.getDay() == day && dt.getMonth() == month && dt.getYear() == year) {
                 totalToday++;
@@ -167,7 +147,7 @@ void StatisticController::patientGenderCounts(const LinkList<Patient> *patients,
 
     auto *n = patients->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.isDefault() && n->info.getValid()) {
+        if (!n->info.isDefault()) {
             if (n->info.getGender()) male++;
             else female++;
         }
@@ -184,7 +164,7 @@ void StatisticController::patientAgeDistribution(const LinkList<Patient> *patien
 
     auto *n = patients->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.isDefault() && n->info.getValid()) {
+        if (!n->info.isDefault()) {
             int age = n->info.getAge();
             if (age < 18) under18++;
             else if (age <= 45) from18to45++;
@@ -207,7 +187,7 @@ int StatisticController::getTopDoctors(const LinkList<Appointment> *appts, const
 
     auto *dn = docs->getHeader()->next;
     while (dn && dn->next && idx < totalDocs) {
-        if (!dn->info.isDefault() && dn->info.getValid()) {
+        if (!dn->info.isDefault()) {
             allItems[idx].doctorId = dn->info.getID();
             allItems[idx].doctorName = dn->info.getfullName();
             allItems[idx].specialtyId = dn->info.getSpId();
@@ -224,7 +204,7 @@ int StatisticController::getTopDoctors(const LinkList<Appointment> *appts, const
     if (appts && appts->getHeader()) {
         auto *an = appts->getHeader()->next;
         while (an && an->next) {
-            if (!an->info.isDefault() && an->info.getValid()) {
+            if (!an->info.isDefault()) {
                 std::string did = an->info.getDoctorId();
                 for (int i = 0; i < validDoctors; ++i) {
                     if (allItems[i].doctorId == did) {
@@ -237,15 +217,11 @@ int StatisticController::getTopDoctors(const LinkList<Appointment> *appts, const
         }
     }
 
-    // Sort descending by appointmentCount (simple bubble sort - no forbidden STL headers)
-    for (int i = 0; i < validDoctors - 1; ++i) {
-        for (int j = 0; j < validDoctors - i - 1; ++j) {
-            if (allItems[j].appointmentCount < allItems[j + 1].appointmentCount) {
-                DoctorLeaderboardItem tmp = allItems[j];
-                allItems[j] = allItems[j + 1];
-                allItems[j + 1] = tmp;
-            }
-        }
+    // QuickSort descending by appointmentCount using libPBL2::qsort
+    if (validDoctors > 1) {
+        libPBL2::qsort(allItems, 0, validDoctors - 1, [](const DoctorLeaderboardItem &a, const DoctorLeaderboardItem &b) {
+            return a.appointmentCount > b.appointmentCount;
+        });
     }
 
     int copyCount = (validDoctors < maxCount) ? validDoctors : maxCount;
@@ -266,9 +242,9 @@ int StatisticController::getSpecialtyDemand(const LinkList<Appointment> *appts, 
 
     auto *an = appts->getHeader()->next;
     while (an && an->next) {
-        if (!an->info.isDefault() && an->info.getValid()) {
+        if (!an->info.isDefault()) {
             Doctor *d = DoctorController::findById(docList, an->info.getDoctorId());
-            if (d && d->getValid()) {
+            if (d) {
                 std::string spId = d->getSpId();
                 int foundIdx = -1;
                 for (int i = 0; i < uniqueCount; ++i) {
@@ -289,15 +265,11 @@ int StatisticController::getSpecialtyDemand(const LinkList<Appointment> *appts, 
         an = an->next;
     }
 
-    // Sort descending by count
-    for (int i = 0; i < uniqueCount - 1; ++i) {
-        for (int j = 0; j < uniqueCount - i - 1; ++j) {
-            if (items[j].count < items[j + 1].count) {
-                SpecialtyDemandItem tmp = items[j];
-                items[j] = items[j + 1];
-                items[j + 1] = tmp;
-            }
-        }
+    // QuickSort descending by count using libPBL2::qsort
+    if (uniqueCount > 1) {
+        libPBL2::qsort(items, 0, uniqueCount - 1, [](const SpecialtyDemandItem &a, const SpecialtyDemandItem &b) {
+            return a.count > b.count;
+        });
     }
 
     int copyCount = (uniqueCount < maxCount) ? uniqueCount : maxCount;
@@ -321,7 +293,7 @@ void StatisticController::getWeeklyTrend(const LinkList<Appointment> *appts, int
 
     auto *an = appts->getHeader()->next;
     while (an && an->next) {
-        if (!an->info.isDefault() && an->info.getValid()) {
+        if (!an->info.isDefault()) {
             Date dt = an->info.getDateGet();
             for (int i = 0; i < 7; ++i) {
                 if (dt.getDay() == days[i].getDay() &&

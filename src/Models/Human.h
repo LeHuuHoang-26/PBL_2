@@ -10,10 +10,9 @@ protected:
     std::string phone;
     bool gender;
     int age;
-    bool valid;
 
 public:
-    Human(std::string id = "", std::string fullName = "", std::string phone = "", bool gender = false, int age = 0, bool valid = true);
+    Human(std::string id = "", std::string fullName = "", std::string phone = "", bool gender = false, int age = 0);
     virtual ~Human() = default;
     friend bool operator ==(const Human &, const Human &);
     virtual void displayInfo() const;
@@ -23,14 +22,12 @@ public:
     std::string getPhone() const;
     bool getGender() const;
     int getAge() const;
-    bool getValid() const;
 
     void setID(std::string id);
     void setfullName(std::string fullName);
     void setPhone(std::string phone);
     void setGender(bool gender);
     void setAge(int age);
-    void setValid(bool valid);
 };
 
 #endif

@@ -42,29 +42,18 @@ Patient::Patient(std::ifstream &f) {
     }
     age = stoi(tmp);
 
-    string rest;
-    if (!getline(f, rest, '\n')) {
+    if (!getline(f, CCCD, '\n')) {
         setDefault();
         return;
-    }
-    auto pipePos = rest.find('|');
-    if (pipePos != string::npos) {
-        CCCD = rest.substr(0, pipePos);
-        string vStr = rest.substr(pipePos + 1);
-        libPBL2::trim(vStr);
-        valid = (vStr == "1");
-    } else {
-        CCCD = rest;
-        valid = true;
     }
     libPBL2::trim(CCCD);
 }
 
-Patient::Patient(std::string id, std::string fullName, std::string phone, bool gender, int age, std::string CCCD, bool valid)
-    : Human(id, fullName, phone, gender, age, valid), CCCD(CCCD) {}
+Patient::Patient(std::string id, std::string fullName, std::string phone, bool gender, int age, std::string CCCD)
+    : Human(id, fullName, phone, gender, age), CCCD(CCCD) {}
 
 Patient::Patient(const Patient &P)
-    : Human(P.id, P.fullName, P.phone, P.gender, P.age, P.valid), CCCD(P.CCCD) {}
+    : Human(P.id, P.fullName, P.phone, P.gender, P.age), CCCD(P.CCCD) {}
 
 Patient::~Patient() {}
 
@@ -95,34 +84,21 @@ string Patient::toString() const {
          + libPBL2::padRightUtf8(phone, 10) + " | "
          + libPBL2::padRightUtf8(gender ? "1" : "0", 8) + " | "
          + libPBL2::padRightUtf8(to_string(age), 5) + " | "
-         + libPBL2::padRightUtf8(CCCD, 12) + " | "
-         + (valid ? "1" : "0");
+         + CCCD;
 }
 
 Patient Patient::loadFromString(const std::string &str) {
     if (str.empty()) return Patient();
     stringstream ss(str);
-    string id, fullName, phone, genderStr, ageStr, cccd, validStr;
+    string id, fullName, phone, genderStr, ageStr, cccd;
 
     if (!getline(ss, id, '|') ||
         !getline(ss, fullName, '|') ||
         !getline(ss, phone, '|') ||
         !getline(ss, genderStr, '|') ||
-        !getline(ss, ageStr, '|')) {
+        !getline(ss, ageStr, '|') ||
+        !getline(ss, cccd)) {
         return Patient();
-    }
-
-    string rest;
-    if (!getline(ss, rest)) {
-        return Patient();
-    }
-    auto pipePos = rest.find('|');
-    if (pipePos != string::npos) {
-        cccd = rest.substr(0, pipePos);
-        validStr = rest.substr(pipePos + 1);
-    } else {
-        cccd = rest;
-        validStr = "1";
     }
 
     libPBL2::trim(id);
@@ -131,7 +107,6 @@ Patient Patient::loadFromString(const std::string &str) {
     libPBL2::trim(genderStr);
     libPBL2::trim(ageStr);
     libPBL2::trim(cccd);
-    libPBL2::trim(validStr);
 
     if (id.empty()) return Patient();
 
@@ -141,8 +116,7 @@ Patient Patient::loadFromString(const std::string &str) {
         age = stoi(ageStr);
     } catch (...) {}
 
-    bool valid = validStr.empty() || (validStr == "1");
-    return Patient(id, fullName, phone, gender, age, cccd, valid);
+    return Patient(id, fullName, phone, gender, age, cccd);
 }
 
 LinkList<Patient>* Patient::loadFromFile(const std::string &path) {
@@ -177,8 +151,8 @@ bool Patient::saveToFile(const std::string &path, const LinkList<Patient> *list)
     if (!f.is_open())
         return false;
 
-    f << "P_ID  | P_FullName              | P_Phone    | P_Gender | P_Age | P_CCCD       | P_Valid\n";
-    f << "------+-------------------------+------------+----------+-------+--------------+--------\n";
+    f << "P_ID  | P_FullName              | P_Phone    | P_Gender | P_Age | P_CCCD\n";
+    f << "------+-------------------------+------------+----------+-------+-------------\n";
 
     LinkList<Patient>::Node *tmp = list->getHeader()->next;
     while (tmp != nullptr && tmp->next != nullptr) {
