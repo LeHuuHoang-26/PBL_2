@@ -1,7 +1,7 @@
 QT += core gui widgets charts
 CONFIG += c++23
 
-TARGET = AnTamMng
+TARGET = MngCareBook
 TEMPLATE = app
 
 # --- Cấu hình thư mục build ---
