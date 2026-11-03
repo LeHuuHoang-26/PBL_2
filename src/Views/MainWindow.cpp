@@ -29,7 +29,6 @@
 #include <QIcon>
 #include <QStyle>
 #include <QTimer>
-#include <QDebug>
 
 using namespace std;
 
@@ -346,7 +345,6 @@ void MainWindow::setPage(int index)
     if (pages)
         pages->setCurrentIndex(index);
     updateNavigation();
-    qInfo() << "Chuyển trang hiển thị:" << index;
 }
 
 void MainWindow::updateNavigation()
@@ -389,7 +387,6 @@ void MainWindow::handleLogin()
     if (success && manager)
     {
         currentManager = manager;
-        qInfo() << "Đăng nhập thành công:" << username << "| Quyền:" << ManagerController::roleName(manager->getRole());
         loginView->showSuccessMessage("Đăng nhập thành công!");
 
         // Khởi dựng Shell làm việc theo phân quyền tài khoản
@@ -404,7 +401,6 @@ void MainWindow::handleLogin()
     }
     else
     {
-        qWarning() << "Đăng nhập thất bại:" << username << "| Lỗi:" << errorMessage;
         loginView->showErrorMessage(errorMessage);
     }
 }
@@ -509,7 +505,6 @@ void MainWindow::handleLogout()
 
     if (dialog.exec() == QDialog::Accepted)
     {
-        qInfo() << "Người dùng thực hiện đăng xuất.";
         saveAll();
         currentManager = nullptr;
         showLogin();
@@ -807,12 +802,7 @@ void MainWindow::saveAll()
               Appointment::saveToFile(appointmentPath, appointments);
     if (!ok)
     {
-        qCritical() << "Lỗi: Không thể lưu một hoặc nhiều tệp dữ liệu vào Data/";
         UIHelper::showWarning(this, "Lỗi lưu dữ liệu", "Không thể lưu một hoặc nhiều tệp dữ liệu.");
-    }
-    else
-    {
-        qInfo() << "Lưu thành công toàn bộ dữ liệu hệ thống vào thư mục Data/";
     }
 }
 
@@ -859,13 +849,9 @@ bool MainWindow::initApp()
     bool ok = managers && patients && doctors && symptoms && symptomPatients && appointments;
     if (!ok)
     {
-        qCritical() << "Lỗi: Không thể nạp dữ liệu từ thư mục Data/!";
         UIHelper::showWarning(this, "Lỗi dữ liệu", "Không thể nạp dữ liệu từ thư mục Data/! Vui lòng đảm bảo tệp dữ liệu tồn tại và ứng dụng được khởi chạy từ đúng thư mục.");
         return false;
     }
-    qInfo() << "Nạp thành công dữ liệu từ Data/. Tổng bác sĩ:" << (doctors ? doctors->count : 0)
-            << "| Bệnh nhân:" << (patients ? patients->count : 0)
-            << "| Lịch hẹn:" << (appointments ? appointments->count : 0);
 
     // Cập nhật trạng thái triệu chứng
     auto *p = patients->getHeader()->next;

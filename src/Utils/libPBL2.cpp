@@ -1,3 +1,6 @@
+#ifndef LIBPBL2_CPP
+#define LIBPBL2_CPP
+
 #include "libPBL2.h"
 #include "../Models/Manager.h"
 #include "../Models/Patient.h"
@@ -17,7 +20,7 @@ using namespace std;
 
 namespace libPBL2 {
 
-void trim(string &str) {
+inline void trim(string &str) {
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == string::npos) {
         str.clear();
@@ -27,7 +30,7 @@ void trim(string &str) {
     str = str.substr(start, end - start + 1);
 }
 
-void filterNewline(string &str) {
+inline void filterNewline(string &str) {
     string res = "";
     for (char c : str) {
         if (c != '\r' && c != '\n') {
@@ -37,7 +40,7 @@ void filterNewline(string &str) {
     str = res;
 }
 
-size_t utf8Length(const string &str) {
+inline size_t utf8Length(const string &str) {
     size_t len = 0;
     for (unsigned char c : str) {
         if ((c & 0xC0) != 0x80) {
@@ -47,13 +50,13 @@ size_t utf8Length(const string &str) {
     return len;
 }
 
-string padRightUtf8(const string &str, size_t targetWidth) {
+inline string padRightUtf8(const string &str, size_t targetWidth) {
     size_t ulen = utf8Length(str);
     if (ulen >= targetWidth) return str;
     return str + string(targetWidth - ulen, ' ');
 }
 
-bool isAllowed(const Manager &M, PermissionType Per, const LinkList<Permission> *PermissionList) {
+inline bool isAllowed(const Manager &M, PermissionType Per, const LinkList<Permission> *PermissionList) {
     if (!M.isActive())
         return false;
 
@@ -77,10 +80,124 @@ bool isAllowed(const Manager &M, PermissionType Per, const LinkList<Permission> 
 }
 
 // -------------------------------------------------------------
+// Generic QuickSort Algorithm Implementation (Định nghĩa template)
+// -------------------------------------------------------------
+
+template <typename T>
+void swapVal(T &a, T &b) {
+    T tmp = static_cast<T&&>(a);
+    a = static_cast<T&&>(b);
+    b = static_cast<T&&>(tmp);
+}
+
+// Partition logic for doubly linked list
+template <typename T, typename Compare>
+typename LinkList<T>::Node* partitionNodes(typename LinkList<T>::Node *left,
+                                            typename LinkList<T>::Node *right,
+                                            Compare comp) {
+    T pivot = right->info;
+    typename LinkList<T>::Node *i = left->prev;
+
+    for (typename LinkList<T>::Node *j = left; j != right; j = j->next) {
+        if (comp(j->info, pivot)) {
+            i = (i == left->prev) ? left : i->next;
+            if (i != j) {
+                swapVal(i->info, j->info);
+            }
+        }
+    }
+    i = (i == left->prev) ? left : i->next;
+    if (i != right) {
+        swapVal(i->info, right->info);
+    }
+    return i;
+}
+
+// Recursive node quicksort
+template <typename T, typename Compare>
+void qsortNodes(typename LinkList<T>::Node *left, typename LinkList<T>::Node *right, Compare comp) {
+    if (!left || !right || left == right || right->next == left) {
+        return;
+    }
+
+    typename LinkList<T>::Node *pivot = partitionNodes<T, Compare>(left, right, comp);
+
+    if (pivot != left && pivot->prev) {
+        qsortNodes<T, Compare>(left, pivot->prev, comp);
+    }
+    if (pivot != right && pivot->next) {
+        qsortNodes<T, Compare>(pivot->next, right, comp);
+    }
+}
+
+// QuickSort on LinkList<T>
+template <typename T, typename Compare>
+void qsort(LinkList<T> &list, Compare comp) {
+    if (list.getCount() <= 1 || !list.getHeader() || !list.getFooter()) return;
+    typename LinkList<T>::Node *first = list.getHeader()->next;
+    typename LinkList<T>::Node *last = list.getFooter()->prev;
+    if (!first || !last || first == list.getFooter() || first == last) return;
+    qsortNodes<T, Compare>(first, last, comp);
+}
+
+template <typename T, typename Compare>
+void qsort(LinkList<T> *list, Compare comp) {
+    if (list) {
+        qsort<T, Compare>(*list, comp);
+    }
+}
+
+// QuickSort on C-arrays
+template <typename T, typename Compare>
+void qsort(T *arr, int low, int high, Compare comp) {
+    if (!arr || low >= high) return;
+    T pivot = arr[high];
+    int i = low - 1;
+    for (int j = low; j < high; ++j) {
+        if (comp(arr[j], pivot)) {
+            i++;
+            swapVal(arr[i], arr[j]);
+        }
+    }
+    swapVal(arr[i + 1], arr[high]);
+    int pi = i + 1;
+    qsort(arr, low, pi - 1, comp);
+    qsort(arr, pi + 1, high, comp);
+}
+
+// QuickSort on random-access indexable containers (QList, std::vector, etc.)
+template <typename Container, typename Compare>
+void qsortRandomAccess(Container &c, int low, int high, Compare comp) {
+    if (low >= high) return;
+    auto pivot = c[high];
+    int i = low - 1;
+    for (int j = low; j < high; ++j) {
+        if (comp(c[j], pivot)) {
+            i++;
+            auto tmp = c[i];
+            c[i] = c[j];
+            c[j] = tmp;
+        }
+    }
+    auto tmp = c[i + 1];
+    c[i + 1] = c[high];
+    c[high] = tmp;
+    int pi = i + 1;
+    qsortRandomAccess(c, low, pi - 1, comp);
+    qsortRandomAccess(c, pi + 1, high, comp);
+}
+
+template <typename Container, typename Compare>
+void qsort(Container &c, Compare comp) {
+    if (c.size() <= 1) return;
+    qsortRandomAccess(c, 0, static_cast<int>(c.size()) - 1, comp);
+}
+
+// -------------------------------------------------------------
 // Comparison Helpers
 // -------------------------------------------------------------
 
-int compareNatural(const string &a, const string &b) {
+inline int compareNatural(const string &a, const string &b) {
     size_t i = 0, j = 0;
     while (i < a.size() && j < b.size()) {
         if (isdigit(static_cast<unsigned char>(a[i])) && isdigit(static_cast<unsigned char>(b[j]))) {
@@ -107,7 +224,7 @@ int compareNatural(const string &a, const string &b) {
     return 0;
 }
 
-string extractLastName(const string &fullName) {
+inline string extractLastName(const string &fullName) {
     size_t end = fullName.find_last_not_of(" \t\r\n");
     if (end == string::npos) return "";
     size_t start = fullName.find_last_of(" \t", end);
@@ -115,7 +232,7 @@ string extractLastName(const string &fullName) {
     return fullName.substr(start + 1, end - start);
 }
 
-int compareVietnameseNames(const string &name1, const string &name2) {
+inline int compareVietnameseNames(const string &name1, const string &name2) {
     string last1 = extractLastName(name1);
     string last2 = extractLastName(name2);
 
@@ -137,7 +254,7 @@ int compareVietnameseNames(const string &name1, const string &name2) {
     return 0;
 }
 
-int compareDates(const Date &da, const Date &db) {
+inline int compareDates(const Date &da, const Date &db) {
     if (da.getYear() != db.getYear()) return (da.getYear() < db.getYear()) ? -1 : 1;
     if (da.getMonth() != db.getMonth()) return (da.getMonth() < db.getMonth()) ? -1 : 1;
     if (da.getDay() != db.getDay()) return (da.getDay() < db.getDay()) ? -1 : 1;
@@ -150,7 +267,7 @@ int compareDates(const Date &da, const Date &db) {
 // Model Sorting Implementations
 // -------------------------------------------------------------
 
-void sortPatients(LinkList<Patient> &list, PatientSortBy criteria, bool ascending) {
+inline void sortPatients(LinkList<Patient> &list, PatientSortBy criteria, bool ascending) {
     qsort(list, [criteria, ascending](const Patient &a, const Patient &b) {
         int cmp = 0;
         switch (criteria) {
@@ -178,11 +295,11 @@ void sortPatients(LinkList<Patient> &list, PatientSortBy criteria, bool ascendin
     });
 }
 
-void sortPatients(LinkList<Patient> *list, PatientSortBy criteria, bool ascending) {
+inline void sortPatients(LinkList<Patient> *list, PatientSortBy criteria, bool ascending) {
     if (list) sortPatients(*list, criteria, ascending);
 }
 
-void sortDoctors(LinkList<Doctor> &list, DoctorSortBy criteria, bool ascending) {
+inline void sortDoctors(LinkList<Doctor> &list, DoctorSortBy criteria, bool ascending) {
     qsort(list, [criteria, ascending](const Doctor &a, const Doctor &b) {
         int cmp = 0;
         switch (criteria) {
@@ -213,11 +330,11 @@ void sortDoctors(LinkList<Doctor> &list, DoctorSortBy criteria, bool ascending) 
     });
 }
 
-void sortDoctors(LinkList<Doctor> *list, DoctorSortBy criteria, bool ascending) {
+inline void sortDoctors(LinkList<Doctor> *list, DoctorSortBy criteria, bool ascending) {
     if (list) sortDoctors(*list, criteria, ascending);
 }
 
-void sortAppointments(LinkList<Appointment> &list, AppointmentSortBy criteria, bool ascending) {
+inline void sortAppointments(LinkList<Appointment> &list, AppointmentSortBy criteria, bool ascending) {
     qsort(list, [criteria, ascending](const Appointment &a, const Appointment &b) {
         int cmp = 0;
         switch (criteria) {
@@ -239,11 +356,11 @@ void sortAppointments(LinkList<Appointment> &list, AppointmentSortBy criteria, b
     });
 }
 
-void sortAppointments(LinkList<Appointment> *list, AppointmentSortBy criteria, bool ascending) {
+inline void sortAppointments(LinkList<Appointment> *list, AppointmentSortBy criteria, bool ascending) {
     if (list) sortAppointments(*list, criteria, ascending);
 }
 
-void sortAccounts(LinkList<Manager> &list, AccountSortBy criteria, bool ascending) {
+inline void sortAccounts(LinkList<Manager> &list, AccountSortBy criteria, bool ascending) {
     qsort(list, [criteria, ascending](const Manager &a, const Manager &b) {
         int cmp = 0;
         switch (criteria) {
@@ -269,16 +386,18 @@ void sortAccounts(LinkList<Manager> &list, AccountSortBy criteria, bool ascendin
     });
 }
 
-void sortAccounts(LinkList<Manager> *list, AccountSortBy criteria, bool ascending) {
+inline void sortAccounts(LinkList<Manager> *list, AccountSortBy criteria, bool ascending) {
     if (list) sortAccounts(*list, criteria, ascending);
 }
 
-void sortManagers(LinkList<Manager> &list, AccountSortBy criteria, bool ascending) {
+inline void sortManagers(LinkList<Manager> &list, AccountSortBy criteria, bool ascending) {
     sortAccounts(list, criteria, ascending);
 }
 
-void sortManagers(LinkList<Manager> *list, AccountSortBy criteria, bool ascending) {
+inline void sortManagers(LinkList<Manager> *list, AccountSortBy criteria, bool ascending) {
     if (list) sortAccounts(*list, criteria, ascending);
 }
 
 } // namespace libPBL2
+
+#endif // LIBPBL2_CPP

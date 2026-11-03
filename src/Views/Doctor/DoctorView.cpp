@@ -15,7 +15,6 @@
 #include <QLabel>
 #include <QFrame>
 #include <QTimer>
-#include <QDebug>
 
 DoctorView::DoctorView(MainWindow *mainWindow, QWidget *parent)
     : QWidget(parent), mainWindow(mainWindow) {
@@ -608,7 +607,6 @@ void DoctorView::editDoctorDialog(const std::string &id) {
         doctor->setState(state->currentIndex() == 0);
 
         mainWindow->saveAll();
-        qInfo() << "Cập nhật thông tin bác sĩ thành công:" << UIHelper::qs(doctor->getID()) << "-" << UIHelper::qs(doctor->getfullName());
         dialog.accept();
     });
     dialog.setFocusPolicy(Qt::StrongFocus);
@@ -919,7 +917,6 @@ void DoctorView::addDoctorDialog() {
         if (docList) {
             docList->insert(newDoctor);
             mainWindow->saveAll();
-            qInfo() << "Thêm bác sĩ mới thành công:" << UIHelper::qs(newDoctor.getID()) << "-" << UIHelper::qs(newDoctor.getfullName());
         }
         dialog.accept();
     });

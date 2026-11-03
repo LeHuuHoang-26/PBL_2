@@ -2292,7 +2292,7 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
     const int PAGE_SIZE = 50;
     auto currentPage = std::make_shared<int>(0);
     auto sortColumn = std::make_shared<int>(3);
-    auto sortAscending = std::make_shared<bool>(true);
+    auto sortAscending = std::make_shared<bool>(false);
 
     auto *pagination = new QHBoxLayout;
     pagination->setContentsMargins(4, 4, 4, 0);
@@ -2340,16 +2340,17 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
         }
 
         QList<Appointment*> ordered;
-        auto *n = appointments->getHeader()->next;
-        while (n && n->next) {
+        auto *n = appointments->getFooter()->prev;
+        while (n && n->prev) {
             if (!n->info.isDefault()) ordered.append(&n->info);
-            n = n->next;
+            n = n->prev;
         }
 
         int col = *sortColumn;
         bool asc = *sortAscending;
 
-        libPBL2::qsort(ordered, [this, col, asc, &computeApptStatus](const Appointment *a, const Appointment *b) -> bool {
+        if (col >= 0) {
+            libPBL2::qsort(ordered, [this, col, asc, &computeApptStatus](const Appointment *a, const Appointment *b) -> bool {
             if (!a || !b) return false;
             int cmp = 0;
             switch (col) {
@@ -2398,6 +2399,7 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
             }
             return asc ? (cmp < 0) : (cmp > 0);
         });
+        }
 
         QList<Appointment*> filtered;
         for (auto *item : ordered) {
