@@ -116,10 +116,6 @@ void SymptomPatient::addS_id(const string &id) {
     }
 }
 
-void SymptomPatient::save(std::ofstream &f) const {
-    f << toString() << "\n";
-}
-
 string SymptomPatient::toString() const {
     ostringstream oss;
     oss << "{\n"
@@ -195,7 +191,7 @@ bool SymptomPatient::saveToFile(const string &path, const LinkList<SymptomPatien
     LinkList<SymptomPatient>::Node *tmp = list->getHeader()->next;
     while (tmp != nullptr && tmp->next != nullptr) {
         if (!tmp->info.isDefault()) {
-            tmp->info.save(f);
+            f << tmp->info.toString() << "\n";
         }
         tmp = tmp->next;
     }

@@ -236,6 +236,7 @@ private:
 
 QWidget *UIHelper::page(const QString &title, const QString &subtitle, QWidget *parent) {
     auto *w = new QWidget(parent);
+    w->setCursor(Qt::ArrowCursor);
     auto *layout = new QVBoxLayout(w);
     layout->setContentsMargins(36, 32, 36, 32);
     layout->setSpacing(20);
@@ -366,6 +367,7 @@ QFrame *UIHelper::createTableCard(QTableWidget *table, QWidget *parent) {
     auto *card = new QFrame(parent);
     card->setObjectName("tableCard");
     card->setAttribute(Qt::WA_StyledBackground, true);
+    card->setCursor(Qt::ArrowCursor);
     card->setStyleSheet(R"(
         QFrame#tableCard {
             background-color: #ffffff;
@@ -530,6 +532,7 @@ QIcon UIHelper::trashIcon(const QColor &color) {
 
 QPair<QWidget*, QPushButton*> UIHelper::createActionCell(const QIcon &icon, const QString &tooltip) {
     auto *widget = new QWidget;
+    widget->setCursor(Qt::ArrowCursor);
     auto *layout = new QHBoxLayout(widget);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setAlignment(Qt::AlignCenter);

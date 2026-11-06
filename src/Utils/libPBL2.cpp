@@ -71,7 +71,7 @@ inline bool isAllowed(const Manager &M, PermissionType Per, const LinkList<Permi
 
     LinkList<Permission>::Node *tmp = PermissionList->getHeader()->next;
     while (tmp != nullptr && tmp->next != nullptr) {
-        if (M.getID() == tmp->info.MA_id && tmp->info.Per_id == Per)
+        if (M.getID() == tmp->info.getMA_id() && tmp->info.getPer_id() == Per)
             return true;
         tmp = tmp->next;
     }
@@ -360,7 +360,7 @@ inline void sortAppointments(LinkList<Appointment> *list, AppointmentSortBy crit
     if (list) sortAppointments(*list, criteria, ascending);
 }
 
-inline void sortAccounts(LinkList<Manager> &list, AccountSortBy criteria, bool ascending) {
+inline void sortManagers(LinkList<Manager> &list, AccountSortBy criteria, bool ascending) {
     qsort(list, [criteria, ascending](const Manager &a, const Manager &b) {
         int cmp = 0;
         switch (criteria) {
@@ -386,16 +386,8 @@ inline void sortAccounts(LinkList<Manager> &list, AccountSortBy criteria, bool a
     });
 }
 
-inline void sortAccounts(LinkList<Manager> *list, AccountSortBy criteria, bool ascending) {
-    if (list) sortAccounts(*list, criteria, ascending);
-}
-
-inline void sortManagers(LinkList<Manager> &list, AccountSortBy criteria, bool ascending) {
-    sortAccounts(list, criteria, ascending);
-}
-
 inline void sortManagers(LinkList<Manager> *list, AccountSortBy criteria, bool ascending) {
-    if (list) sortAccounts(*list, criteria, ascending);
+    if (list) sortManagers(*list, criteria, ascending);
 }
 
 } // namespace libPBL2

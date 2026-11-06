@@ -48,8 +48,6 @@ Symptom::Symptom(std::string S_id, std::string sName, std::string Sp_id, int sSc
 Symptom::Symptom(const Symptom &S)
     : S_id(S.S_id), sName(S.sName), Sp_id(S.Sp_id), sScore(S.sScore) {}
 
-Symptom::~Symptom() {}
-
 void Symptom::setDefault() {
     S_id = "";
     sName = "";
@@ -70,10 +68,6 @@ void Symptom::setS_id(string id) { S_id = id; }
 void Symptom::setSName(string name) { sName = name; }
 void Symptom::setSp_id(string spId) { Sp_id = spId; }
 void Symptom::setSScore(int score) { sScore = score; }
-
-void Symptom::save(std::ofstream &f) const {
-    f << toString() << "\n";
-}
 
 string Symptom::toString() const {
     return libPBL2::padRightUtf8(S_id, 6) + " | "

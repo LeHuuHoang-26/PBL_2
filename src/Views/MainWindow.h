@@ -9,6 +9,7 @@
 #include <QTime>
 #include <QDateTime>
 #include <string>
+#include <QCloseEvent>
 
 #include "LinkList.h"
 #include "Manager.h"
@@ -56,7 +57,8 @@ public:
     LinkList<Symptom> *getSymptoms() const { return symptoms; }
     LinkList<SymptomPatient> *getSymptomPatients() const { return symptomPatients; }
     LinkList<Appointment> *getAppointments() const { return appointments; }
-    Manager *getCurrentManager() const { return currentManager; }
+    Manager *getCurrentManager() const;
+    void resetTabOrderToId(int tabIndex);
 
     // Kiểm tra phân quyền (ủy thác ManagerController)
     bool isRootAdmin() const;
@@ -92,6 +94,9 @@ public:
     QString style() const;
     QPushButton *button(const QString &text, const QString &kind = "primary");
 
+protected:
+    void closeEvent(QCloseEvent *event) override;
+
 private:
     LinkList<Manager> *managers = nullptr;
     LinkList<Patient> *patients = nullptr;
@@ -101,6 +106,7 @@ private:
     LinkList<Appointment> *appointments = nullptr;
 
     Manager *currentManager = nullptr;
+    std::string currentManagerId;
     QWidget *root = nullptr;
     QStackedWidget *pages = nullptr;
     QWidget *sidebar = nullptr;

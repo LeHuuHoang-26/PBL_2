@@ -48,13 +48,23 @@ QString PatientController::getUnresolvedSymptoms(const std::string &patientId,
                                                  const LinkList<SymptomPatient> *spList,
                                                  const LinkList<Symptom> *sList,
                                                  const LinkList<Appointment> *aList) {
-    (void)aList;
     QStringList names;
     if (!spList || !spList->getHeader()) return QStringLiteral("Đã khám hết");
     auto *record = spList->getHeader()->next;
     while (record && record->next) {
         if (record->info.getP_id() == patientId) {
-            if (record->info.getResolved() == 1) {
+            bool isResolved = false;
+            if (aList && aList->getHeader()) {
+                auto *aNode = aList->getHeader()->next;
+                while (aNode && aNode->next) {
+                    if (aNode->info.getSymptomPatientId() == record->info.getSP_id() && aNode->info.getState() == 1) {
+                        isResolved = true;
+                        break;
+                    }
+                    aNode = aNode->next;
+                }
+            }
+            if (isResolved) {
                 record = record->next;
                 continue;
             }
@@ -84,22 +94,7 @@ QString PatientController::getUnresolvedSymptoms(const std::string &patientId,
 void PatientController::updateSymptomStatus(const std::string &patientId,
                                            LinkList<SymptomPatient> *spList,
                                            const LinkList<Appointment> *aList) {
-    if (!aList || !spList || !spList->getHeader() || !aList->getHeader()) return;
-
-    auto *appointment = aList->getHeader()->next;
-    while (appointment && appointment->next) {
-        std::string spId = appointment->info.getSymptomPatientId();
-        int st = appointment->info.getState();
-        auto *record = spList->getHeader()->next;
-        while (record && record->next) {
-            if (record->info.getSP_id() == spId) {
-                if (patientId.empty() || record->info.getP_id() == patientId) {
-                    record->info.setResolved(st);
-                }
-                break;
-            }
-            record = record->next;
-        }
-        appointment = appointment->next;
-    }
+    (void)patientId;
+    (void)spList;
+    (void)aList;
 }

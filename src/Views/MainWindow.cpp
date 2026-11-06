@@ -32,6 +32,31 @@
 
 using namespace std;
 
+namespace {
+
+class CursorLeaveFilter : public QObject {
+public:
+    static CursorLeaveFilter *instance() {
+        static CursorLeaveFilter inst;
+        return &inst;
+    }
+protected:
+    bool eventFilter(QObject *obj, QEvent *event) override {
+        if (event->type() == QEvent::Leave) {
+            if (auto *w = qobject_cast<QWidget*>(obj)) {
+                if (w->cursor().shape() == Qt::PointingHandCursor) {
+                    if (w->parentWidget()) {
+                        w->parentWidget()->setCursor(Qt::ArrowCursor);
+                    }
+                }
+            }
+        }
+        return QObject::eventFilter(obj, event);
+    }
+};
+
+} // namespace
+
 // Đường dẫn tệp cấu hình và dữ liệu chuẩn
 static const string patientPath = "Data/Patient.txt";
 static const string managerPath = "Data/Manager.txt";
@@ -43,20 +68,65 @@ static const string specializationPath = "Data/Doctor/Specialization.txt";
 static const string holidayConfigPath = "Config/Lichnghile.txt";
 static const string permissionManagerPath = "Data/PermissionManager.txt";
 
+Manager *MainWindow::getCurrentManager() const
+{
+    if (currentManager)
+        return currentManager;
+    if (!currentManagerId.empty() && managers)
+    {
+        Manager *found = ManagerController::findById(managers, currentManagerId);
+        if (found) return found;
+    }
+    return nullptr;
+}
+
+void MainWindow::resetTabOrderToId(int tabIndex)
+{
+    switch (tabIndex)
+    {
+    case 2:
+        if (patients)
+        {
+            libPBL2::sortPatients(patients, libPBL2::PatientSortBy::ID, true);
+        }
+        break;
+    case 3:
+        if (doctors)
+        {
+            libPBL2::sortDoctors(doctors, libPBL2::DoctorSortBy::ID, true);
+        }
+        break;
+    case 4:
+        if (appointments)
+        {
+            libPBL2::sortAppointments(appointments, libPBL2::AppointmentSortBy::ID, true);
+        }
+        break;
+    case 6:
+        if (managers)
+        {
+            libPBL2::sortManagers(managers, libPBL2::AccountSortBy::ID, true);
+        }
+        break;
+    default:
+        break;
+    }
+}
+
 // --- KIỂM TRA PHÂN QUYỀN (Ủy thác ManagerController) ---
 bool MainWindow::isRootAdmin() const
 {
-    return ManagerController::isRootAdmin(currentManager);
+    return ManagerController::isRootAdmin(getCurrentManager());
 }
 
 bool MainWindow::isAdministrator() const
 {
-    return ManagerController::isAdministrator(currentManager, permissionManagerPath);
+    return ManagerController::isAdministrator(getCurrentManager(), permissionManagerPath);
 }
 
 bool MainWindow::hasPermission(const string &permissionId) const
 {
-    return ManagerController::hasPermission(currentManager, permissionId, permissionManagerPath);
+    return ManagerController::hasPermission(getCurrentManager(), permissionId, permissionManagerPath);
 }
 
 // --- TIỆN ÍCH DỮ LIỆU (Ủy thác Controllers) ---
@@ -341,6 +411,10 @@ QPushButton *MainWindow::button(const QString &text, const QString &kind)
 
 void MainWindow::setPage(int index)
 {
+    if (index != activeNav)
+    {
+        resetTabOrderToId(activeNav);
+    }
     activeNav = index;
     if (pages)
         pages->setCurrentIndex(index);
@@ -386,7 +460,9 @@ void MainWindow::handleLogin()
 
     if (success && manager)
     {
-        currentManager = manager;
+        delete currentManager;
+        currentManager = new Manager(*manager);
+        currentManagerId = currentManager->getID();
         loginView->showSuccessMessage("Đăng nhập thành công!");
 
         // Khởi dựng Shell làm việc theo phân quyền tài khoản
@@ -505,8 +581,11 @@ void MainWindow::handleLogout()
 
     if (dialog.exec() == QDialog::Accepted)
     {
+        resetTabOrderToId(activeNav);
         saveAll();
+        delete currentManager;
         currentManager = nullptr;
+        currentManagerId.clear();
         showLogin();
     }
 }
@@ -533,6 +612,7 @@ void MainWindow::setupShell()
 
     root = new QWidget;
     root->setObjectName("appRoot");
+    root->setCursor(Qt::ArrowCursor);
 
     auto *outer = new QHBoxLayout(root);
     outer->setContentsMargins(0, 0, 0, 0);
@@ -541,6 +621,7 @@ void MainWindow::setupShell()
     sidebar = new QFrame;
     sidebar->setObjectName("sidebar");
     sidebar->setFixedWidth(238);
+    sidebar->setCursor(Qt::ArrowCursor);
 
     auto *side = new QVBoxLayout(sidebar);
     side->setContentsMargins(18, 22, 18, 16);
@@ -569,6 +650,10 @@ void MainWindow::setupShell()
         navButtons.push_back(b);
         connect(b, &QPushButton::clicked, this, [this, i]
         {
+            if (i != activeNav)
+            {
+                resetTabOrderToId(activeNav);
+            }
             refreshPage(i);
             setPage(i);
         });
@@ -581,6 +666,10 @@ void MainWindow::setupShell()
         navButtons.push_back(b);
         connect(b, &QPushButton::clicked, this, [this]
         {
+            if (6 != activeNav)
+            {
+                resetTabOrderToId(activeNav);
+            }
             refreshPage(6);
             setPage(6);
         });
@@ -608,7 +697,8 @@ void MainWindow::setupShell()
 
     QLabel *avatarLabel = new QLabel;
     avatarLabel->setFixedSize(38, 38);
-    QString currentName = currentManager ? UIHelper::qs(currentManager->getfullName()) : "Quản trị viên";
+    Manager *curM = getCurrentManager();
+    QString currentName = curM ? UIHelper::qs(curM->getfullName()) : "Quản trị viên";
     avatarLabel->setPixmap(UIHelper::createAvatar(currentName, 38));
     profileRow->addWidget(avatarLabel);
 
@@ -618,7 +708,7 @@ void MainWindow::setupShell()
     nameLabel->setStyleSheet("color: white; font-weight: 700; font-size: 13px;");
     nameLabel->setWordWrap(true);
 
-    QLabel *roleLabel = new QLabel(currentManager ? ManagerController::roleName(currentManager->getRole()) : "Quản trị hệ thống");
+    QLabel *roleLabel = new QLabel(curM ? ManagerController::roleName(curM->getRole()) : "Quản trị hệ thống");
     roleLabel->setStyleSheet("color: #8faec0; font-size: 11px; font-weight: 500;");
 
     nameCol->addWidget(nameLabel);
@@ -703,6 +793,7 @@ void MainWindow::setupShell()
     side->addWidget(timeCard);
 
     pages = new QStackedWidget;
+    pages->setCursor(Qt::ArrowCursor);
     outer->addWidget(sidebar);
     outer->addWidget(pages, 1);
 
@@ -793,8 +884,19 @@ void MainWindow::refreshPage(int index)
     }
 }
 
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    saveAll();
+    QMainWindow::closeEvent(event);
+}
+
 void MainWindow::saveAll()
 {
+    if (patients) libPBL2::sortPatients(patients, libPBL2::PatientSortBy::ID, true);
+    if (doctors) libPBL2::sortDoctors(doctors, libPBL2::DoctorSortBy::ID, true);
+    if (appointments) libPBL2::sortAppointments(appointments, libPBL2::AppointmentSortBy::ID, true);
+    if (managers) libPBL2::sortManagers(managers, libPBL2::AccountSortBy::ID, true);
+
     bool ok = Patient::saveToFile(patientPath, patients) &&
               Manager::saveToFile(managerPath, managers) &&
               Doctor::saveToFile(doctorPath, doctors) &&
@@ -808,6 +910,10 @@ void MainWindow::saveAll()
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
+    setCursor(Qt::ArrowCursor);
+    if (qApp) {
+        qApp->installEventFilter(CursorLeaveFilter::instance());
+    }
     setStyleSheet(style());
     setMinimumSize(1120, 720);
     resize(1360, 850);
@@ -828,6 +934,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 
 MainWindow::~MainWindow()
 {
+    delete currentManager;
     delete managers;
     delete patients;
     delete doctors;
@@ -852,6 +959,12 @@ bool MainWindow::initApp()
         UIHelper::showWarning(this, "Lỗi dữ liệu", "Không thể nạp dữ liệu từ thư mục Data/! Vui lòng đảm bảo tệp dữ liệu tồn tại và ứng dụng được khởi chạy từ đúng thư mục.");
         return false;
     }
+
+    // Sắp xếp mặc định ban đầu theo ID tăng dần
+    if (patients) libPBL2::sortPatients(patients, libPBL2::PatientSortBy::ID, true);
+    if (doctors) libPBL2::sortDoctors(doctors, libPBL2::DoctorSortBy::ID, true);
+    if (appointments) libPBL2::sortAppointments(appointments, libPBL2::AppointmentSortBy::ID, true);
+    if (managers) libPBL2::sortManagers(managers, libPBL2::AccountSortBy::ID, true);
 
     // Cập nhật trạng thái triệu chứng
     auto *p = patients->getHeader()->next;

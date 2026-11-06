@@ -78,11 +78,15 @@ AccountView::AccountView(MainWindow *mainWindow, QWidget *parent)
 }
 
 void AccountView::resetToFirstPage() {
+    sortColumn = -1;
+    sortAscending = true;
     currentPage = 0;
     refresh();
 }
 
 void AccountView::showEvent(QShowEvent *event) {
+    sortColumn = -1;
+    sortAscending = true;
     QWidget::showEvent(event);
     currentPage = 0;
     refresh();
@@ -961,6 +965,10 @@ void AccountView::editManagerDialog(const std::string &managerId) {
 
         if (!isTargetRoot && !isSelf) {
             targetMgr->setState(statusCombo->currentIndex() == 0 ? 1 : 0);
+        }
+
+        if (isSelf && mainWindow && mainWindow->getCurrentManager()) {
+            *mainWindow->getCurrentManager() = *targetMgr;
         }
 
         if (isCurrentRoot && !isTargetRoot) {

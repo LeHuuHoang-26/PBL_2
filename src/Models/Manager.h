@@ -25,7 +25,7 @@ class Manager: public Human {
         Manager(std::string id, std::string fullName, std::string phone, bool gender, int age, std::string username, std::string password, ManagerRole role, int state);
         Manager(const Manager &M);
         Manager();
-        ~Manager();
+        ~Manager() = default;
 
         ManagerRole getRole() const;
         std::string getUsername() const;
@@ -43,8 +43,6 @@ class Manager: public Human {
         Manager &operator = (const Manager &M);
         bool isValid(const std::string &username, const std::string &password) const;
         bool isActive() const;
-
-        void displayInfo() const override;
 
         std::string toString() const;
         static Manager loadFromString(const std::string &str);

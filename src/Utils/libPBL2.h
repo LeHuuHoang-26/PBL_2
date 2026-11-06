@@ -117,8 +117,6 @@ namespace libPBL2 {
         Role,
         State
     };
-    inline void sortAccounts(LinkList<Manager> &list, AccountSortBy criteria = AccountSortBy::ID, bool ascending = true);
-    inline void sortAccounts(LinkList<Manager> *list, AccountSortBy criteria = AccountSortBy::ID, bool ascending = true);
     inline void sortManagers(LinkList<Manager> &list, AccountSortBy criteria = AccountSortBy::ID, bool ascending = true);
     inline void sortManagers(LinkList<Manager> *list, AccountSortBy criteria = AccountSortBy::ID, bool ascending = true);
 

@@ -1,0 +1,198 @@
+{
+  "version": "3.0.0",
+  "darkMode": true,
+  "gridEnabling": false,
+  "currentViewName": null,
+  "defaultView": {
+    "detailLevel": "All",
+    "relationshipMode": "All",
+    "tablePositions": [
+      {
+        "name": "Manager",
+        "schemaName": "public",
+        "x": 67.90733883497967,
+        "y": -58.18371144220981
+      },
+      {
+        "name": "Permission",
+        "schemaName": "public",
+        "x": 415.83608331024664,
+        "y": 10.99245654723569
+      },
+      {
+        "name": "Doctor",
+        "schemaName": "public",
+        "x": 67.90733883497967,
+        "y": 343.63561941134606
+      },
+      {
+        "name": "Specialty",
+        "schemaName": "public",
+        "x": 480.6685381284931,
+        "y": 503.9645091931395
+      },
+      {
+        "name": "Patient",
+        "schemaName": "public",
+        "x": 613.8326615081758,
+        "y": 641.2819973875986
+      },
+      {
+        "name": "Symptom",
+        "schemaName": "public",
+        "x": 474.3173257729718,
+        "y": 231.4613804891857
+      },
+      {
+        "name": "Symptom_Patient",
+        "schemaName": "public",
+        "x": 907.8536616690809,
+        "y": 286.05958002638636
+      },
+      {
+        "name": "Appointment",
+        "schemaName": "public",
+        "x": 972.6899618508114,
+        "y": 603.0462493717665
+      }
+    ],
+    "tableGroupCollapseStates": [],
+    "stickyNoteLayouts": [],
+    "referencePaths": [
+      {
+        "firstFieldNames": [
+          "MA_ID"
+        ],
+        "firstTableName": "Manager",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "MA_ID"
+        ],
+        "secondTableName": "Permission",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "Sp_ID"
+        ],
+        "firstTableName": "Specialty",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "Sp_ID"
+        ],
+        "secondTableName": "Doctor",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "Sp_ID"
+        ],
+        "firstTableName": "Specialty",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "Sp_ID"
+        ],
+        "secondTableName": "Symptom",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "S_ID"
+        ],
+        "firstTableName": "Symptom",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "S_ID"
+        ],
+        "secondTableName": "Symptom_Patient",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "P_ID"
+        ],
+        "firstTableName": "Patient",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "P_ID"
+        ],
+        "secondTableName": "Symptom_Patient",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "Sp_ID"
+        ],
+        "firstTableName": "Specialty",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "Sp_ID"
+        ],
+        "secondTableName": "Symptom_Patient",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "SP_ID"
+        ],
+        "firstTableName": "Symptom_Patient",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "SP_ID"
+        ],
+        "secondTableName": "Appointment",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "D_ID"
+        ],
+        "firstTableName": "Doctor",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "D_ID"
+        ],
+        "secondTableName": "Appointment",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": [
+          {
+            "x": 353.79601070997967,
+            "y": 884.515816336145
+          },
+          {
+            "x": 895.3595742434551,
+            "y": 884.515816336145
+          },
+          {
+            "x": 895.3595742434551,
+            "y": 720.2344619709748
+          }
+        ]
+      }
+    ]
+  },
+  "views": {}
+}

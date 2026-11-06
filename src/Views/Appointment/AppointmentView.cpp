@@ -62,19 +62,23 @@ void AppointmentView::highlightCalendarAppointments(QCalendarWidget *cal, int ye
         cal->setWeekdayTextFormat(static_cast<Qt::DayOfWeek>(dow), weekdayHeaderFmt);
     }
 
+    const auto oldDates = cal->dateTextFormat().keys();
+    for (const QDate &oldD : oldDates) {
+        cal->setDateTextFormat(oldD, QTextCharFormat());
+    }
+
     // Lưới hiển thị của QCalendarWidget gồm 6 tuần = 42 ô
     QDate firstDay(year, month, 1);
-    int firstDow = firstDay.dayOfWeek(); // 1 = Monday, 7 = Sunday
-    QDate gridStart = firstDay.addDays(-(firstDow - 1));
-    QDate gridEnd = gridStart.addDays(41);
+    QDate gridStart = firstDay.addDays(-14);
+    QDate gridEnd = firstDay.addDays(45);
 
     for (QDate d = gridStart; d <= gridEnd; d = d.addDays(1)) {
         QTextCharFormat fmt;
         if (d.month() != month) {
-            // Ngày không thuộc tháng hiện tại: làm mờ nhạt rõ rệt so với ngày chính
-            fmt.setForeground(QColor("#cbd5e1"));
+            // Ngày không thuộc tháng hiện tại: nền cell màu xám
+            fmt.setBackground(QColor("#e2e8f0"));
+            fmt.setForeground(QColor("#64748b"));
             fmt.setFontWeight(QFont::Normal);
-            fmt.clearBackground();
         } else {
             // Ngày trong tháng
             bool isHol = mainWindow->isHoliday(d);
@@ -781,7 +785,7 @@ bool AppointmentView::showBookingDialog(const QDate &defaultDate) {
         std::string nextSpId = SymptomPatient::generateNextId(symptomPatients);
 
         if (symptomPatients) {
-            symptomPatients->insert(SymptomPatient(nextSpId, combinedSymIds, pId, specId, Date::now(), 0));
+            symptomPatients->insert(SymptomPatient(nextSpId, combinedSymIds, pId, specId, Date::now()));
         }
         if (appointments) {
             appointments->insert(Appointment(AppointmentController::generateNextId(appointments), nextSpId, dId, Date::now(), Date::loadFromString(UIHelper::ss(dateEdit->dateTime().toString("yyyy-MM-dd HH:mm"))), 0));
@@ -1012,6 +1016,7 @@ QWidget *AppointmentView::createDashboardWidget(QWidget *parent) {
     if (!mainWindow) return new QWidget(parent);
 
     auto *w = new QWidget(parent);
+    w->setCursor(Qt::ArrowCursor);
     auto *layout = new QVBoxLayout(w);
     layout->setContentsMargins(28, 20, 28, 20);
     layout->setSpacing(16);
@@ -1098,7 +1103,10 @@ QWidget *AppointmentView::createDashboardWidget(QWidget *parent) {
 
     auto *bookQuick = UIHelper::button("Đặt lịch khám  →", "primary");
     connect(bookQuick, &QPushButton::clicked, w, [this] {
-        if (mainWindow) mainWindow->setPage(1);
+        if (mainWindow) {
+            mainWindow->refreshPage(1);
+            mainWindow->setPage(1);
+        }
     });
     bLayout->addWidget(bookQuick);
     layout->addWidget(banner);
@@ -1226,6 +1234,9 @@ QWidget *AppointmentView::createDashboardWidget(QWidget *parent) {
             });
         }
         table->setRowCount(0);
+        if (table->viewport()) {
+            table->viewport()->setCursor(Qt::ArrowCursor);
+        }
         int total = all.size();
         int totalPages = total == 0 ? 1 : (total + DashState::PAGE_SIZE - 1) / DashState::PAGE_SIZE;
         state->pageNumber = qBound(0, state->pageNumber, totalPages - 1);
@@ -1389,6 +1400,10 @@ QWidget *AppointmentView::createDashboardWidget(QWidget *parent) {
 
 QWidget *AppointmentView::createBookingWidget(QWidget *parent) {
     auto *scroll = new QScrollArea(parent);
+    scroll->setCursor(Qt::ArrowCursor);
+    if (scroll->viewport()) {
+        scroll->viewport()->setCursor(Qt::ArrowCursor);
+    }
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
     scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -1396,6 +1411,7 @@ QWidget *AppointmentView::createBookingWidget(QWidget *parent) {
     scroll->setStyleSheet("QScrollArea { background: transparent; border: none; } QScrollBar:vertical, QScrollBar:horizontal { width: 0px; height: 0px; background: transparent; border: none; }");
 
     auto *w = new QWidget;
+    w->setCursor(Qt::ArrowCursor);
     w->setStyleSheet("background: transparent;");
     auto *layout = new QVBoxLayout(w);
     layout->setContentsMargins(24, 14, 24, 14);
@@ -1870,6 +1886,9 @@ QWidget *AppointmentView::createBookingWidget(QWidget *parent) {
         nextBtn->setEnabled(state->pageNumber < totalPages - 1);
 
         t->setRowCount(0);
+        if (t->viewport()) {
+            t->viewport()->setCursor(Qt::ArrowCursor);
+        }
         int start = state->pageNumber * BookingPageState::PAGE_SIZE;
         int end = qMin(start + BookingPageState::PAGE_SIZE, total);
 
@@ -2291,8 +2310,8 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
     // Pagination: 50 stack 1 trang
     const int PAGE_SIZE = 50;
     auto currentPage = std::make_shared<int>(0);
-    auto sortColumn = std::make_shared<int>(3);
-    auto sortAscending = std::make_shared<bool>(false);
+    auto sortColumn = std::make_shared<int>(-1);
+    auto sortAscending = std::make_shared<bool>(true);
 
     auto *pagination = new QHBoxLayout;
     pagination->setContentsMargins(4, 4, 4, 0);
@@ -2330,6 +2349,9 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
     auto fill = [fillPtr]() { if (*fillPtr) (*fillPtr)(); };
     *fillPtr = [this, w, t, doctor, date, allDates, status, totalLabel, prevBtn, nextBtn, pageStatus, currentPage, PAGE_SIZE, computeApptStatus, sortColumn, sortAscending, fill] {
         t->setRowCount(0);
+        if (t->viewport()) {
+            t->viewport()->setCursor(Qt::ArrowCursor);
+        }
         auto *appointments = mainWindow ? mainWindow->getAppointments() : nullptr;
         if (!appointments) {
             totalLabel->setText("Tổng số: 0 lịch hẹn");
@@ -2340,10 +2362,10 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
         }
 
         QList<Appointment*> ordered;
-        auto *n = appointments->getFooter()->prev;
-        while (n && n->prev) {
+        auto *n = appointments->getHeader()->next;
+        while (n && n->next) {
             if (!n->info.isDefault()) ordered.append(&n->info);
-            n = n->prev;
+            n = n->next;
         }
 
         int col = *sortColumn;
@@ -2521,17 +2543,6 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
                 }
 
                 if (!patientId.empty()) {
-                    auto *symptomPatients = mainWindow->getSymptomPatients();
-                    if (symptomPatients && !spId.empty()) {
-                        auto *spNode = symptomPatients->getHeader()->next;
-                        while (spNode && spNode->next) {
-                            if (spNode->info.getSP_id() == spId) {
-                                spNode->info.setResolved(0);
-                                break;
-                            }
-                            spNode = spNode->next;
-                        }
-                    }
                     mainWindow->updatePatientSymptomStatus(patientId);
                 }
 
@@ -3010,10 +3021,6 @@ void AppointmentView::showAppointmentDetailDialog(Appointment *a) {
             if (statCombo) {
                 int newSt = statCombo->currentData().toInt();
                 a->setState(newSt);
-                SymptomPatient *sp = mainWindow->findSymptomPatient(a->getSymptomPatientId());
-                if (sp) {
-                    sp->setResolved(newSt);
-                }
             }
 
             std::string patientId = mainWindow->getPatientIdForAppointment(*a);
@@ -3078,6 +3085,9 @@ QWidget *AppointmentView::createHolidayWidget(QWidget *parent) {
 
     auto fill = [t] {
         t->setRowCount(0);
+        if (t->viewport()) {
+            t->viewport()->setCursor(Qt::ArrowCursor);
+        }
         auto list = AppointmentController::loadHolidays("Config/Lichnghile.txt");
         for (const auto &item : list) {
             int row = t->rowCount();
@@ -3250,6 +3260,9 @@ void AppointmentView::showHolidayManagementDialog(QWidget *parent) {
     auto fill = [fillPtr]() { if (*fillPtr) (*fillPtr)(); };
     *fillPtr = [this, t, &dialog, fill]() {
         t->setRowCount(0);
+        if (t->viewport()) {
+            t->viewport()->setCursor(Qt::ArrowCursor);
+        }
         auto list = AppointmentController::loadHolidays("Config/Lichnghile.txt");
         for (int i = 0; i < list.size(); ++i) {
             const auto &item = list[i];

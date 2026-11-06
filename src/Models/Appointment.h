@@ -10,7 +10,7 @@ class SymptomPatient;
 class Appointment {
 private:
     std::string id;
-    std::string symptomPatientId; // SP_id (SymptomPatient)
+    std::string symptomPatientId;
     std::string doctorId;
     Date dateSet;
     Date dateGet;
@@ -43,8 +43,6 @@ public:
     static std::string stateToString(int state);
     static int stringToState(const std::string &str);
     int computeEffectiveState(int currentDay, int currentMonth, int currentYear, int currentHour, int currentMinute) const;
-
-    void displayInfo() const;
 
     bool isDefault() const;
     void setDefault();

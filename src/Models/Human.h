@@ -14,8 +14,7 @@ protected:
 public:
     Human(std::string id = "", std::string fullName = "", std::string phone = "", bool gender = false, int age = 0);
     virtual ~Human() = default;
-    friend bool operator ==(const Human &, const Human &);
-    virtual void displayInfo() const;
+    bool operator==(const Human &other) const;
 
     std::string getID() const;
     std::string getfullName() const;

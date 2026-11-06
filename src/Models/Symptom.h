@@ -17,7 +17,7 @@ class Symptom {
         Symptom(std::string S_id, std::string sName, std::string Sp_id, int sScore);
         Symptom(const Symptom &S);
         Symptom &operator=(const Symptom &S) = default;
-        ~Symptom();
+        ~Symptom() = default;
 
         void setDefault();
         bool isDefault() const;
@@ -32,7 +32,6 @@ class Symptom {
         void setSp_id(std::string spId);
         void setSScore(int score);
 
-        void save(std::ofstream &f) const;
         std::string toString() const;
         static Symptom loadFromString(const std::string &str);
         static LinkList<Symptom>* loadFromFile(const std::string &path);

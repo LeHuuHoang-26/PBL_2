@@ -156,11 +156,15 @@ void DoctorView::setupUI() {
 }
 
 void DoctorView::resetToFirstPage() {
+    sortColumn = -1;
+    sortAscending = true;
     currentPage = 0;
     refresh();
 }
 
 void DoctorView::showEvent(QShowEvent *event) {
+    sortColumn = -1;
+    sortAscending = true;
     QWidget::showEvent(event);
     currentPage = 0;
     refresh();

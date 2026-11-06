@@ -55,7 +55,6 @@ Patient::Patient(std::string id, std::string fullName, std::string phone, bool g
 Patient::Patient(const Patient &P)
     : Human(P.id, P.fullName, P.phone, P.gender, P.age), CCCD(P.CCCD) {}
 
-Patient::~Patient() {}
 
 void Patient::setDefault() {
     Patient tmp;
@@ -73,10 +72,6 @@ bool Patient::isDefault() const {
 
 string Patient::getCCCD() const { return this->CCCD; }
 void Patient::setCCCD(string CCCD) { this->CCCD = CCCD; }
-
-void Patient::save(std::ofstream &f) const {
-    f << toString() << "\n";
-}
 
 string Patient::toString() const {
     return libPBL2::padRightUtf8(id, 5) + " | "
@@ -157,7 +152,7 @@ bool Patient::saveToFile(const std::string &path, const LinkList<Patient> *list)
     LinkList<Patient>::Node *tmp = list->getHeader()->next;
     while (tmp != nullptr && tmp->next != nullptr) {
         if (!tmp->info.isDefault()) {
-            tmp->info.save(f);
+            f << tmp->info.toString() << "\n";
         }
         tmp = tmp->next;
     }

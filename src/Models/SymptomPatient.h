@@ -42,8 +42,6 @@ public:
     void setResolved(int resolved);
     void addS_id(const std::string &id);
 
-    void save(std::ofstream &f) const;
-
     std::string toString() const;
     static SymptomPatient loadFromString(const std::string &str);
     static LinkList<SymptomPatient>* loadFromFile(const std::string &path);

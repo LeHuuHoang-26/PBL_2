@@ -15,14 +15,12 @@ class Patient: public Human {
         Patient(std::string id, std::string fullName, std::string phone, bool gender, int age, std::string CCCD);
         Patient(const Patient &P);
         Patient &operator=(const Patient &P) = default;
-        ~Patient();
+        ~Patient() = default;
 
         void setDefault();
         bool isDefault() const;
         std::string getCCCD() const;
         void setCCCD(std::string CCCD);
-
-        void save(std::ofstream &f) const;
 
         std::string toString() const;
         static Patient loadFromString(const std::string &str);

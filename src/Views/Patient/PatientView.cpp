@@ -158,12 +158,16 @@ void PatientView::setupUI() {
 
 void PatientView::resetToFirstPage() {
     currentPage = 0;
+    sortColumn = -1;
+    sortAscending = true;
     refresh();
 }
 
 void PatientView::showEvent(QShowEvent *event) {
     QWidget::showEvent(event);
     currentPage = 0;
+    sortColumn = -1;
+    sortAscending = true;
     refresh();
 }
 

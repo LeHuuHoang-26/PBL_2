@@ -8,23 +8,26 @@
 
 ## 📑 MỤC LỤC CHI TIẾT
 
-1. [Kiến trúc Tổng thể & Nguyên tắc Thiết kế (Architecture & Principles)](#1-kiến-trúc-tổng-thể--nguyên-tắc-thiết-kế)
-   - [1.1. Mô hình Phân lớp M-V-C](#11-mô-hình-phân-lớp-m-v-c)
+1. [Kiến trúc Tổng thể & Nguyên tắc Thiết kế (Architecture & System Design)](#1-kiến-trúc-tổng-thể--nguyên-tắc-thiết-kế)
+   - [1.1. Mô hình Phân lớp M-V-C & Luồng Dữ liệu](#11-mô-hình-phân-lớp-m-v-c--luồng-dữ-liệu)
    - [1.2. Nguyên tắc Kỹ thuật Zero Forbidden STL](#12-nguyên-tắc-kỹ-thuật-zero-forbidden-stl)
    - [1.3. Quy tắc Tổ chức Template C++](#13-quy-tắc-tổ-chức-template-c)
+   - [1.4. Hệ thống Quản trị Quyền hạn (RBAC - Role-Based Access Control)](#14-hệ-thống-quản-trị-quyền-hạn-rbac---role-based-access-control)
 2. [Cấu trúc Dữ liệu Cốt lõi: Danh sách Liên kết đôi `LinkList<T>`](#2-cấu-trúc-dữ-liệu-cốt-lõi-danh-sách-liên-kết-đôi-linklistt)
    - [2.1. Kiến trúc Nút Canh Giữ (Sentinel Nodes Architecture)](#21-kiến-trúc-nút-canh-giữ-sentinel-nodes-architecture)
    - [2.2. Phân tích Các Phương thức Cốt lõi & Quản lý Bộ nhớ](#22-phân-tích-các-phương-thức-cốt-lõi--quản-lý-bộ-nhớ)
    - [2.3. Bảng Độ phức tạp của `LinkList<T>`](#23-bảng-độ-phức-tạp-của-linklistt)
 3. [Khung Thuật toán QuickSort Toàn năng (`libPBL2`)](#3-khung-thuật-toán-quicksort-toàn-năng-libpbl2)
-   - [3.1. Thuật toán QuickSort In-Place trên Danh sách Liên kết đôi (`qsortNodes`)](#31-thuật-toán-quicksort-in-place-trên-danh-sách-liên-kết-đôi-qsortnodes)
-   - [3.2. Thuật toán QuickSort trên Mảng thô (C-Arrays) & Random-Access Containers](#32-thuật-toán-quicksort-trên-mảng-thô-c-arrays--random-access-containers)
-   - [3.3. Các Động cơ So sánh Chuyên sâu (Comparison Engines)](#33-các-động-cơ-so-sánh-chuyên-sâu-comparison-engines)
-   - [3.4. Hệ thống Sắp xếp Thực thể Đa tiêu chí](#34-hệ-thống-sắp-xếp-thực-thể-đa-tiêu-chí)
-4. [Lớp Tiện ích Quản lý Thời gian: `Date`](#4-lớp-tiện-ích-quản-lý-thời-gian-date)
+   - [3.1. Kỹ thuật Hoán vị Giá trị In-Place (`swapVal`)](#31-kỹ-thuật-hoán-vị-giá-trị-in-place-swapval)
+   - [3.2. Thuật toán QuickSort In-Place trên Doubly Linked List (`qsortNodes`)](#32-thuật-toán-quicksort-in-place-trên-doubly-linked-list-qsortnodes)
+   - [3.3. Thuật toán QuickSort trên Mảng thô (C-Arrays) & Container Truy cập Ngẫu nhiên](#33-thuật-toán-quicksort-trên-mảng-thô-c-arrays--container-truy-cập-ngẫu-nhiên)
+   - [3.4. Các Động cơ So sánh Chuyên sâu (Comparison Engines)](#34-các-động-cơ-so-sánh-chuyên-sâu-comparison-engines)
+   - [3.5. Hệ sinh thái Sắp xếp Thực thể Đa tiêu chí](#35-hệ-sinh-thái-sắp-xếp-thực-thể-đa-tiêu-chí)
+4. [Lớp Tiện ích Quản lý Thời gian & Lịch pháp: `Date`](#4-lớp-tiện-ích-quản-lý-thời-gian--lịch-pháp-date)
    - [4.1. Biểu diễn Dữ liệu & Tính toán Lịch pháp](#41-biểu-diễn-dữ-liệu--tính-toán-lịch-pháp)
-   - [4.2. Bóc tách & Chuẩn hóa Chuỗi Ngày giờ](#42-bóc-tách--chuẩn-hóa-chuỗi-ngày-giờ)
-5. [Tầng Thực thể Nghiệp vụ (Models Layer)](#5-tầng-thực-thể-nghiệp-vụ-models-layer)
+   - [4.2. Bóc tách & Chuẩn hóa Chuỗi Thời gian](#42-bóc-tách--chuẩn-hóa-chuỗi-thời-gian)
+   - [4.3. Hệ thống Toán tử So sánh Thời gian Phân cấp](#43-hệ-thống-toán-tử-so-sánh-thời-gian-phân-cấp)
+5. [Tầng Mô hình Dữ liệu Nghiệp vụ (Models Layer)](#5-tầng-mô-hình-dữ-liệu-nghiệp-vụ-models-layer)
    - [5.1. Cây Kế thừa Thực thể: `Human` $\to$ `Doctor`, `Patient`, `Manager`](#51-cây-kế-thừa-thực-thể-human--doctor-patient-manager)
    - [5.2. Thực thể Lịch hẹn (`Appointment`) & Suy diễn Trạng thái Động](#52-thực-thể-lịch-hẹn-appointment--suy-diễn-trạng-thái-động)
    - [5.3. Các Thực thể Liên kết: `Symptom`, `SymptomPatient`, `Permission`](#53-các-thực-thể-liên-kết-symptom-symptompatient-permission)
@@ -32,39 +35,59 @@
    - [6.1. `AppointmentController`: Tính toán Lịch nghỉ Lễ & Sinh Mã ID Tự tăng](#61-appointmentcontroller-tính-toán-lịch-nghỉ-lễ--sinh-mã-id-tự-tăng)
    - [6.2. `PatientController` & `DoctorController`: Định danh & Ràng buộc](#62-patientcontroller--doctorcontroller-định-danh--ràng-buộc)
    - [6.3. `StatisticController`: Phân tích Thống kê & Tính toán Chỉ số KPI](#63-statisticcontroller-phân-tích-thống-kê--tính-toán-chỉ-số-kpi)
-7. [Thuật toán Giao diện & Nghiệp vụ Tương tác (Views Engine)](#7-thuật-toán-giao-diện--nghiệp-vụ-tương-tác-views-engine)
-   - [7.1. Sàng lọc Triệu chứng & Điều phối Chuyên khoa (Medical Triage)](#71-sàng-lọc-triệu-chứng--điều-phối-chuyên-khoa-medical-triage)
-   - [7.2. Cơ chế Hiển thị Mặc định: Duyệt Ngược & Sắp xếp Giảm dần theo Ngày khám](#72-cơ-chế-hiển-thị-mặc-định-duyệt-ngược--sắp-xếp-giảm-dần-theo-ngày-khám)
-   - [7.3. Thuật toán Co giãn Cột Bảng Tự động (Responsive Table Scaling)](#73-thuật-toán-co-giãn-cột-bảng-tự-động-responsive-table-scaling)
-8. [Bảng Ma trận Phân tích Độ phức tạp Toàn diện (Complexity Matrix)](#8-bảng-ma-trận-phân-tích-độ-phức-tạp-toàn-diện-complexity-matrix)
+   - [6.4. `AuthController` & `ManagerController`: Xác thực & Kiểm soát Tài khoản](#64-authcontroller--managercontroller-xác-thực--kiểm-soát-tài-khoản)
+7. [Tầng Giao diện & Trải nghiệm Người dùng (Views Engine)](#7-tầng-giao-diện--trải-nghiệm-người-dùng-views-engine)
+   - [7.1. Sàng lọc Triệu chứng & Điều phối Chuyên khoa Tự động (Medical Triage)](#71-sàng-lọc-triệu-chứng--điều-phối-chuyên-khoa-tự-động-medical-triage)
+   - [7.2. Lọc & Tìm kiếm Đa tiêu chí theo Thời gian Thực](#72-lọc--tìm-kiếm-đa-tiêu-chí-theo-thời-gian-thực)
+   - [7.3. Cơ chế Hiển thị Lịch hẹn Mặc định: Duyệt Ngược & Sắp xếp Giảm dần](#73-cơ-chế-hiển-thị-lịch-hẹn-mặc-định-duyệt-ngược--sắp-xếp-giảm-dần)
+   - [7.4. Thuật toán Phân trang Dữ liệu (Pagination)](#74-thuật-toán-phân-trang-dữ-liệu-pagination)
+   - [7.5. Thuật toán Co giãn Cột Bảng Tự động (Responsive Table Scaling)](#75-thuật-toán-co-giãn-cột-bảng-tự-động-responsive-table-scaling)
+8. [Bảng Ma trận Phân tích Độ phức tạp Toàn diện (Comprehensive Complexity Matrix)](#8-bảng-ma-trận-phân-tích-độ-phức-tạp-toàn-diện-comprehensive-complexity-matrix)
 
 ---
 
 ## 1. KIẾN TRÚC TỔNG THỂ & NGUYÊN TẮC THIẾT KẾ
 
-### 1.1. Mô hình Phân lớp M-V-C
+### 1.1. Mô hình Phân lớp M-V-C & Luồng Dữ liệu
 
-Toàn bộ hệ thống được chia thành 4 lớp độc lập:
+Toàn bộ hệ thống tuân thủ mô hình kiến trúc Model-View-Controller (MVC) phân tách độc lập trách nhiệm giữa lưu trữ, xử lý nghiệp vụ và trình diễn giao diện:
 
-$$\text{View (Qt GUI)} \xrightarrow{\text{Events / Triggers}} \text{Controller (Logic)} \xrightarrow{\text{Manipulates}} \text{Model (Data Entities)} \xrightarrow{\text{Stored In}} \text{LinkList<T>} \xrightarrow{\text{I/O}} \text{Text Files}$$
+```mermaid
+flowchart LR
+    V["View (Qt GUI)"] -- "Events / User Inputs" --> C["Controller (Logic)"]
+    C -- "Reads / Updates" --> M["Model (Data Entities)"]
+    M -- "Encapsulated in" --> LL["LinkList&lt;T&gt;"]
+    LL -- "File I/O Stream" --> FS[("Text Files DB")]
+    C -- "Render Data" --> V
+```
 
-1. **Model:** Chứa cấu trúc dữ liệu thuần túy của các thực thể y tế (`Appointment`, `Doctor`, `Patient`, `Manager`...). Các Model hoàn toàn độc lập với Qt Widgets.
-2. **View:** Giao diện đồ họa người dùng kế thừa từ `QWidget`, phụ trách tiếp nhận sự kiện, hiển thị bảng, biểu đồ và form biểu mẫu.
-3. **Controller:** Cung cấp các hàm tĩnh (static functions) xử lý logic nghiệp vụ, tính toán chỉ số, lọc dữ liệu và ánh xạ liên kết giữa các bảng.
-4. **DataStructures & Utils:** Tầng nền tảng cung cấp danh sách liên kết tự tạo (`LinkList`), thuật toán QuickSort (`libPBL2`) và lịch pháp (`Date`).
+1. **Model Layer (`src/Models/`):** Chứa định nghĩa thực thể thuần túy (`Patient`, `Doctor`, `Appointment`, `Manager`, `Symptom`, `SymptomPatient`, `Permission`). Các lớp này hoàn toàn độc lập với Qt Framework, chỉ sử dụng kiểu dữ liệu nguyên thủy và cấu trúc hướng đối tượng C++.
+2. **Controller Layer (`src/Controllers/`):** Cung cấp các hàm tĩnh (static methods) chứa toàn bộ luật nghiệp vụ (Business Rules), tính toán số liệu, sàng lọc dữ liệu và kiểm tra ràng buộc toàn vẹn.
+3. **View Layer (`src/Views/`):** Thành phần đồ họa người dùng kế thừa từ `QWidget`, xử lý biểu diễn giao diện bảng, đồ thị QtCharts, tiếp nhận tương tác người dùng và phân trang.
+4. **DataStructures & Utils Layer (`src/DataStructures/`, `src/Utils/`):** Nền tảng cốt lõi của hệ thống, cung cấp danh sách liên kết đôi tự cài đặt `LinkList<T>`, thư viện thuật toán sắp xếp và chuỗi `libPBL2`, và lớp lịch pháp `Date`.
 
 ### 1.2. Nguyên tắc Kỹ thuật Zero Forbidden STL
 
-Nhằm đáp ứng yêu cầu học thuật của đồ án PBL 2, dự án áp dụng nghiêm ngặt nguyên tắc **Zero Forbidden STL**:
-- **Không sử dụng:** `std::vector`, `std::list`, `std::deque`, `std::map`, `std::set`, `std::sort`, `std::find` trong cấu trúc dữ liệu lưu trữ chính.
-- **Thay thế hoàn toàn bằng:** Cấu trúc tự cài đặt `LinkList<T>` (danh sách liên kết đôi có nút canh giữ) và thuật toán `libPBL2::qsort` (QuickSort in-place).
+Để đáp ứng mục tiêu học thuật chuyên sâu của đồ án PBL 2 (Học phần Cấu trúc Dữ liệu & Giải thuật), dự án áp dụng nghiêm ngặt nguyên tắc **Zero Forbidden STL**:
+- **Tuyệt đối không dùng:** Các container có sẵn như `std::vector`, `std::list`, `std::deque`, `std::set`, `std::map` cho tầng lưu trữ dữ liệu chính; không dùng thuật toán có sẵn `std::sort`, `std::find`, `std::binary_search`.
+- **Thay thế hoàn toàn bằng:** Cấu trúc tự thiết kế `LinkList<T>` (danh sách liên kết đôi có nút canh giữ) kết hợp giải thuật sắp xếp nhanh In-Place QuickSort tự cài đặt (`libPBL2::qsortNodes`, `libPBL2::qsortRandomAccess`).
 
 ### 1.3. Quy tắc Tổ chức Template C++
 
-Để bảo đảm tính rõ ràng giữa giao diện lập trình và triển khai thuật toán:
-- Phần **khai báo (declaration)** của hàm/lớp template luôn đặt trong file header (`.h`).
-- Phần **hiện thực / định nghĩa (implementation)** luôn đặt trong file mã nguồn (`.cpp`) tương ứng.
-- Ở cuối file header (ngay trước chỉ thị `#endif`), đặt câu lệnh `#include "TênFile.cpp"` để trình biên dịch nạp định nghĩa template khi biên dịch mã nguồn của các đơn vị dịch (translation units) khác.
+Để bảo đảm tính rõ ràng và chuẩn mực biên dịch của C++ Template:
+- Phần **khai báo (declaration)** của cấu trúc và hàm template luôn đặt trong file header (`.h`).
+- Phần **triển khai (implementation)** của hàm template luôn được viết trong file mã nguồn (`.cpp`) tương ứng.
+- Ở cuối file header (ngay trước chỉ thị `#endif`), bắt buộc thêm câu lệnh include file `.cpp` (ví dụ: `#include "LinkList.cpp"` hoặc `#include "libPBL2.cpp"`) để trình biên dịch nạp đầy đủ mã máy cho mọi kiểu dữ liệu `T` được khởi tạo.
+
+### 1.4. Hệ thống Quản trị Quyền hạn (RBAC - Role-Based Access Control)
+
+Hàm `libPBL2::isAllowed(const Manager &M, PermissionType Per, const LinkList<Permission> *PermissionList)` kiểm tra quyền thực thi chức năng theo cơ chế phân quyền ma trận:
+
+$$\text{isAllowed}(M, P) = \begin{cases}
+\text{false} & \text{nếu } \neg M.\text{isActive}() \\
+\text{true} & \text{nếu } P = \text{Empty} \lor M.\text{getRole}() = \text{Administrator} \\
+\exists n \in \text{PermissionList}: n.\text{MA\_id} = M.\text{getID}() \land n.\text{Per\_id} = P & \text{nếu } M.\text{getRole}() \neq \text{Administrator}
+\end{cases}$$
 
 ---
 
@@ -74,7 +97,7 @@ Nhằm đáp ứng yêu cầu học thuật của đồ án PBL 2, dự án áp 
 
 ### 2.1. Kiến trúc Nút Canh Giữ (Sentinel Nodes Architecture)
 
-Một danh sách liên kết đôi thông thường thường yêu cầu nhiều câu lệnh điều kiện rẽ nhánh (`if (head == nullptr)`, `if (node->prev == nullptr)`...) khi thêm hoặc xóa nút ở biên. Để loại bỏ hoàn toàn các trường hợp ngoại lệ này, `LinkList<T>` sử dụng kỹ thuật **2 Nút Canh Giữ (Dummy Sentinel Nodes)**: `header` và `footer`.
+Một danh sách liên kết đôi thông thường thường yêu cầu nhiều câu lệnh rẽ nhánh biên (`if (head == nullptr)`, `if (node->prev == nullptr)`...) khi thêm hoặc xóa nút ở đầu/cuối. Để loại bỏ hoàn toàn các trường hợp đặc biệt này và tránh lỗi phân mảnh vùng nhớ, `LinkList<T>` sử dụng kiến trúc **2 Nút Canh Giữ (Dummy Sentinel Nodes)**: `header` và `footer`.
 
 ```
 [nullptr] <-- prev [ header ] next --> [ Node 1 ] next --> ... --> [ Node N ] next --> [ footer ] next --> [nullptr]
@@ -116,10 +139,10 @@ bool insert(const T &info) {
     return true;
 }
 ```
-* **Độ phức tạp thời gian:** $\mathcal{O}(1)$ do truy cập trực tiếp qua con trỏ `footer->prev`.
+* **Độ phức tạp thời gian:** $\mathcal{O}(1)$ do truy cập trực tiếp qua con trỏ `footer->prev`, không cần duyệt danh sách.
 
 #### B. Thao tác Xóa một nút bất kỳ (`remove`)
-Hủy liên kết nút $N$ khỏi danh sách và giải phóng bộ nhớ động:
+Hủy liên kết nút $N$ khỏi chuỗi và thu hồi bộ nhớ động an toàn:
 ```cpp
 bool remove(Node *N) {
     if (N == header || N == footer || N == nullptr)
@@ -133,10 +156,10 @@ bool remove(Node *N) {
     return true;
 }
 ```
-* **Độ phức tạp thời gian:** $\mathcal{O}(1)$ khi đã có con trỏ nút cần xóa. Không yêu cầu duyệt tìm kiếm nút trước như trong danh sách liên kết đơn.
+* **Độ phức tạp thời gian:** $\mathcal{O}(1)$ khi đã xác định được con trỏ nút cần xóa.
 
 #### C. Thao tác Sao chép Sâu (Deep Copy Constructor)
-Khởi tạo bản sao độc lập toàn bộ các nút của danh sách nguồn $L$, ngăn chặn triệt để lỗi *Dangling Pointer* hoặc *Double Free*:
+Khởi tạo bản sao độc lập toàn bộ các nút của danh sách nguồn $L$, ngăn chặn triệt để lỗi giải phóng vùng nhớ hai lần (*Double Free*) hoặc con trỏ lơ lửng (*Dangling Pointer*):
 ```cpp
 LinkList(const LinkList &L): header(new Node), footer(new Node), count(L.count) {
     header->next = footer;
@@ -145,7 +168,7 @@ LinkList(const LinkList &L): header(new Node), footer(new Node), count(L.count) 
     footer->prev = header;
 
     Node *tmp = L.header->next;
-    while (tmp->next != nullptr) { // Dừng khi gặp L.footer
+    while (tmp->next != nullptr) {
         Node *tmpNode = new Node;
         tmpNode->info = tmp->info;
 
@@ -159,10 +182,10 @@ LinkList(const LinkList &L): header(new Node), footer(new Node), count(L.count) 
     }
 }
 ```
-* **Độ phức tạp thời gian:** $\mathcal{O}(N)$ với $N$ là số lượng phần tử của $L$.
+* **Độ phức tạp thời gian:** $\mathcal{O}(N)$ với $N$ là kích thước danh sách.
 
 #### D. Thu hồi Bộ nhớ Toàn diện (Destructor `~LinkList`)
-Lần lượt giải phóng toàn bộ các nút từ `header` đến `footer`:
+Tuần tự giải phóng toàn bộ các nút từ `header` đến `footer`:
 ```cpp
 ~LinkList() {
     Node *tmp = header;
@@ -173,18 +196,19 @@ Lần lượt giải phóng toàn bộ các nút từ `header` đến `footer`:
     }
 }
 ```
-* **Độ phức tạp thời gian:** $\mathcal{O}(N)$  
-* **Độ phức tạp không gian:** $\mathcal{O}(1)$
+* **Độ phức tạp thời gian:** $\mathcal{O}(N)$ | **Độ phức tạp không gian:** $\mathcal{O}(1)$.
 
 ### 2.3. Bảng Độ phức tạp của `LinkList<T>`
 
-| Thao tác | Ký hiệu | Thời gian Trung bình | Thời gian Tệ nhất | Không gian Bộ nhớ |
+| Thao tác | Hàm tương ứng | Độ phức tạp Trung bình | Độ phức tạp Tệ nhất | Không gian Bộ nhớ |
 | :--- | :--- | :---: | :---: | :---: |
-| Chèn vào cuối (`insert`) | $T_{\text{insert}}$ | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ |
-| Xóa nút bất kỳ (`remove`) | $T_{\text{remove}}$ | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ |
-| Lấy số lượng nút (`getCount`) | $T_{\text{count}}$ | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ |
-| Lấy nút đầu / cuối (`getHeader/getFooter`) | $T_{\text{boundary}}$ | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ |
-| Khởi tạo / Giải phóng | $T_{\text{init/destroy}}$ | $\mathcal{O}(N)$ | $\mathcal{O}(N)$ | $\mathcal{O}(N)$ |
+| Chèn nút vào cuối | `insert(const T &info)` | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ |
+| Xóa nút bất kỳ | `remove(Node *N)` | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ |
+| Xóa toàn bộ danh sách | `clear()` | $\mathcal{O}(N)$ | $\mathcal{O}(N)$ | $\mathcal{O}(1)$ |
+| Lấy số lượng phần tử | `count` / `getCount()` | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ |
+| Truy cập biên (Đầu / Cuối) | `getHeader()`, `getFooter()` | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ |
+| Sao chép sâu | Copy Constructor `LinkList(const LinkList &)` | $\mathcal{O}(N)$ | $\mathcal{O}(N)$ | $\mathcal{O}(N)$ |
+| Hủy danh sách | Destructor `~LinkList()` | $\mathcal{O}(N)$ | $\mathcal{O}(N)$ | $\mathcal{O}(1)$ |
 
 ---
 
@@ -192,10 +216,9 @@ Lần lượt giải phóng toàn bộ các nút từ `header` đến `footer`:
 
 *Tệp nguồn:* [`src/Utils/libPBL2.h`](file:///d:/Documents/Universe_Materials/Semester_3/PBL_2/src/Utils/libPBL2.h) & [`src/Utils/libPBL2.cpp`](file:///d:/Documents/Universe_Materials/Semester_3/PBL_2/src/Utils/libPBL2.cpp)
 
-### 3.1. Thuật toán QuickSort In-Place trên Danh sách Liên kết đôi (`qsortNodes`)
+### 3.1. Kỹ thuật Hoán vị Giá trị In-Place (`swapVal`)
 
-#### A. Kỹ thuật Hoán vị Giá trị thay vì Tái cấu trúc Con trỏ
-Trong danh sách liên kết đôi, việc tái liên kết 4 con trỏ (`next`, `prev` của cả 2 nút liền kề) rất phức tạp và dễ phát sinh lỗi rò rỉ bộ nhớ hoặc đứt đoạn chuỗi. `libPBL2` áp dụng giải pháp **In-Place Value Swapping** thông qua hàm `swapVal`:
+Trong danh sách liên kết đôi, việc nối lại 4 con trỏ (`next`, `prev` của cả nút hiện tại và các nút liền kề) rất phức tạp, dễ làm đứt chuỗi và tạo chu trình lặp vô tận. `libPBL2` áp dụng phương pháp **In-Place Value Swapping** kết hợp ngữ nghĩa di chuyển (Move Semantics):
 ```cpp
 template <typename T>
 inline void swapVal(T &a, T &b) {
@@ -204,17 +227,19 @@ inline void swapVal(T &a, T &b) {
     b = static_cast<T&&>(tmp);
 }
 ```
-Nhờ sử dụng kỹ thuật `std::move` semantics (`static_cast<T&&>`), việc hoán đổi thực hiện trực tiếp trên vùng nhớ của `info`, giữ nguyên tuyệt đối cấu trúc topo của danh sách liên kết.
+* **Ưu điểm:** Giữ nguyên 100% cấu trúc topo của danh sách liên kết, không cấp phát thêm node mới, hoán đổi dữ liệu tức thời trong $\mathcal{O}(1)$.
 
-#### B. Giải thuật Phân hoạch Lomuto Biến thể hai con trỏ (`partitionNodes`)
+### 3.2. Thuật toán QuickSort In-Place trên Doubly Linked List (`qsortNodes`)
+
+#### A. Giải thuật Phân hoạch Lomuto Biến thể Hai Con trỏ Node (`partitionNodes`)
 Cho đoạn danh sách giữa hai con trỏ `left` và `right`:
 1. Chọn phần tử chốt (pivot): `T pivot = right->info;`.
 2. Khởi tạo con trỏ chỉ số chậm: `Node *i = left->prev;`.
 3. Cho con trỏ nhanh `j` duyệt tuần tiến từ `left` đến trước `right`:
    - Nếu `comp(j->info, pivot) == true`:
-     - Tăng con trỏ `i`: `i = (i == left->prev) ? left : i->next;`.
+     - Tăng con trỏ chậm: `i = (i == left->prev) ? left : i->next;`.
      - Nếu $i \neq j$: Hoán vị dữ liệu `swapVal(i->info, j->info)`.
-4. Đưa chốt về vị trí phân cách:
+4. Đưa chốt về vị trí ranh giới phân hoạch:
    - `i = (i == left->prev) ? left : i->next;`
    - Hoán vị `swapVal(i->info, right->info);`
 5. Trả về vị trí của chốt `i`.
@@ -243,12 +268,12 @@ typename LinkList<T>::Node* partitionNodes(typename LinkList<T>::Node *left,
 }
 ```
 
-#### C. Giải thuật Đệ quy QuickSort (`qsortNodes`)
+#### B. Thuật toán Đệ quy QuickSort (`qsortNodes`)
 ```cpp
 template <typename T, typename Compare>
 void qsortNodes(typename LinkList<T>::Node *left, typename LinkList<T>::Node *right, Compare comp) {
     if (!left || !right || left == right || right->next == left) {
-        return; // Điều kiện dừng: đoạn rỗng hoặc chỉ có 1 phần tử
+        return; // Điều kiện dừng: đoạn rỗng hoặc có duy nhất 1 phần tử
     }
 
     typename LinkList<T>::Node *pivot = partitionNodes<T, Compare>(left, right, comp);
@@ -262,64 +287,80 @@ void qsortNodes(typename LinkList<T>::Node *left, typename LinkList<T>::Node *ri
 }
 ```
 
-### 3.2. Thuật toán QuickSort trên Mảng thô (C-Arrays) & Random-Access Containers
+### 3.3. Thuật toán QuickSort trên Mảng thô (C-Arrays) & Container Truy cập Ngẫu nhiên
 
-Ngoài danh sách liên kết, hệ thống còn cung cấp hai biến thể nạp chồng:
-1. **QuickSort trên mảng thô (`qsort(T *arr, int low, int high, Compare comp)`):**
-   Phục vụ cho các bảng thống kê và bảng xếp hạng danh sách bác sĩ xuất sắc trong `StatisticController`.
-2. **QuickSort trên container truy cập ngẫu nhiên (`qsortRandomAccess(Container &c, ...)`):**
-   Phục vụ sắp xếp nhanh danh sách con trỏ `QList<Appointment*>` hiển thị trên các bảng giao diện Qt.
+Bên cạnh danh sách liên kết đôi, `libPBL2` cung cấp 2 biến thể sắp xếp cho các tập dữ liệu có chỉ số mảng:
 
-### 3.3. Các Động cơ So sánh Chuyên sâu (Comparison Engines)
+1. **QuickSort trên mảng tĩnh C-Array (`qsort(T *arr, int low, int high, Compare comp)`):**
+   - Áp dụng phân hoạch Lomuto cổ điển trên mảng chỉ số nguyên `[low ... high]`.
+   - Phục vụ xếp hạng bác sĩ và thống kê chuyên khoa trong `StatisticController`.
+2. **QuickSort trên container truy cập ngẫu nhiên (`qsortRandomAccess(Container &c, int low, int high, Compare comp)`):**
+   - Hỗ trợ mọi container hỗ trợ toán tử ngoặc vuông `c[i]` như `QList`, `std::vector`.
+   - Phục vụ sắp xếp nhanh danh sách con trỏ `QList<const Appointment*>` trên giao diện Qt mà không cần cấp phát mảng phụ trợ.
+
+### 3.4. Các Động cơ So sánh Chuyên sâu (Comparison Engines)
 
 #### A. So sánh Chuỗi Tự nhiên (`compareNatural`)
-Chuỗi thông thường so sánh theo thứ tự bảng mã ASCII sẽ dẫn tới lỗi logic khi so sánh số: `"A_010" < "A_002"` vì `'1' < '2'`.  
-Thuật toán `compareNatural` tự động phân tách các cụm chữ số liên tiếp, chuyển đổi thành số nguyên `long long` và so sánh theo độ lớn giá trị số học:
+So sánh từ điển thuần túy (ASCII) gây lỗi khi sắp xếp mã có chữ số (ví dụ `"A_010" < "A_002"` vì `'1' < '2'`).  
+Thuật toán `compareNatural` tự động phân tách chuỗi thành các token ký tự và cụm chữ số liên tiếp:
+- Khi gặp chữ số ở cả hai chuỗi, bóc tách toàn bộ thành số nguyên `long long` và so sánh theo giá trị số học.
+- Khi gặp ký tự chữ, chuyển về chữ thường (`tolower`) để so sánh không phân biệt hoa thường.
+
 $$\text{compareNatural}("A\_002", "A\_010") \implies 2 < 10 \implies -1$$
 
 #### B. So sánh Họ Tên Tiếng Việt Chuẩn (`compareVietnameseNames`)
-1. Hàm `extractLastName`: Cắt chuỗi từ dấu cách cuối cùng để lấy riêng phần **Tên chính** (Ví dụ: `"Nguyễn Văn An"` $\to$ `"An"`).
-2. Sử dụng `QCollator` với locale `QLocale::Vietnamese`:
-   - So sánh Tên chính trước (có phân biệt thứ tự nguyên âm tiếng Việt: A $\to$ Ă $\to$ Â $\to$ B...).
-   - Nếu trùng Tên chính, tiếp tục so sánh toàn bộ Họ và Tên đệm.
+1. Hàm `extractLastName`: Cắt chuỗi từ khoảng trắng cuối cùng để tách riêng **Tên chính** (Ví dụ: `"Nguyễn Văn An"` $\to$ `"An"`).
+2. Sử dụng `QCollator` cấu hình locale `QLocale::Vietnamese`:
+   - So sánh Tên chính trước (có phân biệt chuẩn nguyên âm tiếng Việt: A $\to$ Ă $\to$ Â $\to$ B...).
+   - Nếu trùng Tên chính, tiếp tục so sánh toàn bộ Họ và Tên đệm đầy đủ.
 
 #### C. So sánh Ngày tháng Phân cấp (`compareDates`)
 So sánh tuần tự từ đơn vị lớn nhất đến nhỏ nhất:
 $$\text{Năm} \to \text{Tháng} \to \text{Ngày} \to \text{Giờ} \to \text{Phút}$$
 
-### 3.4. Hệ thống Sắp xếp Thực thể Đa tiêu chí
+### 3.5. Hệ sinh thái Sắp xếp Thực thể Đa tiêu chí
 
-`libPBL2` cung cấp các hàm wrapper cấp cao định sẵn các tiêu chí nghiệp vụ:
-- `sortPatients(list, criteria, ascending)`: Sắp xếp theo ID, Họ tên, Tuổi, CCCD, SĐT, Giới tính.
-- `sortDoctors(list, criteria, ascending)`: Sắp xếp theo ID, Họ tên, Đánh giá (Rating), Đơn giá (Fee), Chuyên khoa, Phòng khám, Trạng thái.
-- `sortAppointments(list, criteria, ascending)`: Sắp xếp theo Ngày hẹn (`DateGet`), ID, Trạng thái, Bác sĩ phụ trách.
-- `sortAccounts(list, criteria, ascending)`: Sắp xếp theo ID, Tên đăng nhập, Quyền hạn, Trạng thái hoạt động.
+`libPBL2` chuẩn hóa các hàm bọc cấp cao theo từng thực thể nghiệp vụ:
+- `sortPatients(LinkList<Patient> &list, PatientSortBy criteria, bool ascending)`: Hỗ trợ tiêu chí: `ID`, `Name` (chuẩn tiếng Việt), `Age`, `CCCD`, `Phone`, `Gender`.
+- `sortDoctors(LinkList<Doctor> &list, DoctorSortBy criteria, bool ascending)`: Hỗ trợ tiêu chí: `ID`, `Name`, `Rating`, `Fee`, `Specialty`, `Room`, `State`.
+- `sortAppointments(LinkList<Appointment> &list, AppointmentSortBy criteria, bool ascending)`: Hỗ trợ tiêu chí: `Date` (`DateGet`), `ID`, `State`, `DoctorID`.
+- `sortManagers(LinkList<Manager> &list, AccountSortBy criteria, bool ascending)`: Hỗ trợ tiêu chí: `ID`, `Username`, `Name`, `Role`, `State`.
 
 ---
 
-## 4. LỚP TIỆN ÍCH QUẢN LÝ THỜI GIAN: `Date`
+## 4. LỚP TIỆN ÍCH QUẢN LÝ THỜI GIAN & LỊCH PHÁP: `Date`
 
 *Tệp nguồn:* [`src/Utils/Date.h`](file:///d:/Documents/Universe_Materials/Semester_3/PBL_2/src/Utils/Date.h) & [`src/Utils/Date.cpp`](file:///d:/Documents/Universe_Materials/Semester_3/PBL_2/src/Utils/Date.cpp)
 
 ### 4.1. Biểu diễn Dữ liệu & Tính toán Lịch pháp
 
-Lớp `Date` đóng gói đầy đủ 5 trường thời gian nguyên thủy: `year`, `month`, `day`, `hour`, `minute`.
+Lớp `Date` đóng gói đầy đủ 5 trường thời gian: `year`, `month`, `day`, `hour`, `minute`.
 
 * **Thuật toán Kiểm tra Năm Nhuận (Leap Year):**
-  Năm $Y$ là năm nhuận khi và chỉ khi:
   $$\text{isLeapYear}(Y) \iff (Y \pmod 4 = 0 \land Y \pmod{100} \neq 0) \lor (Y \pmod{400} = 0)$$
 
 * **Số ngày trong tháng (`daysInMonth`):**
-  Tháng 2 có 29 ngày nếu là năm nhuận, ngược lại có 28 ngày. Các tháng 4, 6, 9, 11 có 30 ngày. Các tháng còn lại có 31 ngày.
+  $$\text{daysInMonth}(M, Y) = \begin{cases}
+  29 & \text{nếu } M = 2 \land \text{isLeapYear}(Y) \\
+  28 & \text{nếu } M = 2 \land \neg\text{isLeapYear}(Y) \\
+  30 & \text{nếu } M \in \{4, 6, 9, 11\} \\
+  31 & \text{ngược lại}
+  \end{cases}$$
 
-### 4.2. Bóc tách & Chuẩn hóa Chuỗi Ngày giờ
+### 4.2. Bóc tách & Chuẩn hóa Chuỗi Thời gian
 
-* **Định dạng chuẩn:** `YYYY-MM-DD HH:MM` (độ dài cố định 16 ký tự).
+* **Định dạng chuẩn:** `YYYY-MM-DD HH:MM` (độ dài đúng 16 ký tự).
 * Phương thức `fromString(const string &str)`: Sử dụng cơ chế bóc tách luồng ký tự phân giải chuỗi vào 5 biến thành phần, đảm bảo dữ liệu luôn hợp lệ trước khi lưu vào bộ nhớ.
+* Phương thức `Date::now()`: Lấy thời điểm hiện tại từ hệ thống để so khớp trạng thái ca khám.
+
+### 4.3. Hệ thống Toán tử So sánh Thời gian Phân cấp
+
+Lớp `Date` nạp chồng toàn diện các toán tử quan hệ (`<`, `<=`, `>`, `>=`, `==`, `!=`):
+$$\text{Date}_A < \text{Date}_B \iff (Y_A < Y_B) \lor (Y_A = Y_B \land M_A < M_B) \lor \dots \lor (\dots \land \text{Min}_A < \text{Min}_B)$$
 
 ---
 
-## 5. TẦNG THỰC THỂ NGHIỆP VỤ (MODELS LAYER)
+## 5. TẦNG MÔ HÌNH DỮ LIỆU NGHIỆP VỤ (MODELS LAYER)
 
 ### 5.1. Cây Kế thừa Thực thể: `Human` $\to$ `Doctor`, `Patient`, `Manager`
 
@@ -386,13 +427,19 @@ classDiagram
   - `0`: Chưa khám (Đang trong hàng đợi).
   - `-1`: Bị hủy hoặc Trễ hẹn.
 
-#### B. Thuật toán Suy diễn Trạng thái Hiệu lực (`computeEffectiveState`)
-Trạng thái thực tế của lịch hẹn không cố định mà biến đổi theo thời gian hiện tại của hệ thống:
+#### B. Thuật toán Suy diễn Trạng thái Động (`computeEffectiveState`)
+Trạng thái hiển thị thực tế không cố định mà biến đổi theo thời gian hiện tại của hệ thống:
 $$\text{EffectiveState} = \begin{cases} 
-1 & \text{nếu } \text{state} == 1 \text{ (Bác sĩ đã xác nhận khám xong)} \\
--1 & \text{nếu } \text{state} == -1 \lor (\text{state} == 0 \land \text{dateGet} < \text{currentTime}) \text{ (Quá giờ khám mà chưa đến)} \\
-0 & \text{ngược lại (Lịch hẹn hợp lệ sắp tới)}
+1 & \text{nếu } \text{state} == 1 \text{ (Bác sĩ đã xác nhận hoàn thành khám)} \\
+-1 & \text{nếu } \text{state} == -1 \lor (\text{state} == 0 \land \text{dateGet} < \text{currentTime}) \text{ (Đã quá giờ hẹn khám)} \\
+0 & \text{ngược lại (Lịch hẹn hợp lệ sắp diễn ra)}
 \end{cases}$$
+
+### 5.3. Các Thực thể Liên kết: `Symptom`, `SymptomPatient`, `Permission`
+
+- `Symptom`: Định nghĩa danh mục triệu chứng bệnh học chuẩn hóa (`id`, `name`, `specialtyId`).
+- `SymptomPatient`: Phiếu tiếp nhận lâm sàng (`id`, `patientId`, `symptomIds` lưu dưới dạng chuỗi các mã triệu chứng phân cách bởi dấu phẩy `S_001,S_003`).
+- `Permission`: Ánh xạ phân quyền chi tiết giữa `Manager` và từng quyền năng hệ thống (`PermissionType`).
 
 ---
 
@@ -400,17 +447,20 @@ $$\text{EffectiveState} = \begin{cases}
 
 ### 6.1. `AppointmentController`: Tính toán Lịch nghỉ Lễ & Sinh Mã ID Tự tăng
 
-#### A. Thuật toán Tính toán Lịch Tết Nguyên Đán (Lunar New Year)
-Lớp `AppointmentController` lưu trữ bảng tra cứu ngày mùng 1 Tết Nguyên Đán (Dương lịch) từ năm 2024 đến năm 2035. Hàm `isTetHoliday(date, holidayDays)` tự động tính toán dải ngày nghỉ Tết (gồm ngày 30 Tết và các ngày mùng 1, 2, 3, 4, 5...) để cảnh báo trên lịch và khóa khung giờ đặt khám của bác sĩ.
+#### A. Thuật toán Tính toán Lịch Tết Nguyên Đán (`getLunarNewYear` & `isTetHoliday`)
+Hệ thống tích hợp bảng tra cứu ngày mùng 1 Tết Âm lịch từ năm 2020 đến năm 2045. Hàm `isTetHoliday(date, holidayDays)` tính toán dải nghỉ Tết chính xác theo quy chuẩn nhà nước (từ 30 Tết đến hết Mùng 4 hoặc Mùng 5 Tết):
+$$\text{TetStart} = \text{Mung1} - 1\text{ ngày}, \quad \text{TetEnd} = \text{TetStart} + \text{holidayDays} - 1$$
 
-#### B. Thuật toán Sinh Mã Định danh Tự tăng Toàn hệ thống (`generateNextId`)
-Để đảm bảo tính nhất quán của khóa chính (Primary Key) định dạng tiền tố `A_xxx`:
-1. Duyệt toàn bộ danh sách `LinkList<Appointment>`.
-2. Trích xuất phần số nguyên nằm sau ký tự `_`.
-3. Tìm giá trị số lớn nhất hiện hữu: $\text{maxId} = \max(\text{currentIds})$.
-4. Định dạng mã mới theo chuẩn 3 chữ số:
-   $$\text{NextId} = \text{"A\_"} + \text{padLeft}(\text{maxId} + 1, 3, \text{'0'})$$
-* **Độ phức tạp:** $\mathcal{O}(N)$ thời gian, $\mathcal{O}(1)$ bộ nhớ phụ trợ.
+#### B. Thuật toán Kiểm tra Ngày lễ Quốc gia (`isHoliday`)
+Đọc động tệp cấu hình `Config/holidays.txt`, bóc tách các ngày nghỉ định kỳ cố định (1/1, 30/4, 1/5, 2/9, 10/3 Giỗ tổ Hùng Vương) và đối soát với ngày hẹn của bệnh nhân nhằm khóa lịch hẹn trên giao diện đặt khám.
+
+#### C. Thuật toán Kiểm tra Xung đột Khung giờ Khám (`isSlotBooked`)
+Ngăn chặn đặt trùng lịch cùng một bác sĩ tại cùng một thời điểm:
+$$\text{isSlotBooked}(D, T) \iff \exists a \in \text{Appointments}: a.\text{doctorId} = D \land a.\text{dateGet} = T \land a.\text{state} \neq -1$$
+
+#### D. Thuật toán Sinh Mã Khóa chính Tự tăng Toàn hệ thống (`generateNextId`)
+Quét toàn bộ danh sách, trích xuất phần số nguyên nằm sau tiền tố định dạng và tìm giá trị cực đại:
+$$\text{maxId} = \max_{e \in \text{List}} (\text{extractNumber}(e.\text{id})), \quad \text{NextId} = \text{Prefix} + \text{padLeft}(\text{maxId} + 1, 3, \text{'0'})$$
 
 ### 6.2. `PatientController` & `DoctorController`: Định danh & Ràng buộc
 
@@ -418,24 +468,31 @@ Lớp `AppointmentController` lưu trữ bảng tra cứu ngày mùng 1 Tết Ng
   $$\text{isValidPhone}(S) \iff |S| = 10 \land S[0] = \text{'0'} \land \forall c \in S, c \in [0..9]$$
 * **Xác thực Căn cước công dân (CCCD):** Độ dài chính xác 12 ký tự, toàn bộ là chữ số và ký tự đầu tiên bắt buộc là số `0`:
   $$\text{isValidCCCD}(S) \iff |S| = 12 \land S[0] = \text{'0'} \land \forall c \in S, c \in [0..9]$$
-* **Kiểm tra trùng lặp:** Kiểm tra toàn bộ danh sách bệnh nhân trước khi lưu, ngăn chặn trùng lặp số điện thoại hoặc CCCD.
+* **Truy vết Triệu chứng Chưa khám (`getUnresolvedSymptoms`):**
+  Duyệt chéo giữa bảng `SymptomPatient` và `Appointment`, xác định những phiếu khám chưa có cuộc hẹn tương ứng nào đạt trạng thái `state == 1` để cảnh báo trên danh sách bệnh nhân.
 
 ### 6.3. `StatisticController`: Phân tích Thống kê & Tính toán Chỉ số KPI
 
-* **Doanh thu trong ngày:**
+* **Doanh thu trong ngày (`todayRevenue`):**
   $$\text{Revenue}_{\text{today}} = \sum_{a \in \text{Appointments}, \text{isToday}(a.\text{dateGet}) \land a.\text{state} = 1} \text{Doctor}(a.\text{doctorId}).\text{fee}$$
-* **Tỷ lệ hoàn tất khám:**
+* **Tỷ lệ hoàn tất khám bệnh (`completionRate`):**
   $$\text{CompletionRate} = \frac{N_{\text{completed}}}{N_{\text{completed}} + N_{\text{delayed}}} \times 100\%$$
-* **Bảng xếp hạng Bác sĩ (`getTopDoctors`):**
-  1. Khởi tạo mảng tĩnh chứa số lượt khám của từng bác sĩ.
+* **Bảng xếp hạng Bác sĩ (`getTopDoctors` / Leaderboard):**
+  1. Khởi tạo mảng thống kê số lượt khám của từng bác sĩ.
   2. Quét qua toàn bộ lịch hẹn có trạng thái hoàn tất ($state = 1$) để tích lũy số lượt.
   3. Áp dụng giải thuật `libPBL2::qsort` trên mảng theo thứ tự giảm dần số lượt khám.
+* **Thống kê Nhu cầu Chuyên khoa (`getSpecialtyDemand`):**
+  Tổng hợp số ca khám theo từng chuyên khoa và sắp xếp giảm dần bằng QuickSort.
+
+### 6.4. `AuthController` & `ManagerController`: Xác thực & Kiểm soát Tài khoản
+
+* **Xác thực Đăng nhập (`login`):** Đối soát cặp `username` và `password` trên `LinkList<Manager>`. Chỉ cho phép truy cập nếu mật khẩu khớp và cờ hoạt động `isActive() == true`.
 
 ---
 
-## 7. THUẬT TOÁN GIAO DIỆN & NGHIỆP VỤ TƯƠNG TÁC (VIEWS ENGINE)
+## 7. TẦNG GIAO DIỆN & TRẢI NGHIỆM NGƯỜI DÙNG (VIEWS ENGINE)
 
-### 7.1. Sàng lọc Triệu chứng & Điều phối Chuyên khoa (Medical Triage)
+### 7.1. Sàng lọc Triệu chứng & Điều phối Chuyên khoa Tự động (Medical Triage)
 
 Khi bệnh nhân thực hiện đặt lịch khám mới, giao diện cung cấp danh sách triệu chứng phổ biến. Thuật toán tự động chấm điểm và điều phối khoa:
 1. Mỗi triệu chứng $s_i$ gắn liền với một mã chuyên khoa mục tiêu $K(s_i)$.
@@ -445,7 +502,15 @@ Khi bệnh nhân thực hiện đặt lịch khám mới, giao diện cung cấp
    $$K^* = \arg\max_{K} \text{Score}(K)$$
 4. Tự động lọc danh sách bác sĩ thuộc chuyên khoa $K^*$ để người dùng lựa chọn.
 
-### 7.2. Cơ chế Hiển thị Mặc định: Duyệt Ngược & Sắp xếp Giảm dần theo Ngày khám
+### 7.2. Lọc & Tìm kiếm Đa tiêu chí theo Thời gian Thực
+
+Trên các View (Bệnh nhân, Bác sĩ, Lịch hẹn, Tài khoản), ô tìm kiếm kết hợp nhiều bộ lọc đồng thời:
+- Lọc theo từ khóa: Tên, SĐT, CCCD, Mã định danh.
+- Lọc theo khoảng ngày khám (`fromDate` $\to$ `toDate`).
+- Lọc theo chuyên khoa và trạng thái hiệu lực.
+- Độ trễ phản hồi tức thời nhờ xử lý trực tiếp trên bộ nhớ RAM.
+
+### 7.3. Cơ chế Hiển thị Lịch hẹn Mặc định: Duyệt Ngược & Sắp xếp Giảm dần
 
 Trong màn hình **Quản lý lịch khám** ([`src/Views/Appointment/AppointmentView.cpp`](file:///d:/Documents/Universe_Materials/Semester_3/PBL_2/src/Views/Appointment/AppointmentView.cpp)):
 1. **Duyệt từ dưới lên trên:** Danh sách các cuộc hẹn từ file dữ liệu được nạp vào cấu trúc `ordered` bằng cách duyệt lùi từ đuôi danh sách liên kết kép:
@@ -463,7 +528,14 @@ Trong màn hình **Quản lý lịch khám** ([`src/Views/Appointment/Appointmen
    ```
    Nhờ đó, các lịch hẹn sắp diễn ra gần nhất hoặc mới nhất luôn ưu tiên nằm trên đầu danh sách, giảm thiểu thao tác cuộn bảng của tiếp tân và điều dưỡng.
 
-### 7.3. Thuật toán Co giãn Cột Bảng Tự động (Responsive Table Scaling)
+### 7.4. Thuật toán Phân trang Dữ liệu (Pagination)
+
+Để đảm bảo hiệu năng mượt mà khi dữ liệu lên tới hàng chục nghìn bản ghi:
+$$\text{totalPages} = \max\left(1, \left\lfloor \frac{N + \text{pageSize} - 1}{\text{pageSize}} \right\rfloor\right)$$
+$$\text{startIdx} = (\text{currentPage} - 1) \times \text{pageSize}, \quad \text{endIdx} = \min(N, \text{startIdx} + \text{pageSize})$$
+Chỉ các bản ghi trong đoạn $[\text{startIdx} \dots \text{endIdx} - 1]$ mới được khởi tạo Qt Widget trên giao diện bảng.
+
+### 7.5. Thuật toán Co giãn Cột Bảng Tự động (Responsive Table Scaling)
 
 Để bảng dữ liệu luôn vừa khít bề ngang cửa sổ và không xuất hiện thanh cuộn ngang khó nhìn:
 1. `UIHelper::setupTableScaling(table, ratios, fixedColWidth)`:
@@ -480,18 +552,24 @@ Trong màn hình **Quản lý lịch khám** ([`src/Views/Appointment/Appointmen
 | :--- | :--- | :---: | :---: | :---: | :--- |
 | **DataStructures** | `LinkList::insert` | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ | Chèn trước con trỏ nút canh giữ `footer` |
 | **DataStructures** | `LinkList::remove` | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ | Tái nối con trỏ 2 nút lân cận & `delete` |
+| **DataStructures** | `LinkList::clear` | $\mathcal{O}(N)$ | $\mathcal{O}(N)$ | $\mathcal{O}(1)$ | Duyệt giải phóng tuần tự từng node |
 | **DataStructures** | `LinkList` Deep Copy | $\mathcal{O}(N)$ | $\mathcal{O}(N)$ | $\mathcal{O}(N)$ | Cấp phát mới độc lập từng nút |
 | **Utils** | `libPBL2::swapVal` | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ | C++ Move Semantics (`static_cast<T&&>`) |
 | **Utils** | `libPBL2::partitionNodes` | $\mathcal{O}(M)$ | $\mathcal{O}(M)$ | $\mathcal{O}(1)$ | Phân hoạch Lomuto hai con trỏ trên List |
 | **Utils** | `libPBL2::qsortNodes` | $\mathcal{O}(N \log N)$ | $\mathcal{O}(N^2)$ | $\mathcal{O}(\log N)$ | QuickSort In-Place trên Doubly Linked List |
-| **Utils** | `libPBL2::qsort` (C-Array) | $\mathcal{O}(N \log N)$ | $\mathcal{O}(N^2)$ | $\mathcal{O}(\log N)$ | QuickSort mảng thô |
+| **Utils** | `libPBL2::qsortRandomAccess` | $\mathcal{O}(N \log N)$ | $\mathcal{O}(N^2)$ | $\mathcal{O}(\log N)$ | QuickSort trên mảng truy cập ngẫu nhiên |
 | **Utils** | `libPBL2::compareNatural` | $\mathcal{O}(L)$ | $\mathcal{O}(L)$ | $\mathcal{O}(1)$ | So sánh số nguyên trích xuất theo giá trị |
 | **Utils** | `libPBL2::compareVietnameseNames`| $\mathcal{O}(L)$ | $\mathcal{O}(L)$ | $\mathcal{O}(1)$ | `QCollator` tiếng Việt theo tên chính |
+| **Utils** | `libPBL2::compareDates` | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ | So sánh phân cấp Năm-Tháng-Ngày-Giờ-Phút |
+| **Utils** | `libPBL2::isAllowed` (RBAC) | $\mathcal{O}(P)$ | $\mathcal{O}(P)$ | $\mathcal{O}(1)$ | Quét danh sách quyền hạn tuyến tính |
 | **Controllers** | `AppointmentController::generateNextId` | $\mathcal{O}(N)$ | $\mathcal{O}(N)$ | $\mathcal{O}(1)$ | Quét tìm max số tự tăng trong chuỗi ID |
 | **Controllers** | `AppointmentController::isHoliday` | $\mathcal{O}(H)$ | $\mathcal{O}(H)$ | $\mathcal{O}(1)$ | Đối soát bảng ngày lễ cố định và Tết âm |
-| **Controllers** | `StatisticController::totalRevenue` | $\mathcal{O}(A \cdot D)$ | $\mathcal{O}(A \cdot D)$ | $\mathcal{O}(1)$ | Tích lũy đơn giá khám của bác sĩ |
+| **Controllers** | `AppointmentController::isSlotBooked` | $\mathcal{O}(N)$ | $\mathcal{O}(N)$ | $\mathcal{O}(1)$ | Kiểm tra xung đột bác sĩ và khung giờ |
+| **Controllers** | `StatisticController::todayRevenue` | $\mathcal{O}(A \cdot D)$ | $\mathcal{O}(A \cdot D)$ | $\mathcal{O}(1)$ | Tích lũy đơn giá khám bác sĩ trong ngày |
 | **Controllers** | `StatisticController::getTopDoctors` | $\mathcal{O}(A + D \log D)$| $\mathcal{O}(A + D^2)$ | $\mathcal{O}(D)$ | Tần suất xuất hiện & QuickSort mảng bác sĩ |
-| **Views** | Phân trang danh sách lịch hẹn | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ | Cắt lát chỉ mục $[startIdx \dots endIdx]$ |
+| **Views** | `Medical Triage` (Sàng lọc khoa) | $\mathcal{O}(\|S\| \cdot \|K\|)$ | $\mathcal{O}(\|S\| \cdot \|K\|)$ | $\mathcal{O}(\|K\|)$ | Chấm điểm tần suất chuyên khoa mục tiêu |
+| **Views** | Phân trang danh sách (`Pagination`) | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ | Cắt lát chỉ mục $[startIdx \dots endIdx]$ |
+| **Views** | `setupTableScaling` (Co giãn bảng) | $\mathcal{O}(C)$ | $\mathcal{O}(C)$ | $\mathcal{O}(1)$ | Tính toán tỷ lệ chiều rộng theo vector $\vec{R}$ |
 
 ---
-*Tài liệu được cập nhật tự động và kiểm thử đồng bộ với mã nguồn mới nhất của dự án AnTamMng.*
+*Tài liệu được tổng hợp, kiểm chứng và đồng bộ 100% với cấu trúc mã nguồn hiện hành của dự án AnTamMng.*

@@ -2,34 +2,29 @@
 #include "libPBL2.h"
 #include <fstream>
 #include <sstream>
-#include <iostream>
 
 using namespace std;
 
+// ==========================================
+// Constructors & Destructor
+// ==========================================
 Permission::Permission(string maId, PermissionType perId)
     : MA_id(maId), Per_id(perId) {}
 
 Permission::Permission(const Permission &other)
     : MA_id(other.MA_id), Per_id(other.Per_id) {}
 
-Permission::~Permission() {}
+// ==========================================
+// Getters & Setters
+// ==========================================
+string Permission::getMA_id() const { return MA_id; }
+PermissionType Permission::getPer_id() const { return Per_id; }
+void Permission::setMA_id(const string &maId) { MA_id = maId; }
+void Permission::setPer_id(PermissionType perId) { Per_id = perId; }
 
-string Permission::getMA_id() const {
-    return MA_id;
-}
-
-PermissionType Permission::getPer_id() const {
-    return Per_id;
-}
-
-void Permission::setMA_id(const string &maId) {
-    MA_id = maId;
-}
-
-void Permission::setPer_id(PermissionType perId) {
-    Per_id = perId;
-}
-
+// ==========================================
+// State Helpers
+// ==========================================
 bool Permission::isDefault() const {
     return MA_id.empty() && Per_id == PermissionType::Empty;
 }
@@ -39,6 +34,9 @@ void Permission::setDefault() {
     Per_id = PermissionType::Empty;
 }
 
+// ==========================================
+// Type Conversions & Serialization
+// ==========================================
 string Permission::permissionTypeToString(PermissionType per) {
     switch (per) {
         case PermissionType::Per_1: return "Per_1";
@@ -46,7 +44,7 @@ string Permission::permissionTypeToString(PermissionType per) {
         case PermissionType::Per_3: return "Per_3";
         case PermissionType::Per_4: return "Per_4";
         case PermissionType::Per_5: return "Per_5";
-        default: return "Empty";
+        default:                    return "Empty";
     }
 }
 
@@ -64,24 +62,23 @@ string Permission::toString() const {
 }
 
 Permission Permission::loadFromString(const string &str) {
-    Permission p;
-    p.Per_id = PermissionType::Empty;
-    if (str.empty()) return p;
+    if (str.empty()) return Permission();
 
     stringstream ss(str);
     string maId, perStr;
     if (!getline(ss, maId, '|') || !getline(ss, perStr)) {
-        return p;
+        return Permission();
     }
 
     libPBL2::trim(maId);
     libPBL2::trim(perStr);
 
-    p.MA_id = maId;
-    p.Per_id = permissionTypeFromString(perStr);
-    return p;
+    return Permission(maId, permissionTypeFromString(perStr));
 }
 
+// ==========================================
+// File I/O
+// ==========================================
 LinkList<Permission>* Permission::loadFromFile(const string &path) {
     LinkList<Permission> *PerList = new LinkList<Permission>;
     if (!PerList) return nullptr;
@@ -132,4 +129,3 @@ bool Permission::saveToFile(const string &path, const LinkList<Permission> *list
     f.close();
     return true;
 }
-

@@ -77,7 +77,6 @@ Manager::Manager(string id, string fullName, string phone, bool gender, int age,
 Manager::Manager(const Manager &M)
     : Human(M.id, M.fullName, M.phone, M.gender, M.age), username(M.username), password(M.password), role(M.role), state(M.state) {}
 
-Manager::~Manager() {}
 
 ManagerRole Manager::getRole() const { return role; }
 string Manager::getUsername() const { return username; }
@@ -133,18 +132,6 @@ bool Manager::isValid(const string &username, const string &password) const {
 
 bool Manager::isActive() const {
     return (this->state == 1);
-}
-
-void Manager::displayInfo() const {
-    cout << "--- MANAGER ---\n"
-         << "ID: " << id << "\n"
-         << "Full Name: " << fullName << "\n"
-         << "Phone: " << phone << "\n"
-         << "Gender: " << (gender ? "Nam" : "Nu") << "\n"
-         << "Age: " << age << "\n"
-         << "Username: " << username << "\n"
-         << "Role: " << roleToString(role) << "\n"
-         << "State: " << (state ? "Hoat dong" : "Khoa") << "\n";
 }
 
 string Manager::roleToString(ManagerRole role) {

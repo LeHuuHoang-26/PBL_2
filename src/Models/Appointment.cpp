@@ -61,16 +61,6 @@ int Appointment::computeEffectiveState(int curDay, int curMonth, int curYear, in
     return 0; // Chưa khám (chưa đến giờ)
 }
 
-void Appointment::displayInfo() const {
-    cout << "--- APPOINTMENT ---\n"
-         << "A_ID: " << id << "\n"
-         << "SP_ID: " << symptomPatientId << "\n"
-         << "D_ID: " << doctorId << "\n"
-         << "A_DateSet: " << dateSet.toString() << "\n"
-         << "A_DateGet: " << dateGet.toString() << "\n"
-         << "A_State: " << state << "\n";
-}
-
 bool Appointment::isDefault() const {
     return id.empty() && symptomPatientId.empty() && doctorId.empty();
 }
