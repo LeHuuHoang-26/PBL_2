@@ -25,6 +25,7 @@ public:
     static QDate getLunarNewYear(int year);
     static bool isTetHoliday(const QDate &date, int holidayDays = 5);
     static bool isHoliday(const QDate &date, const std::string &configPath);
+    static bool isSlotBooked(const LinkList<Appointment> *appointments, const std::string &doctorId, const Date &targetTime, const std::string &excludeApptId = "");
     static QString getHolidayNote(const QDate &date, const std::string &configPath);
     static QList<HolidayEntry> loadHolidays(const std::string &configPath);
     static bool saveHolidays(const std::string &configPath, const QList<HolidayEntry> &list);

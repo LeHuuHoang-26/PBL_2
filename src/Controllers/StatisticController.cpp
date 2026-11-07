@@ -220,7 +220,8 @@ int StatisticController::getTopDoctors(const LinkList<Appointment> *appts, const
     // QuickSort descending by appointmentCount using libPBL2::qsort
     if (validDoctors > 1) {
         libPBL2::qsort(allItems, 0, validDoctors - 1, [](const DoctorLeaderboardItem &a, const DoctorLeaderboardItem &b) {
-            return a.appointmentCount > b.appointmentCount;
+            if (a.appointmentCount != b.appointmentCount) return a.appointmentCount > b.appointmentCount;
+            return a.doctorId < b.doctorId;
         });
     }
 
@@ -268,7 +269,8 @@ int StatisticController::getSpecialtyDemand(const LinkList<Appointment> *appts, 
     // QuickSort descending by count using libPBL2::qsort
     if (uniqueCount > 1) {
         libPBL2::qsort(items, 0, uniqueCount - 1, [](const SpecialtyDemandItem &a, const SpecialtyDemandItem &b) {
-            return a.count > b.count;
+            if (a.count != b.count) return a.count > b.count;
+            return a.spId < b.spId;
         });
     }
 

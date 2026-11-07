@@ -352,6 +352,7 @@ inline void sortAppointments(LinkList<Appointment> &list, AppointmentSortBy crit
                 break;
         }
         if (cmp == 0) cmp = compareDates(a.getDateGet(), b.getDateGet());
+        if (cmp == 0) cmp = compareNatural(a.getId(), b.getId());
         return ascending ? (cmp < 0) : (cmp > 0);
     });
 }

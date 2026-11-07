@@ -14,8 +14,9 @@ class AccountView : public QWidget {
 
 public:
     explicit AccountView(MainWindow *mainWindow, QWidget *parent = nullptr);
-    void refresh();
+    void refresh(bool preserveScroll = true);
     void resetToFirstPage();
+    void reapplyCurrentSort();
 
 protected:
     void showEvent(QShowEvent *event) override;

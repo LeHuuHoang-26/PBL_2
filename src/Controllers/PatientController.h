@@ -4,6 +4,7 @@
 #include "../Models/Patient.h"
 #include "../Models/Symptom.h"
 #include "../Models/SymptomPatient.h"
+#include "../Models/SymptomPatientDetail.h"
 #include "../Models/Appointment.h"
 #include "../DataStructures/LinkList.h"
 #include <string>
@@ -16,9 +17,11 @@ public:
     static int count(const LinkList<Patient> *patients);
     static QStringList getSymptomsForPatient(const std::string &patientId,
                                             const LinkList<SymptomPatient> *spList,
+                                            const LinkList<SymptomPatientDetail> *spdList,
                                             const LinkList<Symptom> *sList);
     static QString getUnresolvedSymptoms(const std::string &patientId,
                                          const LinkList<SymptomPatient> *spList,
+                                         const LinkList<SymptomPatientDetail> *spdList,
                                          const LinkList<Symptom> *sList,
                                          const LinkList<Appointment> *aList);
     static void updateSymptomStatus(const std::string &patientId,

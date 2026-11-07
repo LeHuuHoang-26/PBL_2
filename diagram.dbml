@@ -27,6 +27,7 @@ TableGroup "Medical" [color: #3f8cda] {
   Patient
   Symptom
   Symptom_Patient
+  Symptom_Patient_Detail
   Appointment
 }
 
@@ -66,10 +67,14 @@ Table Symptom {
 
 Table Symptom_Patient {
   SP_ID varchar(15) pk
-  S_ID varchar(15) [ref: > Symptom.S_ID]
   P_ID varchar(15) [ref: > Patient.P_ID]
   Sp_ID varchar(15) [ref: > Specialty.Sp_ID]
   Date datetime
+}
+
+Table Symptom_Patient_Detail {
+  SP_ID varchar(15) [ref: > Symptom_Patient.SP_ID]
+  S_ID varchar(15) [ref: > Symptom.S_ID]
 }
 
 Table Appointment {

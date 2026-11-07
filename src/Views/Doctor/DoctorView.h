@@ -16,8 +16,9 @@ class DoctorView : public QWidget {
 
 public:
     explicit DoctorView(MainWindow *mainWindow, QWidget *parent = nullptr);
-    void refresh();
+    void refresh(bool preserveScroll = true);
     void resetToFirstPage();
+    void reapplyCurrentSort();
 
 protected:
     void showEvent(QShowEvent *event) override;

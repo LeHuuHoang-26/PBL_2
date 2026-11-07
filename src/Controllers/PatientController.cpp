@@ -18,24 +18,28 @@ int PatientController::count(const LinkList<Patient> *patients) {
 
 QStringList PatientController::getSymptomsForPatient(const std::string &patientId,
                                                     const LinkList<SymptomPatient> *spList,
+                                                    const LinkList<SymptomPatientDetail> *spdList,
                                                     const LinkList<Symptom> *sList) {
     QStringList result;
-    if (!spList || !sList) return result;
+    if (!spList || !spdList || !sList) return result;
     auto *spNode = spList->getHeader()->next;
     while (spNode && spNode->next) {
         if (spNode->info.getP_id() == patientId) {
-            std::stringstream ss(spNode->info.getS_id());
-            std::string singleId;
-            while (std::getline(ss, singleId, ',')) {
-                libPBL2::trim(singleId);
-                auto *sNode = sList->getHeader()->next;
-                while (sNode && sNode->next) {
-                    if (sNode->info.getS_id() == singleId) {
-                        result.append(QString::fromUtf8(sNode->info.getSName().c_str()));
-                        break;
+            std::string spId = spNode->info.getSP_id();
+            auto *spdNode = spdList->getHeader()->next;
+            while (spdNode && spdNode->next) {
+                if (spdNode->info.getSP_id() == spId) {
+                    std::string sId = spdNode->info.getS_id();
+                    auto *sNode = sList->getHeader()->next;
+                    while (sNode && sNode->next) {
+                        if (sNode->info.getS_id() == sId) {
+                            result.append(QString::fromUtf8(sNode->info.getSName().c_str()));
+                            break;
+                        }
+                        sNode = sNode->next;
                     }
-                    sNode = sNode->next;
                 }
+                spdNode = spdNode->next;
             }
         }
         spNode = spNode->next;
@@ -46,13 +50,16 @@ QStringList PatientController::getSymptomsForPatient(const std::string &patientI
 
 QString PatientController::getUnresolvedSymptoms(const std::string &patientId,
                                                  const LinkList<SymptomPatient> *spList,
+                                                 const LinkList<SymptomPatientDetail> *spdList,
                                                  const LinkList<Symptom> *sList,
                                                  const LinkList<Appointment> *aList) {
     QStringList names;
-    if (!spList || !spList->getHeader()) return QStringLiteral("Đã khám hết");
+    if (!spList || !spList->getHeader()) return QStringLiteral("Không có triệu chứng");
+    bool hasAnyRecord = false;
     auto *record = spList->getHeader()->next;
     while (record && record->next) {
         if (record->info.getP_id() == patientId) {
+            hasAnyRecord = true;
             bool isResolved = false;
             if (aList && aList->getHeader()) {
                 auto *aNode = aList->getHeader()->next;
@@ -68,26 +75,31 @@ QString PatientController::getUnresolvedSymptoms(const std::string &patientId,
                 record = record->next;
                 continue;
             }
-            std::stringstream ids(record->info.getS_id());
-            std::string id;
-            while (std::getline(ids, id, ',')) {
-                libPBL2::trim(id);
-                if (id.empty()) continue;
-                if (sList && sList->getHeader()) {
-                    auto *s = sList->getHeader()->next;
-                    while (s && s->next) {
-                        if (s->info.getS_id() == id) {
-                            names.append(QString::fromUtf8(s->info.getSName().c_str()));
-                            break;
+            if (spdList && spdList->getHeader()) {
+                std::string spId = record->info.getSP_id();
+                auto *spdNode = spdList->getHeader()->next;
+                while (spdNode && spdNode->next) {
+                    if (spdNode->info.getSP_id() == spId) {
+                        std::string sId = spdNode->info.getS_id();
+                        if (sList && sList->getHeader()) {
+                            auto *s = sList->getHeader()->next;
+                            while (s && s->next) {
+                                if (s->info.getS_id() == sId) {
+                                    names.append(QString::fromUtf8(s->info.getSName().c_str()));
+                                    break;
+                                }
+                                s = s->next;
+                            }
                         }
-                        s = s->next;
                     }
+                    spdNode = spdNode->next;
                 }
             }
         }
         record = record->next;
     }
     names.removeDuplicates();
+    if (!hasAnyRecord) return QStringLiteral("Không có triệu chứng");
     return names.isEmpty() ? QStringLiteral("Đã khám hết") : QStringLiteral("Chưa khám: %1").arg(names.join(QStringLiteral(", ")));
 }
 

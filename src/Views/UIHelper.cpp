@@ -1092,6 +1092,9 @@ void UIHelper::showWarning(QWidget *parent, const QString &title, const QString 
             background-color: #0f766e;
         }
     )");
+    box.setWindowModality(Qt::ApplicationModal);
+    box.raise();
+    box.activateWindow();
     box.exec();
 }
 
@@ -1121,6 +1124,9 @@ void UIHelper::showInfo(QWidget *parent, const QString &title, const QString &me
             background-color: #0f766e;
         }
     )");
+    box.setWindowModality(Qt::ApplicationModal);
+    box.raise();
+    box.activateWindow();
     box.exec();
 }
 
@@ -1168,6 +1174,9 @@ bool UIHelper::confirmDelete(QWidget *parent, const QString &title, const QStrin
             background-color: #e2e8f0;
         }
     )");
+    box.setWindowModality(Qt::ApplicationModal);
+    box.raise();
+    box.activateWindow();
     box.exec();
     return box.clickedButton() == confirmBtn;
 }
@@ -1212,6 +1221,9 @@ bool UIHelper::confirmWarning(QWidget *parent, const QString &title, const QStri
             background-color: #e2e8f0;
         }
     )");
+    box.setWindowModality(Qt::ApplicationModal);
+    box.raise();
+    box.activateWindow();
     box.exec();
     return box.clickedButton() == confirmBtn;
 }

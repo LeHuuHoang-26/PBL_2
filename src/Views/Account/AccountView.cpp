@@ -13,6 +13,7 @@
 #include <QComboBox>
 #include <QCheckBox>
 #include <QLabel>
+#include <QScrollBar>
 #include <QFrame>
 #include <QHeaderView>
 #include <QShowEvent>
@@ -74,14 +75,27 @@ static QIcon createEyeIcon(bool isVisible) {
 AccountView::AccountView(MainWindow *mainWindow, QWidget *parent)
     : QWidget(parent), mainWindow(mainWindow) {
     setupUI();
-    refresh();
+    refresh(false);
+}
+
+void AccountView::reapplyCurrentSort() {
+    if (sortColumn < 0 || !mainWindow || !mainWindow->getManagers()) return;
+    libPBL2::AccountSortBy criteria = libPBL2::AccountSortBy::Name;
+    switch (sortColumn) {
+        case 0: criteria = libPBL2::AccountSortBy::Name; break;
+        case 1: criteria = libPBL2::AccountSortBy::Username; break;
+        case 2: criteria = libPBL2::AccountSortBy::Role; break;
+        case 3: criteria = libPBL2::AccountSortBy::State; break;
+        default: return;
+    }
+    libPBL2::sortManagers(mainWindow->getManagers(), criteria, sortAscending);
 }
 
 void AccountView::resetToFirstPage() {
     sortColumn = -1;
     sortAscending = true;
     currentPage = 0;
-    refresh();
+    refresh(false);
 }
 
 void AccountView::showEvent(QShowEvent *event) {
@@ -89,7 +103,7 @@ void AccountView::showEvent(QShowEvent *event) {
     sortAscending = true;
     QWidget::showEvent(event);
     currentPage = 0;
-    refresh();
+    refresh(false);
 }
 
 void AccountView::setupUI() {
@@ -151,7 +165,7 @@ void AccountView::setupUI() {
         if (mainWindow && mainWindow->getManagers()) {
             libPBL2::sortManagers(mainWindow->getManagers(), criteria, sortAscending);
             currentPage = 0;
-            refresh();
+            refresh(false);
         }
     });
 
@@ -182,18 +196,18 @@ void AccountView::setupUI() {
     connect(prevBtn, &QPushButton::clicked, this, [this] {
         if (currentPage > 0) {
             currentPage--;
-            refresh();
+            refresh(false);
         }
     });
 
     connect(nextBtn, &QPushButton::clicked, this, [this] {
         currentPage++;
-        refresh();
+        refresh(false);
     });
 
     connect(addBtn, &QPushButton::clicked, this, [this] {
         addManagerDialog();
-        refresh();
+        refresh(false);
     });
 
     // Dup click vào hàng thì có thể sửa thông tin (bỏ qua cột xóa)
@@ -208,12 +222,18 @@ void AccountView::setupUI() {
     });
 }
 
-void AccountView::refresh() {
+void AccountView::refresh(bool preserveScroll) {
     if (!mainWindow || !table) return;
+    int vScroll = (preserveScroll && table->verticalScrollBar()) ? table->verticalScrollBar()->value() : 0;
+    int curRow = preserveScroll ? table->currentRow() : -1;
+    table->setUpdatesEnabled(false);
     table->setRowCount(0);
 
     auto *managers = mainWindow->getManagers();
-    if (!managers) return;
+    if (!managers) {
+        table->setUpdatesEnabled(true);
+        return;
+    }
 
     QList<Manager*> allList;
     auto *n = managers->getHeader()->next;
@@ -329,10 +349,20 @@ void AccountView::refresh() {
                     n = n->next;
                 }
             }
-            mainWindow->saveAll();
-            refresh();
+            mainWindow->saveAll(SaveScope::Account, SaveAction::Normal);
+            refresh(true);
         });
         table->setCellWidget(r, 4, action.first);
+    }
+
+    table->setUpdatesEnabled(true);
+    if (preserveScroll) {
+        if (table->verticalScrollBar()) table->verticalScrollBar()->setValue(vScroll);
+        if (curRow >= 0 && curRow < table->rowCount()) table->setCurrentCell(curRow, 0);
+        QTimer::singleShot(0, table, [this, vScroll, curRow]() {
+            if (table && table->verticalScrollBar()) table->verticalScrollBar()->setValue(qBound(0, vScroll, table->verticalScrollBar()->maximum()));
+            if (table && curRow >= 0 && curRow < table->rowCount()) table->setCurrentCell(curRow, 0);
+        });
     }
 }
 
@@ -555,10 +585,14 @@ void AccountView::addManagerDialog() {
     auto *btnBox = new QHBoxLayout;
     btnBox->addStretch();
     auto *cancelBtn = new QPushButton("Hủy bỏ");
+    cancelBtn->setAutoDefault(false);
+    cancelBtn->setDefault(false);
     cancelBtn->setStyleSheet("QPushButton { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; padding: 9px 20px; font-size: 13px; font-weight: 600; color: #475569; } QPushButton:hover { background: #e2e8f0; color: #1e293b; }");
     connect(cancelBtn, &QPushButton::clicked, &dialog, &QDialog::reject);
 
     auto *saveBtn = new QPushButton("＋  Tạo tài khoản");
+    saveBtn->setAutoDefault(false);
+    saveBtn->setDefault(false);
     saveBtn->setStyleSheet("QPushButton { background: #0d9488; border: none; border-radius: 8px; padding: 9px 22px; font-size: 13px; font-weight: 700; color: white; } QPushButton:hover { background: #0f766e; }");
 
     connect(saveBtn, &QPushButton::clicked, &dialog, [this, &dialog, name, phone, username, password, age, gender, role] {
@@ -592,7 +626,7 @@ void AccountView::addManagerDialog() {
         if (managers) {
             managers->insert(Manager(id, UIHelper::ss(name->text().trimmed()), UIHelper::ss(phoneStr), gender->currentIndex() == 0, age->value(), UIHelper::ss(username->text().trimmed()), UIHelper::ss(password->text()), r, 1));
         }
-        mainWindow->saveAll();
+        mainWindow->saveAll(SaveScope::Account, SaveAction::Normal);
         dialog.accept();
         UIHelper::showSuccess(this, "Thành công", "Tài khoản quản lý mới đã được tạo thành công.");
     });
@@ -916,10 +950,14 @@ void AccountView::editManagerDialog(const std::string &managerId) {
     auto *btnBox = new QHBoxLayout;
     btnBox->addStretch();
     auto *cancelBtn = new QPushButton("Hủy bỏ");
+    cancelBtn->setAutoDefault(false);
+    cancelBtn->setDefault(false);
     cancelBtn->setStyleSheet("QPushButton { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; padding: 9px 20px; font-size: 13px; font-weight: 600; color: #475569; } QPushButton:hover { background: #e2e8f0; color: #1e293b; }");
     connect(cancelBtn, &QPushButton::clicked, &dialog, &QDialog::reject);
 
     auto *saveBtn = new QPushButton("✓  Lưu thay đổi");
+    saveBtn->setAutoDefault(false);
+    saveBtn->setDefault(false);
     saveBtn->setStyleSheet("QPushButton { background: #0d9488; border: none; border-radius: 8px; padding: 9px 22px; font-size: 13px; font-weight: 700; color: white; } QPushButton:hover { background: #0f766e; }");
 
     connect(saveBtn, &QPushButton::clicked, &dialog, [this, &dialog, targetMgr, managerId, name, phone, age, gender, username, password, role, statusCombo, isTargetRoot, isSelf, isCurrentRoot, checks] {
@@ -985,8 +1023,8 @@ void AccountView::editManagerDialog(const std::string &managerId) {
             ManagerController::savePermissions(managerId, newGrants, "Data/PermissionManager.txt");
         }
 
-        mainWindow->saveAll();
-        refresh();
+        mainWindow->saveAll(SaveScope::Account, SaveAction::Normal);
+        refresh(true);
         dialog.accept();
         UIHelper::showSuccess(this, "Thành công", "Thông tin tài khoản đã được cập nhật thành công.");
     });

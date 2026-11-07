@@ -31,7 +31,8 @@ static bool compareAppointmentDates(const Appointment *a, const Appointment *b) 
     if (da.getMonth() != db.getMonth()) return da.getMonth() < db.getMonth();
     if (da.getDay() != db.getDay()) return da.getDay() < db.getDay();
     if (da.getHour() != db.getHour()) return da.getHour() < db.getHour();
-    return da.getMinute() < db.getMinute();
+    if (da.getMinute() != db.getMinute()) return da.getMinute() < db.getMinute();
+    return libPBL2::compareNatural(a->getId(), b->getId()) < 0;
 }
 
 void AppointmentController::sortAppointmentsByDate(QList<Appointment*> &list) {
@@ -215,6 +216,33 @@ bool AppointmentController::isHoliday(const QDate &date, const std::string &conf
                 return true;
             }
         }
+    }
+    return false;
+}
+
+bool AppointmentController::isSlotBooked(const LinkList<Appointment> *appointments, const std::string &doctorId, const Date &targetTime, const std::string &excludeApptId) {
+    if (!appointments || !appointments->getHeader() || doctorId.empty() || targetTime.isDefault()) {
+        return false;
+    }
+    auto *n = appointments->getHeader()->next;
+    while (n && n->next) {
+        if (!n->info.isDefault()) {
+            if (!excludeApptId.empty() && n->info.getId() == excludeApptId) {
+                n = n->next;
+                continue;
+            }
+            if (n->info.getDoctorId() == doctorId && n->info.getState() != -1) {
+                Date ad = n->info.getDateGet();
+                if (ad.getYear() == targetTime.getYear() &&
+                    ad.getMonth() == targetTime.getMonth() &&
+                    ad.getDay() == targetTime.getDay() &&
+                    ad.getHour() == targetTime.getHour() &&
+                    ad.getMinute() == targetTime.getMinute()) {
+                    return true;
+                }
+            }
+        }
+        n = n->next;
     }
     return false;
 }

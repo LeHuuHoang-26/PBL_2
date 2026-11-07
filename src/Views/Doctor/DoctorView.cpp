@@ -13,13 +13,14 @@
 #include <QLocale>
 #include <QHeaderView>
 #include <QLabel>
+#include <QScrollBar>
 #include <QFrame>
 #include <QTimer>
 
 DoctorView::DoctorView(MainWindow *mainWindow, QWidget *parent)
     : QWidget(parent), mainWindow(mainWindow) {
     setupUI();
-    refresh();
+    refresh(false);
 }
 
 void DoctorView::setupUI() {
@@ -88,7 +89,7 @@ void DoctorView::setupUI() {
         if (mainWindow && mainWindow->getDoctors()) {
             libPBL2::sortDoctors(mainWindow->getDoctors(), criteria, sortAscending);
             currentPage = 0;
-            refresh();
+            refresh(false);
         }
     });
 
@@ -119,24 +120,24 @@ void DoctorView::setupUI() {
     connect(prevBtn, &QPushButton::clicked, this, [this] {
         if (currentPage > 0) {
             currentPage--;
-            refresh();
+            refresh(false);
         }
     });
 
     connect(nextBtn, &QPushButton::clicked, this, [this] {
         currentPage++;
-        refresh();
+        refresh(false);
     });
 
     connect(search, &QLineEdit::textChanged, this, [this] {
         currentPage = 0;
-        refresh();
+        refresh(false);
     });
 
     if (addBtn) {
         connect(addBtn, &QPushButton::clicked, this, [this] {
             addDoctorDialog();
-            refresh();
+            refresh(false);
         });
     }
 
@@ -150,9 +151,24 @@ void DoctorView::setupUI() {
         if (id.empty()) return;
         QTimer::singleShot(0, this, [this, id]() {
             editDoctorDialog(id);
-            refresh();
+            refresh(true);
         });
     });
+}
+
+void DoctorView::reapplyCurrentSort() {
+    if (sortColumn < 0 || !mainWindow || !mainWindow->getDoctors()) return;
+    libPBL2::DoctorSortBy criteria = libPBL2::DoctorSortBy::Name;
+    switch (sortColumn) {
+        case 0: criteria = libPBL2::DoctorSortBy::Name; break;
+        case 1: criteria = libPBL2::DoctorSortBy::Specialty; break;
+        case 2: criteria = libPBL2::DoctorSortBy::Room; break;
+        case 3: criteria = libPBL2::DoctorSortBy::Fee; break;
+        case 4: criteria = libPBL2::DoctorSortBy::Rating; break;
+        case 5: criteria = libPBL2::DoctorSortBy::State; break;
+        default: return;
+    }
+    libPBL2::sortDoctors(mainWindow->getDoctors(), criteria, sortAscending);
 }
 
 void DoctorView::resetToFirstPage() {
@@ -170,12 +186,18 @@ void DoctorView::showEvent(QShowEvent *event) {
     refresh();
 }
 
-void DoctorView::refresh() {
+void DoctorView::refresh(bool preserveScroll) {
     if (!mainWindow || !table) return;
+    int vScroll = (preserveScroll && table->verticalScrollBar()) ? table->verticalScrollBar()->value() : 0;
+    int curRow = preserveScroll ? table->currentRow() : -1;
+    table->setUpdatesEnabled(false);
     table->setRowCount(0);
 
     auto *doctors = mainWindow->getDoctors();
-    if (!doctors) return;
+    if (!doctors) {
+        table->setUpdatesEnabled(true);
+        return;
+    }
 
     QString q = search ? search->text().trimmed().toLower() : "";
     QList<Doctor*> matched;
@@ -237,7 +259,7 @@ void DoctorView::refresh() {
         auto *item0 = new QTableWidgetItem(name);
         item0->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
         item0->setData(Qt::UserRole, UIHelper::qs(d->getID()));
-        item0->setToolTip("Nháy đúp chuột để sửa thông tin bác sĩ");
+
         QFont f = item0->font();
         f.setWeight(QFont::DemiBold);
         item0->setFont(f);
@@ -245,28 +267,28 @@ void DoctorView::refresh() {
 
         auto *item1 = new QTableWidgetItem(spec);
         item1->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-        item1->setToolTip("Nháy đúp chuột để sửa thông tin bác sĩ");
+
         table->setItem(r, 1, item1);
 
         auto *item2 = new QTableWidgetItem(room);
         item2->setTextAlignment(Qt::AlignCenter);
-        item2->setToolTip("Nháy đúp chuột để sửa thông tin bác sĩ");
+
         table->setItem(r, 2, item2);
 
         auto *item3 = new QTableWidgetItem(feeStr);
         item3->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        item3->setToolTip("Nháy đúp chuột để sửa thông tin bác sĩ");
+
         table->setItem(r, 3, item3);
 
         auto *item4 = new QTableWidgetItem(ratingStr);
         item4->setTextAlignment(Qt::AlignCenter);
-        item4->setToolTip("Nháy đúp chuột để sửa thông tin bác sĩ");
+
         table->setItem(r, 4, item4);
 
         auto *item5 = new QTableWidgetItem(working ? "Đang nhận khám" : "Tạm nghỉ");
         item5->setTextAlignment(Qt::AlignCenter);
         item5->setForeground(working ? QColor("#059669") : QColor("#dc2626"));
-        item5->setToolTip("Nháy đúp chuột để sửa thông tin bác sĩ");
+
         table->setItem(r, 5, item5);
 
         // Cột 6: Nút xóa hồ sơ bác sĩ (icon thùng rác đỏ)
@@ -319,12 +341,22 @@ void DoctorView::refresh() {
                     n = n->next;
                 }
             }
-            mainWindow->saveAll();
-            refresh();
+            mainWindow->saveAll(SaveScope::Doctor, SaveAction::Normal);
+            refresh(true);
             mainWindow->refreshPage(0);
         });
 
         table->setCellWidget(r, 6, action.first);
+    }
+
+    table->setUpdatesEnabled(true);
+    if (preserveScroll) {
+        if (table->verticalScrollBar()) table->verticalScrollBar()->setValue(vScroll);
+        if (curRow >= 0 && curRow < table->rowCount()) table->setCurrentCell(curRow, 0);
+        QTimer::singleShot(0, table, [this, vScroll, curRow]() {
+            if (table && table->verticalScrollBar()) table->verticalScrollBar()->setValue(qBound(0, vScroll, table->verticalScrollBar()->maximum()));
+            if (table && curRow >= 0 && curRow < table->rowCount()) table->setCurrentCell(curRow, 0);
+        });
     }
 }
 
@@ -576,10 +608,14 @@ void DoctorView::editDoctorDialog(const std::string &id) {
     btnRow->addStretch();
 
     auto *cancel = new QPushButton("Hủy");
+    cancel->setAutoDefault(false);
+    cancel->setDefault(false);
     cancel->setCursor(Qt::PointingHandCursor);
     cancel->setStyleSheet("QPushButton { background: #ffffff; color: #475569; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 9px 22px; font-weight: 700; font-size: 13px; } QPushButton:hover { background: #f1f5f9; color: #0f172a; }");
 
     auto *save = new QPushButton("✓  Lưu thay đổi");
+    save->setAutoDefault(false);
+    save->setDefault(false);
     save->setCursor(Qt::PointingHandCursor);
     save->setStyleSheet("QPushButton { background: #0d9488; color: #ffffff; border: none; border-radius: 8px; padding: 9px 24px; font-weight: 700; font-size: 13px; } QPushButton:hover { background: #0f766e; }");
 
@@ -610,7 +646,7 @@ void DoctorView::editDoctorDialog(const std::string &id) {
         doctor->setRating(rating->value());
         doctor->setState(state->currentIndex() == 0);
 
-        mainWindow->saveAll();
+        mainWindow->saveAll(SaveScope::Doctor, SaveAction::Normal);
         dialog.accept();
     });
     dialog.setFocusPolicy(Qt::StrongFocus);
@@ -875,10 +911,14 @@ void DoctorView::addDoctorDialog() {
     btnRow->addStretch();
 
     auto *cancel = new QPushButton("Hủy");
+    cancel->setAutoDefault(false);
+    cancel->setDefault(false);
     cancel->setCursor(Qt::PointingHandCursor);
     cancel->setStyleSheet("QPushButton { background: #ffffff; color: #475569; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 9px 22px; font-weight: 700; font-size: 13px; } QPushButton:hover { background: #f1f5f9; color: #0f172a; }");
 
     auto *save = new QPushButton("✓  Thêm bác sĩ");
+    save->setAutoDefault(false);
+    save->setDefault(false);
     save->setCursor(Qt::PointingHandCursor);
     save->setStyleSheet("QPushButton { background: #0d9488; color: #ffffff; border: none; border-radius: 8px; padding: 9px 24px; font-weight: 700; font-size: 13px; } QPushButton:hover { background: #0f766e; }");
 
@@ -920,7 +960,7 @@ void DoctorView::addDoctorDialog() {
         auto *docList = mainWindow->getDoctors();
         if (docList) {
             docList->insert(newDoctor);
-            mainWindow->saveAll();
+            mainWindow->saveAll(SaveScope::Doctor, SaveAction::Normal);
         }
         dialog.accept();
     });

@@ -12,6 +12,7 @@
 #include <QComboBox>
 #include <QCheckBox>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QHeaderView>
 #include <QLabel>
 #include <QFrame>
@@ -20,7 +21,7 @@
 PatientView::PatientView(MainWindow *mainWindow, QWidget *parent)
     : QWidget(parent), mainWindow(mainWindow) {
     setupUI();
-    refresh();
+    refresh(false);
 }
 
 void PatientView::setupUI() {
@@ -93,7 +94,7 @@ void PatientView::setupUI() {
         if (mainWindow && mainWindow->getPatients()) {
             libPBL2::sortPatients(mainWindow->getPatients(), criteria, sortAscending);
             currentPage = 0;
-            refresh();
+            refresh(false);
         }
     });
 
@@ -124,23 +125,23 @@ void PatientView::setupUI() {
     connect(prevBtn, &QPushButton::clicked, this, [this] {
         if (currentPage > 0) {
             currentPage--;
-            refresh();
+            refresh(false);
         }
     });
 
     connect(nextBtn, &QPushButton::clicked, this, [this] {
         currentPage++;
-        refresh();
+        refresh(false);
     });
 
     connect(search, &QLineEdit::textChanged, this, [this] {
         currentPage = 0;
-        refresh();
+        refresh(false);
     });
 
     connect(addBtn, &QPushButton::clicked, this, [this] {
         addPatientDialog();
-        refresh();
+        refresh(false);
     });
 
     // Tích hợp sửa hồ sơ khi click 2 lần chuột trái (double-click) vào hàng bệnh nhân (bỏ qua cột xóa)
@@ -152,8 +153,22 @@ void PatientView::setupUI() {
         std::string id = UIHelper::ss(item->data(Qt::UserRole).toString());
         if (id.empty()) return;
         editPatientDialog(id);
-        refresh();
+        refresh(true);
     });
+}
+
+void PatientView::reapplyCurrentSort() {
+    if (sortColumn < 0 || !mainWindow || !mainWindow->getPatients()) return;
+    libPBL2::PatientSortBy criteria = libPBL2::PatientSortBy::Name;
+    switch (sortColumn) {
+        case 0: criteria = libPBL2::PatientSortBy::Name; break;
+        case 1: criteria = libPBL2::PatientSortBy::Phone; break;
+        case 2: criteria = libPBL2::PatientSortBy::CCCD; break;
+        case 3: criteria = libPBL2::PatientSortBy::Age; break;
+        case 4: criteria = libPBL2::PatientSortBy::Gender; break;
+        default: return;
+    }
+    libPBL2::sortPatients(mainWindow->getPatients(), criteria, sortAscending);
 }
 
 void PatientView::resetToFirstPage() {
@@ -171,12 +186,18 @@ void PatientView::showEvent(QShowEvent *event) {
     refresh();
 }
 
-void PatientView::refresh() {
+void PatientView::refresh(bool preserveScroll) {
     if (!mainWindow || !table) return;
+    int vScroll = (preserveScroll && table->verticalScrollBar()) ? table->verticalScrollBar()->value() : 0;
+    int curRow = preserveScroll ? table->currentRow() : -1;
+    table->setUpdatesEnabled(false);
     table->setRowCount(0);
 
     auto *patients = mainWindow->getPatients();
-    if (!patients) return;
+    if (!patients) {
+        table->setUpdatesEnabled(true);
+        return;
+    }
 
     QString q = search ? search->text().trimmed().toLower() : "";
     QList<Patient*> matched;
@@ -227,7 +248,6 @@ void PatientView::refresh() {
         auto *item0 = new QTableWidgetItem(name);
         item0->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
         item0->setData(Qt::UserRole, UIHelper::qs(p->getID()));
-        item0->setToolTip("Nháy đúp chuột để sửa hồ sơ bệnh nhân");
         QFont f = item0->font();
         f.setWeight(QFont::DemiBold);
         item0->setFont(f);
@@ -235,22 +255,18 @@ void PatientView::refresh() {
 
         auto *item1 = new QTableWidgetItem(phone);
         item1->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-        item1->setToolTip("Nháy đúp chuột để sửa hồ sơ bệnh nhân");
         table->setItem(r, 1, item1);
 
         auto *item2 = new QTableWidgetItem(cccd);
         item2->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-        item2->setToolTip("Nháy đúp chuột để sửa hồ sơ bệnh nhân");
         table->setItem(r, 2, item2);
 
         auto *item3 = new QTableWidgetItem(QString::number(p->getAge()));
         item3->setTextAlignment(Qt::AlignCenter);
-        item3->setToolTip("Nháy đúp chuột để sửa hồ sơ bệnh nhân");
         table->setItem(r, 3, item3);
 
         auto *item4 = new QTableWidgetItem(p->getGender() ? "Nam" : "Nữ");
         item4->setTextAlignment(Qt::AlignCenter);
-        item4->setToolTip("Nháy đúp chuột để sửa hồ sơ bệnh nhân");
         table->setItem(r, 4, item4);
 
         // Cột Xóa: không có tên trường, chỉ có icon thùng rác đỏ
@@ -303,12 +319,50 @@ void PatientView::refresh() {
                     n = n->next;
                 }
             }
-            mainWindow->saveAll();
-            refresh();
+
+            // Dọn dẹp SymptomPatient và Appointment liên kết với bệnh nhân bị xóa
+            auto *symptomPatients = mainWindow->getSymptomPatients();
+            if (symptomPatients && symptomPatients->getHeader()) {
+                auto *spNode = symptomPatients->getHeader()->next;
+                while (spNode && spNode->next) {
+                    if (spNode->info.getP_id() == pid) {
+                        std::string spId = spNode->info.getSP_id();
+                        if (appointments && appointments->getHeader()) {
+                            auto *aNode = appointments->getHeader()->next;
+                            while (aNode && aNode->next) {
+                                if (aNode->info.getSymptomPatientId() == spId) {
+                                    auto *toDelA = aNode;
+                                    aNode = aNode->next;
+                                    appointments->remove(toDelA);
+                                    continue;
+                                }
+                                aNode = aNode->next;
+                            }
+                        }
+                        auto *toDelSp = spNode;
+                        spNode = spNode->next;
+                        symptomPatients->remove(toDelSp);
+                        continue;
+                    }
+                    spNode = spNode->next;
+                }
+            }
+            mainWindow->saveAll(SaveScope::All, SaveAction::Normal);
+            refresh(true);
             mainWindow->refreshPage(0);
         });
 
         table->setCellWidget(r, 5, action.first);
+    }
+
+    table->setUpdatesEnabled(true);
+    if (preserveScroll) {
+        if (table->verticalScrollBar()) table->verticalScrollBar()->setValue(vScroll);
+        if (curRow >= 0 && curRow < table->rowCount()) table->setCurrentCell(curRow, 0);
+        QTimer::singleShot(0, table, [this, vScroll, curRow]() {
+            if (table && table->verticalScrollBar()) table->verticalScrollBar()->setValue(qBound(0, vScroll, table->verticalScrollBar()->maximum()));
+            if (table && curRow >= 0 && curRow < table->rowCount()) table->setCurrentCell(curRow, 0);
+        });
     }
 }
 
@@ -518,10 +572,14 @@ void PatientView::addPatientDialog() {
     buttons->setSpacing(10);
     buttons->addStretch();
     auto *cancel = new QPushButton("Hủy");
+    cancel->setAutoDefault(false);
+    cancel->setDefault(false);
     cancel->setCursor(Qt::PointingHandCursor);
     cancel->setStyleSheet("QPushButton { background: #ffffff; color: #475569; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 9px 22px; font-weight: 700; font-size: 13px; } QPushButton:hover { background: #f1f5f9; color: #0f172a; }");
 
     auto *save = new QPushButton("Tạo hồ sơ");
+    save->setAutoDefault(false);
+    save->setDefault(false);
     save->setCursor(Qt::PointingHandCursor);
     save->setStyleSheet("QPushButton { background: #0d9488; color: #ffffff; border: none; border-radius: 8px; padding: 9px 24px; font-weight: 700; font-size: 13px; } QPushButton:hover { background: #0f766e; }");
 
@@ -569,7 +627,7 @@ void PatientView::addPatientDialog() {
             patients->insert(Patient(id, UIHelper::ss(nameStr), UIHelper::ss(phoneStr), gender->currentIndex() == 0, age->value(), UIHelper::ss(cccdStr)));
         }
 
-        mainWindow->saveAll();
+        mainWindow->saveAll(SaveScope::Patient, SaveAction::Normal);
         refresh();
         dialog.accept();
     });
@@ -791,10 +849,14 @@ void PatientView::editPatientDialog(const std::string &id) {
     buttons->setSpacing(10);
     buttons->addStretch();
     auto *cancel = new QPushButton("Hủy");
+    cancel->setAutoDefault(false);
+    cancel->setDefault(false);
     cancel->setCursor(Qt::PointingHandCursor);
     cancel->setStyleSheet("QPushButton { background: #ffffff; color: #475569; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 9px 22px; font-weight: 700; font-size: 13px; } QPushButton:hover { background: #f1f5f9; color: #0f172a; }");
 
     auto *save = new QPushButton("✓  Lưu thay đổi");
+    save->setAutoDefault(false);
+    save->setDefault(false);
     save->setCursor(Qt::PointingHandCursor);
     save->setStyleSheet("QPushButton { background: #0d9488; color: #ffffff; border: none; border-radius: 8px; padding: 9px 24px; font-weight: 700; font-size: 13px; } QPushButton:hover { background: #0f766e; }");
 
@@ -843,7 +905,7 @@ void PatientView::editPatientDialog(const std::string &id) {
         patient->setAge(age->value());
         patient->setGender(gender->currentIndex() == 0);
 
-        mainWindow->saveAll();
+        mainWindow->saveAll(SaveScope::Patient, SaveAction::Normal);
         dialog.accept();
     });
     dialog.setFocusPolicy(Qt::StrongFocus);

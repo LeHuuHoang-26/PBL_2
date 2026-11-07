@@ -63,6 +63,7 @@ static const string managerPath = "Data/Manager.txt";
 static const string doctorPath = "Data/Doctor/Doctor.txt";
 static const string appointmentPath = "Data/Appointment.txt";
 static const string symptomPatientPath = "Data/Symptom/SymptomPatient.txt";
+static const string symptomPatientDetailPath = "Data/Symptom/SymptomPatientDetail.txt";
 static const string symptomPath = "Data/Symptom/Symptom.txt";
 static const string specializationPath = "Data/Doctor/Specialization.txt";
 static const string holidayConfigPath = "Config/Lichnghile.txt";
@@ -179,22 +180,24 @@ string MainWindow::getPatientIdForAppointment(const Appointment &a) const
 QString MainWindow::getSymptomNamesForAppointment(const Appointment &a) const
 {
     SymptomPatient *sp = findSymptomPatient(a.getSymptomPatientId());
-    if (!sp || sp->getS_id().empty()) return QStringLiteral("Chưa ghi nhận");
+    if (!sp) return QStringLiteral("Chưa ghi nhận");
 
     QStringList names;
-    stringstream ss(sp->getS_id());
-    string singleId;
-    while (getline(ss, singleId, ',')) {
-        libPBL2::trim(singleId);
-        if (symptoms && symptoms->getHeader()) {
-            auto *sNode = symptoms->getHeader()->next;
-            while (sNode && sNode->next) {
-                if (sNode->info.getS_id() == singleId) {
-                    names.append(QString::fromUtf8(sNode->info.getSName().c_str()));
-                    break;
+    if (symptomPatientDetails && symptoms) {
+        auto *spdNode = symptomPatientDetails->getHeader()->next;
+        while (spdNode && spdNode->next) {
+            if (spdNode->info.getSP_id() == sp->getSP_id()) {
+                string sId = spdNode->info.getS_id();
+                auto *sNode = symptoms->getHeader()->next;
+                while (sNode && sNode->next) {
+                    if (sNode->info.getS_id() == sId) {
+                        names.append(QString::fromUtf8(sNode->info.getSName().c_str()));
+                        break;
+                    }
+                    sNode = sNode->next;
                 }
-                sNode = sNode->next;
             }
+            spdNode = spdNode->next;
         }
     }
     names.removeDuplicates();
@@ -213,13 +216,13 @@ QString MainWindow::holidayNote(const QDate &date) const
 
 QString MainWindow::patientSymptoms(const string &patientId) const
 {
-    QStringList names = PatientController::getSymptomsForPatient(patientId, symptomPatients, symptoms);
+    QStringList names = PatientController::getSymptomsForPatient(patientId, symptomPatients, symptomPatientDetails, symptoms);
     return names.isEmpty() ? QStringLiteral("Chưa ghi nhận") : names.join(QStringLiteral(", "));
 }
 
 QString MainWindow::unresolvedPatientSymptoms(const string &patientId) const
 {
-    return PatientController::getUnresolvedSymptoms(patientId, symptomPatients, symptoms, appointments);
+    return PatientController::getUnresolvedSymptoms(patientId, symptomPatients, symptomPatientDetails, symptoms, appointments);
 }
 
 void MainWindow::updatePatientSymptomStatus(const string &patientId)
@@ -537,6 +540,8 @@ void MainWindow::handleLogout()
     btnRow->addStretch();
 
     auto *cancelBtn = new QPushButton("Hủy bỏ");
+    cancelBtn->setAutoDefault(false);
+    cancelBtn->setDefault(false);
     cancelBtn->setCursor(Qt::PointingHandCursor);
     cancelBtn->setStyleSheet(R"(
         QPushButton {
@@ -557,6 +562,8 @@ void MainWindow::handleLogout()
     connect(cancelBtn, &QPushButton::clicked, &dialog, &QDialog::reject);
 
     auto *confirmBtn = new QPushButton("Đăng xuất");
+    confirmBtn->setAutoDefault(false);
+    confirmBtn->setDefault(false);
     confirmBtn->setCursor(Qt::PointingHandCursor);
     confirmBtn->setStyleSheet(R"(
         QPushButton {
@@ -582,7 +589,7 @@ void MainWindow::handleLogout()
     if (dialog.exec() == QDialog::Accepted)
     {
         resetTabOrderToId(activeNav);
-        saveAll();
+        saveAll(SaveScope::All, SaveAction::CloseOrLogout);
         delete currentManager;
         currentManager = nullptr;
         currentManagerId.clear();
@@ -886,22 +893,92 @@ void MainWindow::refreshPage(int index)
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    saveAll();
+    saveAll(SaveScope::All, SaveAction::CloseOrLogout);
     QMainWindow::closeEvent(event);
 }
 
-void MainWindow::saveAll()
+void MainWindow::saveAll(SaveScope scope, SaveAction action)
 {
-    if (patients) libPBL2::sortPatients(patients, libPBL2::PatientSortBy::ID, true);
-    if (doctors) libPBL2::sortDoctors(doctors, libPBL2::DoctorSortBy::ID, true);
-    if (appointments) libPBL2::sortAppointments(appointments, libPBL2::AppointmentSortBy::ID, true);
-    if (managers) libPBL2::sortManagers(managers, libPBL2::AccountSortBy::ID, true);
+    bool ok = true;
 
-    bool ok = Patient::saveToFile(patientPath, patients) &&
-              Manager::saveToFile(managerPath, managers) &&
-              Doctor::saveToFile(doctorPath, doctors) &&
-              SymptomPatient::saveToFile(symptomPatientPath, symptomPatients) &&
-              Appointment::saveToFile(appointmentPath, appointments);
+    // 1. Bệnh nhân & Triệu chứng
+    if (scope == SaveScope::All || scope == SaveScope::Patient)
+    {
+        if (patients) libPBL2::sortPatients(patients, libPBL2::PatientSortBy::ID, true);
+        if (symptomPatients)
+        {
+            libPBL2::qsort(symptomPatients, [](const SymptomPatient &a, const SymptomPatient &b) {
+                return a.getSP_id() < b.getSP_id();
+            });
+            ok = SymptomPatient::saveToFile(symptomPatientPath, symptomPatients) && ok;
+        }
+        if (symptomPatientDetails)
+        {
+            libPBL2::qsort(symptomPatientDetails, [](const SymptomPatientDetail &a, const SymptomPatientDetail &b) {
+                if (a.getSP_id() != b.getSP_id()) return a.getSP_id() < b.getSP_id();
+                return a.getS_id() < b.getS_id();
+            });
+            ok = SymptomPatientDetail::saveToFile(symptomPatientDetailPath, symptomPatientDetails) && ok;
+        }
+        ok = Patient::saveToFile(patientPath, patients) && ok;
+
+        if (action == SaveAction::Normal && patientView)
+        {
+            patientView->reapplyCurrentSort();
+        }
+    }
+
+    // 2. Bác sĩ
+    if (scope == SaveScope::All || scope == SaveScope::Doctor)
+    {
+        if (doctors) libPBL2::sortDoctors(doctors, libPBL2::DoctorSortBy::ID, true);
+        ok = Doctor::saveToFile(doctorPath, doctors) && ok;
+
+        if (action == SaveAction::Normal && doctorView)
+        {
+            doctorView->reapplyCurrentSort();
+        }
+    }
+
+    // 3. Lịch hẹn (+ Triệu chứng nếu có)
+    if (scope == SaveScope::All || scope == SaveScope::Appointment)
+    {
+        if (appointments) libPBL2::sortAppointments(appointments, libPBL2::AppointmentSortBy::ID, true);
+        if (symptomPatients && scope == SaveScope::Appointment)
+        {
+            libPBL2::qsort(symptomPatients, [](const SymptomPatient &a, const SymptomPatient &b) {
+                return a.getSP_id() < b.getSP_id();
+            });
+            ok = SymptomPatient::saveToFile(symptomPatientPath, symptomPatients) && ok;
+        }
+        if (symptomPatientDetails && scope == SaveScope::Appointment)
+        {
+            libPBL2::qsort(symptomPatientDetails, [](const SymptomPatientDetail &a, const SymptomPatientDetail &b) {
+                if (a.getSP_id() != b.getSP_id()) return a.getSP_id() < b.getSP_id();
+                return a.getS_id() < b.getS_id();
+            });
+            ok = SymptomPatientDetail::saveToFile(symptomPatientDetailPath, symptomPatientDetails) && ok;
+        }
+        ok = Appointment::saveToFile(appointmentPath, appointments) && ok;
+
+        if (action == SaveAction::Normal && appointmentView)
+        {
+            appointmentView->reapplyCurrentSort();
+        }
+    }
+
+    // 4. Quản lý tài khoản
+    if (scope == SaveScope::All || scope == SaveScope::Account)
+    {
+        if (managers) libPBL2::sortManagers(managers, libPBL2::AccountSortBy::ID, true);
+        ok = Manager::saveToFile(managerPath, managers) && ok;
+
+        if (action == SaveAction::Normal && accountView)
+        {
+            accountView->reapplyCurrentSort();
+        }
+    }
+
     if (!ok)
     {
         UIHelper::showWarning(this, "Lỗi lưu dữ liệu", "Không thể lưu một hoặc nhiều tệp dữ liệu.");
@@ -940,6 +1017,7 @@ MainWindow::~MainWindow()
     delete doctors;
     delete symptoms;
     delete symptomPatients;
+    delete symptomPatientDetails;
     delete appointments;
 }
 
@@ -951,9 +1029,10 @@ bool MainWindow::initApp()
     doctors = Doctor::loadFromFile(doctorPath);
     symptoms = Symptom::loadFromFile(symptomPath);
     symptomPatients = SymptomPatient::loadFromFile(symptomPatientPath);
+    symptomPatientDetails = SymptomPatientDetail::loadFromFile(symptomPatientDetailPath);
     appointments = Appointment::loadFromFile(appointmentPath);
 
-    bool ok = managers && patients && doctors && symptoms && symptomPatients && appointments;
+    bool ok = managers && patients && doctors && symptoms && symptomPatients && symptomPatientDetails && appointments;
     if (!ok)
     {
         UIHelper::showWarning(this, "Lỗi dữ liệu", "Không thể nạp dữ liệu từ thư mục Data/! Vui lòng đảm bảo tệp dữ liệu tồn tại và ứng dụng được khởi chạy từ đúng thư mục.");
@@ -965,14 +1044,18 @@ bool MainWindow::initApp()
     if (doctors) libPBL2::sortDoctors(doctors, libPBL2::DoctorSortBy::ID, true);
     if (appointments) libPBL2::sortAppointments(appointments, libPBL2::AppointmentSortBy::ID, true);
     if (managers) libPBL2::sortManagers(managers, libPBL2::AccountSortBy::ID, true);
-
-    // Cập nhật trạng thái triệu chứng
-    auto *p = patients->getHeader()->next;
-    while (p && p->next)
-    {
-        updatePatientSymptomStatus(p->info.getID());
-        p = p->next;
+    if (symptomPatients) {
+        libPBL2::qsort(symptomPatients, [](const SymptomPatient &a, const SymptomPatient &b) {
+            return a.getSP_id() < b.getSP_id();
+        });
     }
+    if (symptomPatientDetails) {
+        libPBL2::qsort(symptomPatientDetails, [](const SymptomPatientDetail &a, const SymptomPatientDetail &b) {
+            if (a.getSP_id() != b.getSP_id()) return a.getSP_id() < b.getSP_id();
+            return a.getS_id() < b.getS_id();
+        });
+    }
+
 
     // Khởi tạo windowStack và nạp màn hình Login
     windowStack = new QStackedWidget(this);

@@ -18,6 +18,7 @@
 #include "Appointment.h"
 #include "Symptom.h"
 #include "SymptomPatient.h"
+#include "SymptomPatientDetail.h"
 
 class QStackedWidget;
 class QPushButton;
@@ -34,6 +35,19 @@ class AccountView;
 class StatisticView;
 class Login;
 
+enum class SaveScope {
+    All,
+    Patient,
+    Doctor,
+    Appointment,
+    Account
+};
+
+enum class SaveAction {
+    Normal,
+    CloseOrLogout
+};
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -48,7 +62,7 @@ public:
     void handleLogout();
     void setPage(int index);
     void refreshPage(int index);
-    void saveAll();
+    void saveAll(SaveScope scope = SaveScope::All, SaveAction action = SaveAction::Normal);
 
     // Truy cập nguồn dữ liệu (Data Getters)
     LinkList<Manager> *getManagers() const { return managers; }
@@ -56,6 +70,7 @@ public:
     LinkList<Doctor> *getDoctors() const { return doctors; }
     LinkList<Symptom> *getSymptoms() const { return symptoms; }
     LinkList<SymptomPatient> *getSymptomPatients() const { return symptomPatients; }
+    LinkList<SymptomPatientDetail> *getSymptomPatientDetails() const { return symptomPatientDetails; }
     LinkList<Appointment> *getAppointments() const { return appointments; }
     Manager *getCurrentManager() const;
     void resetTabOrderToId(int tabIndex);
@@ -103,6 +118,7 @@ private:
     LinkList<Doctor> *doctors = nullptr;
     LinkList<Symptom> *symptoms = nullptr;
     LinkList<SymptomPatient> *symptomPatients = nullptr;
+    LinkList<SymptomPatientDetail> *symptomPatientDetails = nullptr;
     LinkList<Appointment> *appointments = nullptr;
 
     Manager *currentManager = nullptr;

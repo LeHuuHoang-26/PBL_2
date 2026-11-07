@@ -30,9 +30,13 @@ public:
     void editAppointmentDialog(const std::string &id);
     void highlightCalendarAppointments(QCalendarWidget *cal, int year, int month);
     QList<Appointment*> getAppointmentsForDate(const QDate &targetDate) const;
+    void reapplyCurrentSort();
 
 private:
     MainWindow *mainWindow = nullptr;
+    int listSortColumn = -1;
+    bool listSortAscending = true;
+    int listCurrentPage = 0;
 };
 
 #endif // APPOINTMENTVIEW_H

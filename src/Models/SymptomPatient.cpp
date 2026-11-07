@@ -8,156 +8,64 @@
 using namespace std;
 
 SymptomPatient::SymptomPatient()
-    : SP_id(""), S_id(""), P_id(""), Sp_id(""), date(0, 0, 0, 0, 0), resolved(0) {}
+    : SP_id(""), P_id(""), Sp_id(""), date(0, 0, 0, 0, 0) {}
 
-SymptomPatient::SymptomPatient(std::ifstream &f) {
-    setDefault();
-    string line;
-    bool foundOpenBrace = false;
-
-    while (getline(f, line)) {
-        libPBL2::trim(line);
-        if (line.empty()) continue;
-        if (line.find('{') != string::npos) {
-            foundOpenBrace = true;
-            break;
-        }
-    }
-
-    if (!foundOpenBrace) {
-        setDefault();
-        return;
-    }
-
-    while (getline(f, line)) {
-        libPBL2::trim(line);
-        if (line.empty()) continue;
-
-        if (line.find('}') != string::npos) {
-            break;
-        }
-
-        size_t colonPos = line.find(':');
-        if (colonPos != string::npos) {
-            string key = line.substr(0, colonPos);
-            string val = line.substr(colonPos + 1);
-            libPBL2::trim(key);
-            libPBL2::trim(val);
-
-            if (!val.empty() && val.back() == ',') {
-                val.pop_back();
-                libPBL2::trim(val);
-            }
-
-            if (key == "SP_id" || key == "QP_id") {
-                this->SP_id = val;
-            } else if (key == "S_id") {
-                this->S_id = val;
-            } else if (key == "P_id") {
-                this->P_id = val;
-            } else if (key == "Sp_id") {
-                this->Sp_id = val;
-            } else if (key == "Date") {
-                this->date = Date::loadFromString(val);
-            } else if (key == "Resolved") {
-                if (val == "1" || val == "true") this->resolved = 1;
-                else if (val == "-1") this->resolved = -1;
-                else this->resolved = 0;
-            }
-        }
-    }
-
-    if (this->SP_id.empty()) {
-        setDefault();
-    }
-}
-
-SymptomPatient::SymptomPatient(std::string SP_id, std::string S_id, std::string P_id, std::string Sp_id, Date date, int resolved)
-    : SP_id(SP_id), S_id(S_id), P_id(P_id), Sp_id(Sp_id), date(date), resolved(resolved) {}
+SymptomPatient::SymptomPatient(std::string SP_id, std::string P_id, std::string Sp_id, Date date)
+    : SP_id(SP_id), P_id(P_id), Sp_id(Sp_id), date(date) {}
 
 SymptomPatient::SymptomPatient(const SymptomPatient &SP)
-    : SP_id(SP.SP_id), S_id(SP.S_id), P_id(SP.P_id), Sp_id(SP.Sp_id), date(SP.date), resolved(SP.resolved) {}
-
-SymptomPatient::~SymptomPatient() {}
+    : SP_id(SP.SP_id), P_id(SP.P_id), Sp_id(SP.Sp_id), date(SP.date) {}
 
 void SymptomPatient::setDefault() {
     SP_id = "";
-    S_id = "";
     P_id = "";
     Sp_id = "";
     date = Date(0, 0, 0, 0, 0);
-    resolved = 0;
 }
 
 bool SymptomPatient::isDefault() const {
-    return SP_id == "" && S_id == "" && P_id == "" && date.isDefault();
+    return SP_id.empty() && P_id.empty();
 }
 
 string SymptomPatient::getSP_id() const { return SP_id; }
-string SymptomPatient::getS_id() const { return S_id; }
 string SymptomPatient::getP_id() const { return P_id; }
 string SymptomPatient::getSp_id() const { return Sp_id; }
 Date SymptomPatient::getDate() const { return date; }
-int SymptomPatient::getResolved() const { return resolved; }
-bool SymptomPatient::isResolved() const { return resolved == 1; }
 
 void SymptomPatient::setSP_id(const string &value) { this->SP_id = value; }
-void SymptomPatient::setS_id(const string &value) { this->S_id = value; }
 void SymptomPatient::setP_id(const string &value) { this->P_id = value; }
 void SymptomPatient::setSp_id(const string &value) { this->Sp_id = value; }
 void SymptomPatient::setDate(const Date &value) { this->date = value; }
-void SymptomPatient::setResolved(int value) { this->resolved = value; }
-
-void SymptomPatient::addS_id(const string &id) {
-    if (this->S_id.empty()) {
-        this->S_id = id;
-    } else {
-        this->S_id += ", " + id;
-    }
-}
 
 string SymptomPatient::toString() const {
-    ostringstream oss;
-    oss << "{\n"
-        << "\tSP_id: " << SP_id << ",\n"
-        << "\tS_id: " << S_id << ",\n"
-        << "\tP_id: " << P_id << ",\n"
-        << "\tSp_id: " << Sp_id << ",\n"
-        << "\tDate: " << date.toString() << ",\n"
-        << "\tResolved: " << resolved << ",\n"
-        << "},";
-    return oss.str();
+    return libPBL2::padRightUtf8(SP_id, 6) + " | "
+         + libPBL2::padRightUtf8(P_id, 6) + " | "
+         + libPBL2::padRightUtf8(Sp_id, 6) + " | "
+         + libPBL2::padRightUtf8(date.toString(), 16);
 }
 
 SymptomPatient SymptomPatient::loadFromString(const string &str) {
+    if (str.empty()) return SymptomPatient();
     stringstream ss(str);
-    SymptomPatient sp;
-    string line;
-    while (getline(ss, line)) {
-        libPBL2::trim(line);
-        if (line.empty() || line == "{" || line == "}," || line == "}") continue;
-        size_t colon = line.find(':');
-        if (colon != string::npos) {
-            string key = line.substr(0, colon);
-            string val = line.substr(colon + 1);
-            libPBL2::trim(key);
-            libPBL2::trim(val);
-            if (!val.empty() && val.back() == ',') val.pop_back();
-            libPBL2::trim(val);
+    string spId, pId, specId, dateStr;
 
-            if (key == "SP_id" || key == "QP_id") sp.SP_id = val;
-            else if (key == "S_id") sp.S_id = val;
-            else if (key == "P_id") sp.P_id = val;
-            else if (key == "Sp_id") sp.Sp_id = val;
-            else if (key == "Date") sp.date = Date::loadFromString(val);
-            else if (key == "Resolved") {
-                if (val == "1" || val == "true") sp.resolved = 1;
-                else if (val == "-1") sp.resolved = -1;
-                else sp.resolved = 0;
-            }
-        }
+    if (!getline(ss, spId, '|') ||
+        !getline(ss, pId, '|') ||
+        !getline(ss, specId, '|') ||
+        !getline(ss, dateStr)) {
+        return SymptomPatient();
     }
-    return sp;
+
+    libPBL2::trim(spId);
+    libPBL2::trim(pId);
+    libPBL2::trim(specId);
+    libPBL2::trim(dateStr);
+
+    if (spId.empty() || pId.empty())
+        return SymptomPatient();
+
+    Date d = Date::loadFromString(dateStr);
+    return SymptomPatient(spId, pId, specId, d);
 }
 
 LinkList<SymptomPatient>* SymptomPatient::loadFromFile(const string &path) {
@@ -170,12 +78,20 @@ LinkList<SymptomPatient>* SymptomPatient::loadFromFile(const string &path) {
         return nullptr;
     }
 
-    while (true) {
-        SymptomPatient SP(f);
-        if (SP.isDefault())
-            break;
-        SPList->insert(SP);
+    string tmp;
+    getline(f, tmp); // Bỏ qua tiêu đề
+    getline(f, tmp); // Bỏ qua dòng phân cách
+
+    string line;
+    while (getline(f, line)) {
+        libPBL2::trim(line);
+        if (line.empty()) continue;
+        SymptomPatient SP = SymptomPatient::loadFromString(line);
+        if (!SP.isDefault()) {
+            SPList->insert(SP);
+        }
     }
+
     f.close();
     return SPList;
 }
@@ -187,6 +103,9 @@ bool SymptomPatient::saveToFile(const string &path, const LinkList<SymptomPatien
     ofstream f(path);
     if (!f.is_open())
         return false;
+
+    f << "SP_ID  | P_ID   | Sp_ID  | Date            \n";
+    f << "-------+--------+--------+-----------------\n";
 
     LinkList<SymptomPatient>::Node *tmp = list->getHeader()->next;
     while (tmp != nullptr && tmp->next != nullptr) {
@@ -205,10 +124,10 @@ string SymptomPatient::generateNextId(const LinkList<SymptomPatient> *list) {
     if (list && list->getHeader()) {
         LinkList<SymptomPatient>::Node *cur = list->getHeader()->next;
         while (cur != nullptr && cur->next != nullptr) {
-            string idStr = cur->info.getSP_id();
-            if (idStr.length() > 3 && (idStr.substr(0, 3) == "QP_" || idStr.substr(0, 3) == "SP_")) {
+            string id = cur->info.getSP_id();
+            if (id.rfind("SP_", 0) == 0 && id.length() > 3) {
                 try {
-                    int num = stoi(idStr.substr(3));
+                    int num = stoi(id.substr(3));
                     if (num > maxId) maxId = num;
                 } catch (...) {}
             }
@@ -216,6 +135,6 @@ string SymptomPatient::generateNextId(const LinkList<SymptomPatient> *list) {
         }
     }
     ostringstream oss;
-    oss << "QP_" << setfill('0') << setw(3) << (maxId + 1);
+    oss << "SP_" << setfill('0') << setw(3) << (maxId + 1);
     return oss.str();
 }
