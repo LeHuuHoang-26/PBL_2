@@ -4,6 +4,7 @@
 #include <string>
 #include "Appointment.h"
 #include "libPBL2.h"
+#include "../Utils/AppExceptions.h"
 
 using namespace std;
 
@@ -113,37 +114,52 @@ Appointment Appointment::loadFromString(const string &str) {
 
     Date dSet = Date::loadFromString(dateSetStr);
     Date dGet = Date::loadFromString(dateGetStr);
-    int st = (!stateStr.empty() ? stoi(stateStr) : 0);
+    int st = 0;
+    try {
+        if (!stateStr.empty()) st = stoi(stateStr);
+    } catch (...) {}
 
     return Appointment(id, spId, doctorId, dSet, dGet, st);
 }
 
 LinkList<Appointment>* Appointment::loadFromFile(const string &path) {
-    LinkList<Appointment> *list = new LinkList<Appointment>;
-    if (!list) return nullptr;
-
     ifstream f(path);
     if (!f.is_open()) {
-        delete list;
-        return nullptr;
+        throw FileIOException(path, "Không thể mở tệp để đọc dữ liệu.");
     }
 
-    string tmp;
-    getline(f, tmp); // Bỏ qua tiêu đề
-    getline(f, tmp); // Bỏ qua dòng phân cách
+    LinkList<Appointment> *list = nullptr;
+    try {
+        list = new LinkList<Appointment>;
+        string tmp;
+        getline(f, tmp); // Bỏ qua tiêu đề
+        getline(f, tmp); // Bỏ qua dòng phân cách
 
-    string line;
-    while (getline(f, line)) {
-        libPBL2::trim(line);
-        if (line.empty()) continue;
-        Appointment app = Appointment::loadFromString(line);
-        if (!app.isDefault()) {
-            list->insert(app);
+        string line;
+        int lineNo = 2;
+        while (getline(f, line)) {
+            lineNo++;
+            libPBL2::trim(line);
+            if (line.empty()) continue;
+            try {
+                Appointment app = Appointment::loadFromString(line);
+                if (!app.isDefault()) {
+                    list->insert(app);
+                }
+            } catch (const AppException &) {
+                throw;
+            } catch (const std::exception &e) {
+                throw DataFormatException(path, lineNo, e.what());
+            }
         }
-    }
 
-    f.close();
-    return list;
+        f.close();
+        return list;
+    } catch (...) {
+        delete list;
+        f.close();
+        throw;
+    }
 }
 
 bool Appointment::saveToFile(const string &path, const LinkList<Appointment> *list) {
@@ -151,8 +167,9 @@ bool Appointment::saveToFile(const string &path, const LinkList<Appointment> *li
         return false;
 
     ofstream f(path);
-    if (!f.is_open())
-        return false;
+    if (!f.is_open()) {
+        throw FileIOException(path, "Không thể mở tệp để ghi dữ liệu.");
+    }
 
     f << "A_ID  | SP_ID  | D_ID  | A_DateSet        | A_DateGet        | A_State\n";
     f << "------+--------+-------+------------------+------------------+---------\n";

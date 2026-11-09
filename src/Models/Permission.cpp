@@ -1,5 +1,6 @@
 #include "Permission.h"
 #include "libPBL2.h"
+#include "../Utils/AppExceptions.h"
 #include <fstream>
 #include <sstream>
 
@@ -80,31 +81,43 @@ Permission Permission::loadFromString(const string &str) {
 // File I/O
 // ==========================================
 LinkList<Permission>* Permission::loadFromFile(const string &path) {
-    LinkList<Permission> *PerList = new LinkList<Permission>;
-    if (!PerList) return nullptr;
-
     ifstream f(path);
     if (!f.is_open()) {
-        delete PerList;
-        return nullptr;
+        throw FileIOException(path, "Không thể mở tệp để đọc dữ liệu.");
     }
 
-    string tmp;
-    getline(f, tmp); // Bỏ qua dòng tiêu đề
-    getline(f, tmp); // Bỏ qua dòng phân cách
+    LinkList<Permission> *PerList = nullptr;
+    try {
+        PerList = new LinkList<Permission>;
+        string tmp;
+        getline(f, tmp); // Bỏ qua dòng tiêu đề
+        getline(f, tmp); // Bỏ qua dòng phân cách
 
-    string line;
-    while (getline(f, line)) {
-        libPBL2::trim(line);
-        if (line.empty()) continue;
-        Permission p = Permission::loadFromString(line);
-        if (!p.MA_id.empty() && p.Per_id != PermissionType::Empty) {
-            PerList->insert(p);
+        string line;
+        int lineNo = 2;
+        while (getline(f, line)) {
+            lineNo++;
+            libPBL2::trim(line);
+            if (line.empty()) continue;
+            try {
+                Permission p = Permission::loadFromString(line);
+                if (!p.MA_id.empty() && p.Per_id != PermissionType::Empty) {
+                    PerList->insert(p);
+                }
+            } catch (const AppException &) {
+                throw;
+            } catch (const std::exception &e) {
+                throw DataFormatException(path, lineNo, e.what());
+            }
         }
-    }
 
-    f.close();
-    return PerList;
+        f.close();
+        return PerList;
+    } catch (...) {
+        delete PerList;
+        f.close();
+        throw;
+    }
 }
 
 bool Permission::saveToFile(const string &path, const LinkList<Permission> *list) {
@@ -112,8 +125,9 @@ bool Permission::saveToFile(const string &path, const LinkList<Permission> *list
         return false;
 
     ofstream f(path);
-    if (!f.is_open())
-        return false;
+    if (!f.is_open()) {
+        throw FileIOException(path, "Không thể mở tệp để ghi dữ liệu.");
+    }
 
     f << "MA_ID  | Per_ID\n";
     f << "-------+---------\n";

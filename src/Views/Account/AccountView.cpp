@@ -917,7 +917,27 @@ void AccountView::editManagerDialog(const std::string &managerId) {
             check->setStyleSheet("QCheckBox { font-size: 12.5px; color: #334155; } QCheckBox:hover { color: #0d9488; }");
             check->setChecked(granted.contains(QString::fromUtf8(entry.id)));
             check->setProperty("permissionId", QString::fromUtf8(entry.id));
-            cardLayout->addWidget(check);
+
+            auto *rowLayout = new QHBoxLayout;
+            rowLayout->setContentsMargins(0, 0, 0, 0);
+            rowLayout->setSpacing(8);
+            rowLayout->addWidget(check);
+
+            QLabel *badgeLabel = nullptr;
+            if (std::string(entry.id) == "Per_1") {
+                badgeLabel = new QLabel;
+                badgeLabel->setStyleSheet("font-size: 11.5px; font-weight: 700; color: #0f766e; background-color: #ccfbf1; border: 1px solid #99f6e4; border-radius: 6px; padding: 2px 8px;");
+                badgeLabel->setVisible(false);
+                rowLayout->addWidget(badgeLabel);
+
+                QDateTime currentExpiry = ManagerController::permissionExpiry(managerId, entry.id, "Data/PermissionManager.txt");
+                if (granted.contains(QString::fromUtf8(entry.id)) && currentExpiry.isValid() && currentExpiry > QDateTime::currentDateTime()) {
+                    badgeLabel->setText(currentExpiry.toString("dd-MM-yyyy | HH:mm"));
+                    badgeLabel->setVisible(true);
+                }
+            }
+            rowLayout->addStretch();
+            cardLayout->addLayout(rowLayout);
 
             QSpinBox *duration = nullptr;
             if (std::string(entry.id) == "Per_1") {
@@ -935,9 +955,24 @@ void AccountView::editManagerDialog(const std::string &managerId) {
 
                 durLbl->setVisible(check->isChecked());
                 duration->setVisible(check->isChecked());
-                connect(check, &QCheckBox::toggled, [durLbl, duration](bool c) {
+
+                auto updateBadge = [check, duration, badgeLabel]() {
+                    if (badgeLabel) {
+                        if (check->isChecked()) {
+                            QDateTime newExp = QDateTime::currentDateTime().addDays(duration->value());
+                            badgeLabel->setText(newExp.toString("dd-MM-yyyy | HH:mm"));
+                            badgeLabel->setVisible(true);
+                        } else {
+                            badgeLabel->setVisible(false);
+                        }
+                    }
+                };
+
+                connect(duration, qOverload<int>(&QSpinBox::valueChanged), updateBadge);
+                connect(check, &QCheckBox::toggled, [durLbl, duration, updateBadge](bool c) {
                     durLbl->setVisible(c);
                     duration->setVisible(c);
+                    updateBadge();
                 });
             }
             checks->append({check, duration});

@@ -37,6 +37,7 @@ SOURCES += \
     src/Models/Symptom.cpp \
     src/Models/SymptomPatient.cpp \
     src/Models/SymptomPatientDetail.cpp \
+    src/Utils/AppExceptions.cpp \
     src/Utils/Date.cpp \
     src/Utils/libPBL2.cpp \
     src/Controllers/AuthController.cpp \
@@ -66,6 +67,7 @@ HEADERS += \
     src/Models/SymptomPatient.h \
     src/Models/SymptomPatientDetail.h \
     src/DataStructures/LinkList.h \
+    src/Utils/AppExceptions.h \
     src/Utils/Date.h \
     src/Utils/libPBL2.h \
     src/Controllers/AuthController.h \

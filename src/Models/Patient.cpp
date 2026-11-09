@@ -4,6 +4,7 @@
 #include <sstream>
 #include <iomanip>
 #include "libPBL2.h"
+#include "../Utils/AppExceptions.h"
 
 using namespace std;
 
@@ -34,13 +35,21 @@ Patient::Patient(std::ifstream &f) {
         setDefault();
         return;
     }
-    gender = stoi(tmp);
+    try {
+        gender = stoi(tmp);
+    } catch (...) {
+        gender = true;
+    }
 
     if (!getline(f, tmp, '|')) {
         setDefault();
         return;
     }
-    age = stoi(tmp);
+    try {
+        age = stoi(tmp);
+    } catch (...) {
+        age = 0;
+    }
 
     if (!getline(f, CCCD, '\n')) {
         setDefault();
@@ -115,27 +124,31 @@ Patient Patient::loadFromString(const std::string &str) {
 }
 
 LinkList<Patient>* Patient::loadFromFile(const std::string &path) {
-    LinkList<Patient> *patientList = new LinkList<Patient>;
-    if (!patientList) return nullptr;
-
     ifstream f(path);
     if (!f.is_open()) {
+        throw FileIOException(path, "Không thể mở tệp để đọc dữ liệu.");
+    }
+
+    LinkList<Patient> *patientList = nullptr;
+    try {
+        patientList = new LinkList<Patient>;
+        string tmp;
+        getline(f, tmp); // Bỏ qua tiêu đề
+        getline(f, tmp); // Bỏ qua dòng phân cách
+
+        while (f.peek() != EOF) {
+            Patient P(f);
+            if (P.isDefault())
+                break;
+            patientList->insert(P);
+        }
+        f.close();
+        return patientList;
+    } catch (...) {
         delete patientList;
-        return nullptr;
+        f.close();
+        throw;
     }
-
-    string tmp;
-    getline(f, tmp); // Bỏ qua tiêu đề
-    getline(f, tmp); // Bỏ qua dòng phân cách
-
-    while (true) {
-        Patient P(f);
-        if (P.isDefault())
-            break;
-        patientList->insert(P);
-    }
-    f.close();
-    return patientList;
 }
 
 bool Patient::saveToFile(const std::string &path, const LinkList<Patient> *list) {
@@ -143,8 +156,9 @@ bool Patient::saveToFile(const std::string &path, const LinkList<Patient> *list)
         return false;
 
     ofstream f(path);
-    if (!f.is_open())
-        return false;
+    if (!f.is_open()) {
+        throw FileIOException(path, "Không thể mở tệp để ghi dữ liệu.");
+    }
 
     f << "P_ID  | P_FullName              | P_Phone    | P_Gender | P_Age | P_CCCD\n";
     f << "------+-------------------------+------------+----------+-------+-------------\n";

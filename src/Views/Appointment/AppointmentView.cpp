@@ -64,7 +64,7 @@ QList<Appointment*> AppointmentView::getAppointmentsForDate(const QDate &targetD
 }
 
 void AppointmentView::highlightCalendarAppointments(QCalendarWidget *cal, int year, int month) {
-    if (!cal || !mainWindow || !mainWindow->getAppointments()) return;
+    if (!cal || !mainWindow || !mainWindow->getAppointments() || year < 1 || month < 1 || month > 12) return;
     int dayCount[32] = {0};
     AppointmentController::getMonthDayCounts(mainWindow->getAppointments(), year, month, dayCount);
 
@@ -929,7 +929,7 @@ public:
     qint64 lastWheelTime = 0;
 
     explicit YearSpinBox(QWidget *parent = nullptr) : QSpinBox(parent) {
-        setRange(0, 999999);
+        setRange(1, 9999);
         setButtonSymbols(QAbstractSpinBox::NoButtons);
         setAlignment(Qt::AlignCenter);
         setPrefix("Năm ");
@@ -978,7 +978,7 @@ public:
         if (delta > 0) {
             setValue(value() + step);
         } else {
-            setValue(qMax(0, value() - step));
+            setValue(qMax(1, value() - step));
         }
     }
 
@@ -1706,7 +1706,7 @@ QWidget *AppointmentView::createBookingWidget(QWidget *parent) {
     nextMonthBtn->installEventFilter(new MonthWheelFilter(monthCombo, nextMonthBtn));
 
     auto setComboYear = [yearSpin](int y) {
-        yearSpin->setValue(qMax(0, y));
+        yearSpin->setValue(qMax(1, y));
     };
 
     auto *todayBtn = new QPushButton("Hôm nay");
@@ -2176,7 +2176,14 @@ QWidget *AppointmentView::createBookingWidget(QWidget *parent) {
     connect(prevMonthBtn, &QPushButton::clicked, w, [=]() {
         int m = monthCombo->currentData().toInt();
         int y = yearSpin->value();
-        if (m == 1) { m = 12; y--; } else { m--; }
+        if (m == 1) {
+            if (y > 1) {
+                m = 12;
+                y--;
+            }
+        } else {
+            m--;
+        }
         setComboYear(y);
         monthCombo->setCurrentIndex(m - 1);
     });
@@ -2189,7 +2196,7 @@ QWidget *AppointmentView::createBookingWidget(QWidget *parent) {
     });
 
     connect(prevYearBtn, &QPushButton::clicked, w, [=]() {
-        yearSpin->setValue(qMax(0, yearSpin->value() - 1));
+        yearSpin->setValue(qMax(1, yearSpin->value() - 1));
     });
     connect(nextYearBtn, &QPushButton::clicked, w, [=]() {
         yearSpin->setValue(yearSpin->value() + 1);

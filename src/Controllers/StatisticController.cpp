@@ -1,6 +1,7 @@
 #include "StatisticController.h"
 #include "DoctorController.h"
 #include "libPBL2.h"
+#include "../Utils/AppExceptions.h"
 
 int StatisticController::patientCount(const LinkList<Patient> *items) {
     return items ? items->count : 0;
@@ -182,7 +183,12 @@ int StatisticController::getTopDoctors(const LinkList<Appointment> *appts, const
     if (totalDocs <= 0) return 0;
 
     // Allocate buffer for all doctors
-    DoctorLeaderboardItem *allItems = new DoctorLeaderboardItem[totalDocs];
+    DoctorLeaderboardItem *allItems = nullptr;
+    try {
+        allItems = new DoctorLeaderboardItem[totalDocs];
+    } catch (const std::bad_alloc &) {
+        throw MemoryAllocationException("Không đủ bộ nhớ để cấp phát mảng thống kê bác sĩ.");
+    }
     int idx = 0;
 
     auto *dn = docs->getHeader()->next;
@@ -238,7 +244,13 @@ int StatisticController::getSpecialtyDemand(const LinkList<Appointment> *appts, 
     if (!appts || !appts->getHeader() || !docs || maxCount <= 0) return 0;
 
     auto *docList = const_cast<LinkList<Doctor>*>(docs);
-    SpecialtyDemandItem items[20];
+    int cap = (docs->count > 0 ? docs->count : 20);
+    SpecialtyDemandItem *items = nullptr;
+    try {
+        items = new SpecialtyDemandItem[cap];
+    } catch (const std::bad_alloc &) {
+        throw MemoryAllocationException("Không đủ bộ nhớ để cấp phát mảng nhu cầu chuyên khoa.");
+    }
     int uniqueCount = 0;
 
     auto *an = appts->getHeader()->next;
@@ -256,7 +268,7 @@ int StatisticController::getSpecialtyDemand(const LinkList<Appointment> *appts, 
                 }
                 if (foundIdx >= 0) {
                     items[foundIdx].count++;
-                } else if (uniqueCount < 20) {
+                } else if (uniqueCount < cap) {
                     items[uniqueCount].spId = spId;
                     items[uniqueCount].count = 1;
                     uniqueCount++;
@@ -278,6 +290,7 @@ int StatisticController::getSpecialtyDemand(const LinkList<Appointment> *appts, 
     for (int i = 0; i < copyCount; ++i) {
         outList[i] = items[i];
     }
+    delete[] items;
     return copyCount;
 }
 

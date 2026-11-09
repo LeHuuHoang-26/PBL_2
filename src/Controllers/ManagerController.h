@@ -29,6 +29,7 @@ public:
     static std::string generateNextId(const LinkList<Manager> *managers);
     static QStringList getGrantedPermissions(const std::string &managerId, const std::string &filePath);
     static bool savePermissions(const std::string &managerId, const QList<PermissionRecord> &grantsForManager, const std::string &filePath);
+    static bool cleanExpiredPermissions(const std::string &filePath);
 };
 
 #endif // MANAGERCONTROLLER_H

@@ -88,3 +88,6 @@ test_auth_results.txt
 
 # Log files
 logs/
+
+AGENTS.md
+GEMINI.md

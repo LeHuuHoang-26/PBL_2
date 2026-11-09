@@ -1,5 +1,6 @@
 #include "Doctor.h"
 #include "libPBL2.h"
+#include "../Utils/AppExceptions.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -119,31 +120,43 @@ Doctor Doctor::loadFromString(const string &str) {
 }
 
 LinkList<Doctor>* Doctor::loadFromFile(const string &path) {
-    LinkList<Doctor> *doctorList = new LinkList<Doctor>;
-    if (!doctorList) return nullptr;
-
     ifstream f(path);
     if (!f.is_open()) {
-        delete doctorList;
-        return nullptr;
+        throw FileIOException(path, "Không thể mở tệp để đọc dữ liệu.");
     }
 
-    string tmp;
-    getline(f, tmp); // Bỏ qua tiêu đề
-    getline(f, tmp); // Bỏ qua dòng phân cách
+    LinkList<Doctor> *doctorList = nullptr;
+    try {
+        doctorList = new LinkList<Doctor>;
+        string tmp;
+        getline(f, tmp); // Bỏ qua tiêu đề
+        getline(f, tmp); // Bỏ qua dòng phân cách
 
-    string line;
-    while (getline(f, line)) {
-        libPBL2::trim(line);
-        if (line.empty()) continue;
-        Doctor doc = Doctor::loadFromString(line);
-        if (!doc.isDefault()) {
-            doctorList->insert(doc);
+        string line;
+        int lineNo = 2;
+        while (getline(f, line)) {
+            lineNo++;
+            libPBL2::trim(line);
+            if (line.empty()) continue;
+            try {
+                Doctor doc = Doctor::loadFromString(line);
+                if (!doc.isDefault()) {
+                    doctorList->insert(doc);
+                }
+            } catch (const AppException &) {
+                throw;
+            } catch (const std::exception &e) {
+                throw DataFormatException(path, lineNo, e.what());
+            }
         }
-    }
 
-    f.close();
-    return doctorList;
+        f.close();
+        return doctorList;
+    } catch (...) {
+        delete doctorList;
+        f.close();
+        throw;
+    }
 }
 
 bool Doctor::saveToFile(const string &path, const LinkList<Doctor> *list) {
@@ -151,8 +164,9 @@ bool Doctor::saveToFile(const string &path, const LinkList<Doctor> *list) {
         return false;
 
     ofstream f(path);
-    if (!f.is_open())
-        return false;
+    if (!f.is_open()) {
+        throw FileIOException(path, "Không thể mở tệp để ghi dữ liệu.");
+    }
 
     f << "D_ID   | D_FullName           | D_Phone    | D_Gender | D_Age | Sp_ID  | D_State | Room_ID  | Consultation_Fee | Rating\n";
     f << "-------+----------------------+------------+----------+-------+--------+---------+----------+------------------+-------\n";

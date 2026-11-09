@@ -90,11 +90,22 @@ bool ManagerController::hasPermission(const Manager *m, const std::string &permi
     std::string line;
     while (std::getline(input, line)) {
         std::stringstream row(line);
-        std::string id, permission;
+        std::string id, permission, expiry;
         if (!std::getline(row, id, '|') || !std::getline(row, permission, '|')) continue;
+        std::getline(row, expiry);
         libPBL2::trim(id);
         libPBL2::trim(permission);
-        if (id == m->getID() && permission == permissionId) return true;
+        libPBL2::trim(expiry);
+        if (id == m->getID() && permission == permissionId) {
+            if (!expiry.empty()) {
+                QDateTime parsed = QDateTime::fromString(QString::fromUtf8(expiry.c_str()), Qt::ISODate);
+                if (!parsed.isValid()) parsed = QDateTime::fromString(QString::fromUtf8(expiry.c_str()), "yyyy-MM-dd HH:mm:ss");
+                if (parsed.isValid() && parsed <= QDateTime::currentDateTime()) {
+                    return false;
+                }
+            }
+            return true;
+        }
     }
     return false;
 }
@@ -126,15 +137,64 @@ QStringList ManagerController::getGrantedPermissions(const std::string &managerI
     std::string line;
     while (std::getline(input, line)) {
         std::stringstream row(line);
-        std::string id, permission;
+        std::string id, permission, expiry;
         if (!std::getline(row, id, '|') || !std::getline(row, permission, '|')) continue;
+        std::getline(row, expiry);
         libPBL2::trim(id);
         libPBL2::trim(permission);
+        libPBL2::trim(expiry);
         if (id == managerId) {
+            if (!expiry.empty()) {
+                QDateTime parsed = QDateTime::fromString(QString::fromUtf8(expiry.c_str()), Qt::ISODate);
+                if (!parsed.isValid()) parsed = QDateTime::fromString(QString::fromUtf8(expiry.c_str()), "yyyy-MM-dd HH:mm:ss");
+                if (parsed.isValid() && parsed <= QDateTime::currentDateTime()) {
+                    continue; // Hết hạn -> bỏ qua
+                }
+            }
             granted.append(QString::fromUtf8(permission.c_str()));
         }
     }
     return granted;
+}
+
+bool ManagerController::cleanExpiredPermissions(const std::string &filePath) {
+    std::ifstream input(filePath);
+    if (!input.is_open()) return false;
+
+    QList<PermissionRecord> activeList;
+    std::string line;
+    bool hasExpired = false;
+    while (std::getline(input, line)) {
+        std::stringstream row(line);
+        std::string id, permission, expiry;
+        if (!std::getline(row, id, '|') || !std::getline(row, permission, '|')) continue;
+        std::getline(row, expiry);
+        libPBL2::trim(id);
+        libPBL2::trim(permission);
+        libPBL2::trim(expiry);
+        if (id.empty() || id == "MA_ID" || id.find('-') != std::string::npos) continue;
+
+        if (!expiry.empty()) {
+            QDateTime parsed = QDateTime::fromString(QString::fromUtf8(expiry.c_str()), Qt::ISODate);
+            if (!parsed.isValid()) parsed = QDateTime::fromString(QString::fromUtf8(expiry.c_str()), "yyyy-MM-dd HH:mm:ss");
+            if (parsed.isValid() && parsed <= QDateTime::currentDateTime()) {
+                hasExpired = true;
+                continue;
+            }
+        }
+        activeList.append({id, permission, expiry});
+    }
+    input.close();
+
+    if (hasExpired) {
+        std::ofstream output(filePath);
+        if (!output.is_open()) return false;
+        output << "MA_ID | Per_ID | Expires_At\n-------+--------+--------------------\n";
+        for (const auto &entry : activeList) {
+            output << entry.id << " | " << entry.permission << " | " << entry.expiry << "\n";
+        }
+    }
+    return true;
 }
 
 bool ManagerController::savePermissions(const std::string &managerId, const QList<PermissionRecord> &grantsForManager, const std::string &filePath) {

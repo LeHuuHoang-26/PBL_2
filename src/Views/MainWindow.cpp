@@ -7,6 +7,7 @@
 #include "StatisticView.h"
 #include "Login.h"
 #include "UIHelper.h"
+#include "AppExceptions.h"
 
 #include "AppointmentController.h"
 #include "DoctorController.h"
@@ -901,82 +902,93 @@ void MainWindow::saveAll(SaveScope scope, SaveAction action)
 {
     bool ok = true;
 
-    // 1. Bệnh nhân & Triệu chứng
-    if (scope == SaveScope::All || scope == SaveScope::Patient)
-    {
-        if (patients) libPBL2::sortPatients(patients, libPBL2::PatientSortBy::ID, true);
-        if (symptomPatients)
+    try {
+        // 1. Bệnh nhân & Triệu chứng
+        if (scope == SaveScope::All || scope == SaveScope::Patient)
         {
-            libPBL2::qsort(symptomPatients, [](const SymptomPatient &a, const SymptomPatient &b) {
-                return a.getSP_id() < b.getSP_id();
-            });
-            ok = SymptomPatient::saveToFile(symptomPatientPath, symptomPatients) && ok;
-        }
-        if (symptomPatientDetails)
-        {
-            libPBL2::qsort(symptomPatientDetails, [](const SymptomPatientDetail &a, const SymptomPatientDetail &b) {
-                if (a.getSP_id() != b.getSP_id()) return a.getSP_id() < b.getSP_id();
-                return a.getS_id() < b.getS_id();
-            });
-            ok = SymptomPatientDetail::saveToFile(symptomPatientDetailPath, symptomPatientDetails) && ok;
-        }
-        ok = Patient::saveToFile(patientPath, patients) && ok;
+            if (patients) libPBL2::sortPatients(patients, libPBL2::PatientSortBy::ID, true);
+            if (symptomPatients)
+            {
+                libPBL2::qsort(symptomPatients, [](const SymptomPatient &a, const SymptomPatient &b) {
+                    return a.getSP_id() < b.getSP_id();
+                });
+                ok = SymptomPatient::saveToFile(symptomPatientPath, symptomPatients) && ok;
+            }
+            if (symptomPatientDetails)
+            {
+                libPBL2::qsort(symptomPatientDetails, [](const SymptomPatientDetail &a, const SymptomPatientDetail &b) {
+                    if (a.getSP_id() != b.getSP_id()) return a.getSP_id() < b.getSP_id();
+                    return a.getS_id() < b.getS_id();
+                });
+                ok = SymptomPatientDetail::saveToFile(symptomPatientDetailPath, symptomPatientDetails) && ok;
+            }
+            ok = Patient::saveToFile(patientPath, patients) && ok;
 
-        if (action == SaveAction::Normal && patientView)
-        {
-            patientView->reapplyCurrentSort();
+            if (action == SaveAction::Normal && patientView)
+            {
+                patientView->reapplyCurrentSort();
+            }
         }
-    }
 
-    // 2. Bác sĩ
-    if (scope == SaveScope::All || scope == SaveScope::Doctor)
-    {
-        if (doctors) libPBL2::sortDoctors(doctors, libPBL2::DoctorSortBy::ID, true);
-        ok = Doctor::saveToFile(doctorPath, doctors) && ok;
-
-        if (action == SaveAction::Normal && doctorView)
+        // 2. Bác sĩ
+        if (scope == SaveScope::All || scope == SaveScope::Doctor)
         {
-            doctorView->reapplyCurrentSort();
-        }
-    }
+            if (doctors) libPBL2::sortDoctors(doctors, libPBL2::DoctorSortBy::ID, true);
+            ok = Doctor::saveToFile(doctorPath, doctors) && ok;
 
-    // 3. Lịch hẹn (+ Triệu chứng nếu có)
-    if (scope == SaveScope::All || scope == SaveScope::Appointment)
-    {
-        if (appointments) libPBL2::sortAppointments(appointments, libPBL2::AppointmentSortBy::ID, true);
-        if (symptomPatients && scope == SaveScope::Appointment)
-        {
-            libPBL2::qsort(symptomPatients, [](const SymptomPatient &a, const SymptomPatient &b) {
-                return a.getSP_id() < b.getSP_id();
-            });
-            ok = SymptomPatient::saveToFile(symptomPatientPath, symptomPatients) && ok;
+            if (action == SaveAction::Normal && doctorView)
+            {
+                doctorView->reapplyCurrentSort();
+            }
         }
-        if (symptomPatientDetails && scope == SaveScope::Appointment)
-        {
-            libPBL2::qsort(symptomPatientDetails, [](const SymptomPatientDetail &a, const SymptomPatientDetail &b) {
-                if (a.getSP_id() != b.getSP_id()) return a.getSP_id() < b.getSP_id();
-                return a.getS_id() < b.getS_id();
-            });
-            ok = SymptomPatientDetail::saveToFile(symptomPatientDetailPath, symptomPatientDetails) && ok;
-        }
-        ok = Appointment::saveToFile(appointmentPath, appointments) && ok;
 
-        if (action == SaveAction::Normal && appointmentView)
+        // 3. Lịch hẹn (+ Triệu chứng nếu có)
+        if (scope == SaveScope::All || scope == SaveScope::Appointment)
         {
-            appointmentView->reapplyCurrentSort();
+            if (appointments) libPBL2::sortAppointments(appointments, libPBL2::AppointmentSortBy::ID, true);
+            if (symptomPatients && scope == SaveScope::Appointment)
+            {
+                libPBL2::qsort(symptomPatients, [](const SymptomPatient &a, const SymptomPatient &b) {
+                    return a.getSP_id() < b.getSP_id();
+                });
+                ok = SymptomPatient::saveToFile(symptomPatientPath, symptomPatients) && ok;
+            }
+            if (symptomPatientDetails && scope == SaveScope::Appointment)
+            {
+                libPBL2::qsort(symptomPatientDetails, [](const SymptomPatientDetail &a, const SymptomPatientDetail &b) {
+                    if (a.getSP_id() != b.getSP_id()) return a.getSP_id() < b.getSP_id();
+                    return a.getS_id() < b.getS_id();
+                });
+                ok = SymptomPatientDetail::saveToFile(symptomPatientDetailPath, symptomPatientDetails) && ok;
+            }
+            ok = Appointment::saveToFile(appointmentPath, appointments) && ok;
+
+            if (action == SaveAction::Normal && appointmentView)
+            {
+                appointmentView->reapplyCurrentSort();
+            }
         }
-    }
 
-    // 4. Quản lý tài khoản
-    if (scope == SaveScope::All || scope == SaveScope::Account)
-    {
-        if (managers) libPBL2::sortManagers(managers, libPBL2::AccountSortBy::ID, true);
-        ok = Manager::saveToFile(managerPath, managers) && ok;
-
-        if (action == SaveAction::Normal && accountView)
+        // 4. Quản lý tài khoản
+        if (scope == SaveScope::All || scope == SaveScope::Account)
         {
-            accountView->reapplyCurrentSort();
+            if (managers) libPBL2::sortManagers(managers, libPBL2::AccountSortBy::ID, true);
+            ok = Manager::saveToFile(managerPath, managers) && ok;
+
+            if (action == SaveAction::Normal && accountView)
+            {
+                accountView->reapplyCurrentSort();
+            }
         }
+    } catch (const FileIOException &e) {
+        ok = false;
+        UIHelper::showWarning(this, "Lỗi ghi tệp dữ liệu", QString::fromUtf8(e.what()));
+    } catch (const AppException &e) {
+        ok = false;
+        UIHelper::showWarning(this, "Lỗi hệ thống", QString::fromUtf8(e.what()));
+    } catch (const std::exception &e) {
+        ok = false;
+        UIHelper::showWarning(this, "Lỗi ngoại lệ", QString("Đã xảy ra ngoại lệ khi lưu: %1").arg(e.what()));
     }
 
     if (!ok)
@@ -1023,14 +1035,34 @@ MainWindow::~MainWindow()
 
 bool MainWindow::initApp()
 {
-    // Nạp dữ liệu từ các file
-    managers = Manager::loadFromFile(managerPath);
-    patients = Patient::loadFromFile(patientPath);
-    doctors = Doctor::loadFromFile(doctorPath);
-    symptoms = Symptom::loadFromFile(symptomPath);
-    symptomPatients = SymptomPatient::loadFromFile(symptomPatientPath);
-    symptomPatientDetails = SymptomPatientDetail::loadFromFile(symptomPatientDetailPath);
-    appointments = Appointment::loadFromFile(appointmentPath);
+    // Dọn dẹp các quyền đã hết hạn trong file phân quyền
+    ManagerController::cleanExpiredPermissions(permissionManagerPath);
+
+    try {
+        // Nạp dữ liệu từ các file
+        managers = Manager::loadFromFile(managerPath);
+        patients = Patient::loadFromFile(patientPath);
+        doctors = Doctor::loadFromFile(doctorPath);
+        symptoms = Symptom::loadFromFile(symptomPath);
+        symptomPatients = SymptomPatient::loadFromFile(symptomPatientPath);
+        symptomPatientDetails = SymptomPatientDetail::loadFromFile(symptomPatientDetailPath);
+        appointments = Appointment::loadFromFile(appointmentPath);
+    } catch (const FileIOException &e) {
+        UIHelper::showWarning(this, "Lỗi tệp dữ liệu", QString::fromUtf8(e.what()) + "\nVui lòng kiểm tra lại thư mục Data/.");
+        return false;
+    } catch (const DataFormatException &e) {
+        UIHelper::showWarning(this, "Lỗi định dạng dữ liệu", QString::fromUtf8(e.what()));
+        return false;
+    } catch (const MemoryAllocationException &e) {
+        UIHelper::showWarning(this, "Lỗi bộ nhớ", QString::fromUtf8(e.what()));
+        return false;
+    } catch (const AppException &e) {
+        UIHelper::showWarning(this, "Lỗi nạp dữ liệu", QString::fromUtf8(e.what()));
+        return false;
+    } catch (const std::exception &e) {
+        UIHelper::showWarning(this, "Lỗi ngoại lệ hệ thống", QString("Đã xảy ra ngoại lệ: %1").arg(e.what()));
+        return false;
+    }
 
     bool ok = managers && patients && doctors && symptoms && symptomPatients && symptomPatientDetails && appointments;
     if (!ok)

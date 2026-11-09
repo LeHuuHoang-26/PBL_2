@@ -4,6 +4,7 @@
 #include <sstream>
 #include <iomanip>
 #include "libPBL2.h"
+#include "../Utils/AppExceptions.h"
 
 using namespace std;
 
@@ -39,7 +40,11 @@ Symptom::Symptom(std::ifstream &f) {
         setDefault();
         return;
     }
-    sScore = stoi(tmp);
+    try {
+        sScore = stoi(tmp);
+    } catch (...) {
+        sScore = 0;
+    }
 }
 
 Symptom::Symptom(std::string S_id, std::string sName, std::string Sp_id, int sScore)
@@ -94,33 +99,40 @@ Symptom Symptom::loadFromString(const string &str) {
     libPBL2::trim(scoreStr);
 
     if (sId.empty()) return Symptom();
-    int sc = (!scoreStr.empty() ? stoi(scoreStr) : 0);
+    int sc = 0;
+    try {
+        if (!scoreStr.empty()) sc = stoi(scoreStr);
+    } catch (...) {}
 
     return Symptom(sId, name, spId, sc);
 }
 
 LinkList<Symptom>* Symptom::loadFromFile(const string &path) {
-    LinkList<Symptom> *symptomList = new LinkList<Symptom>;
-    if (!symptomList) return nullptr;
-
     ifstream f(path);
     if (!f.is_open()) {
+        throw FileIOException(path, "Không thể mở tệp để đọc dữ liệu.");
+    }
+
+    LinkList<Symptom> *symptomList = nullptr;
+    try {
+        symptomList = new LinkList<Symptom>;
+        string tmp;
+        getline(f, tmp); // Bỏ qua tiêu đề
+        getline(f, tmp); // Bỏ qua dòng phân cách
+
+        while (f.peek() != EOF) {
+            Symptom S(f);
+            if (S.isDefault())
+                break;
+            symptomList->insert(S);
+        }
+        f.close();
+        return symptomList;
+    } catch (...) {
         delete symptomList;
-        return nullptr;
+        f.close();
+        throw;
     }
-
-    string tmp;
-    getline(f, tmp); // Bỏ qua tiêu đề
-    getline(f, tmp); // Bỏ qua dòng phân cách
-
-    while (true) {
-        Symptom S(f);
-        if (S.isDefault())
-            break;
-        symptomList->insert(S);
-    }
-    f.close();
-    return symptomList;
 }
 
 bool Symptom::saveToFile(const string &path, const LinkList<Symptom> *list) {
@@ -128,8 +140,9 @@ bool Symptom::saveToFile(const string &path, const LinkList<Symptom> *list) {
         return false;
 
     ofstream f(path);
-    if (!f.is_open())
-        return false;
+    if (!f.is_open()) {
+        throw FileIOException(path, "Không thể mở tệp để ghi dữ liệu.");
+    }
 
     f << "S_ID  | S_Name              | Sp_ID  | S_Score\n";
     f << "------+---------------------+--------+--------\n";

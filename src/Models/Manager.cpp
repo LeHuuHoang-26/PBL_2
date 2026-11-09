@@ -1,6 +1,7 @@
 #include "Manager.h"
 #include "Human.h"
 #include "libPBL2.h"
+#include "../Utils/AppExceptions.h"
 #include <string>
 #include <fstream>
 #include <sstream>
@@ -36,13 +37,21 @@ Manager::Manager(ifstream &f) {
         this->setDefault();
         return;
     }
-    gender = stoi(tmp);
+    try {
+        gender = stoi(tmp);
+    } catch (...) {
+        gender = true;
+    }
 
     if (!getline(f, tmp, '|')) {
         this->setDefault();
         return;
     }
-    age = stoi(tmp);
+    try {
+        age = stoi(tmp);
+    } catch (...) {
+        age = 0;
+    }
 
     if (!getline(f, username, '|')) {
         this->setDefault();
@@ -68,7 +77,11 @@ Manager::Manager(ifstream &f) {
         return;
     }
     libPBL2::trim(tmp);
-    state = stoi(tmp);
+    try {
+        state = stoi(tmp);
+    } catch (...) {
+        state = 1;
+    }
 }
 
 Manager::Manager(string id, string fullName, string phone, bool gender, int age, string username, string password, ManagerRole role, int state)
@@ -76,7 +89,6 @@ Manager::Manager(string id, string fullName, string phone, bool gender, int age,
 
 Manager::Manager(const Manager &M)
     : Human(M.id, M.fullName, M.phone, M.gender, M.age), username(M.username), password(M.password), role(M.role), state(M.state) {}
-
 
 ManagerRole Manager::getRole() const { return role; }
 string Manager::getUsername() const { return username; }
@@ -197,35 +209,45 @@ Manager Manager::loadFromString(const string &str) {
     if (id.empty()) return Manager();
 
     bool gender = (genderStr == "1");
-    int age = (!ageStr.empty() ? stoi(ageStr) : 0);
+    int age = 0;
+    try {
+        if (!ageStr.empty()) age = stoi(ageStr);
+    } catch (...) {}
     ManagerRole r = roleFromString(roleStr);
-    int st = (!stateStr.empty() ? stoi(stateStr) : 0);
+    int st = 1;
+    try {
+        if (!stateStr.empty()) st = stoi(stateStr);
+    } catch (...) {}
 
     return Manager(id, fullName, phone, gender, age, un, pw, r, st);
 }
 
 LinkList<Manager>* Manager::loadFromFile(const string &path) {
-    LinkList<Manager> *ManagerList = new LinkList<Manager>;
-    if (!ManagerList) return nullptr;
-
     ifstream f(path);
     if (!f.is_open()) {
+        throw FileIOException(path, "Không thể mở tệp để đọc dữ liệu.");
+    }
+
+    LinkList<Manager> *ManagerList = nullptr;
+    try {
+        ManagerList = new LinkList<Manager>;
+        string tmp;
+        getline(f, tmp); // Bỏ qua tiêu đề
+        getline(f, tmp); // Bỏ qua dòng phân cách
+
+        while (f.peek() != EOF) {
+            Manager M(f);
+            if (M.isDefault())
+                break;
+            ManagerList->insert(M);
+        }
+        f.close();
+        return ManagerList;
+    } catch (...) {
         delete ManagerList;
-        return nullptr;
+        f.close();
+        throw;
     }
-
-    string tmp;
-    getline(f, tmp); // Bỏ qua tiêu đề
-    getline(f, tmp); // Bỏ qua dòng phân cách
-
-    while (true) {
-        Manager M(f);
-        if (M.isDefault())
-            break;
-        ManagerList->insert(M);
-    }
-    f.close();
-    return ManagerList;
 }
 
 bool Manager::saveToFile(const string &path, const LinkList<Manager> *list) {
@@ -233,8 +255,9 @@ bool Manager::saveToFile(const string &path, const LinkList<Manager> *list) {
         return false;
 
     ofstream f(path);
-    if (!f.is_open())
-        return false;
+    if (!f.is_open()) {
+        throw FileIOException(path, "Không thể mở tệp để ghi dữ liệu.");
+    }
 
     f << "MA_ID  | MA_FullName        | MA_Phone   | MA_Gender | MA_Age    | MA_UserName          | MA_Password       | MA_Role | MA_State\n";
     f << "-------+--------------------+------------+-----------+-----------+----------------------+-------------------+---------+---------\n";
