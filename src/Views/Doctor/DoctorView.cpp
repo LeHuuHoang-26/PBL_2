@@ -303,31 +303,32 @@ void DoctorView::refresh(bool preserveScroll) {
                 return;
             }
             QString name = UIHelper::qs(d->getfullName());
-            if (!UIHelper::confirmDelete(this, "Xác nhận xóa bác sĩ",
-                QStringLiteral("Bạn có chắc chắn muốn xóa bác sĩ \"%1\" khỏi hệ thống?\nThông tin bác sĩ sau khi xóa sẽ được loại bỏ khỏi danh sách.").arg(name),
-                "Xóa bác sĩ", "Không xóa")) {
-                return;
-            }
-
             std::string did = d->getID();
+
+            // Khóa cứng: Kiểm tra nếu bác sĩ còn ca khám chưa hoàn tất (chưa khám)
             auto *appointments = mainWindow->getAppointments();
-            bool hasUpcoming = false;
+            int upcomingCount = 0;
             if (appointments) {
                 auto *an = appointments->getHeader()->next;
                 while (an && an->next) {
                     if (an->info.getDoctorId() == did && an->info.getState() == 0) {
-                        hasUpcoming = true;
-                        break;
+                        upcomingCount++;
                     }
                     an = an->next;
                 }
             }
-            if (hasUpcoming) {
-                if (!UIHelper::confirmWarning(this, "Cảnh báo lịch khám phụ trách",
-                    QStringLiteral("Bác sĩ \"%1\" hiện vẫn còn lịch hẹn chưa khám phụ trách.\nBạn vẫn muốn tiếp tục xóa bác sĩ này khỏi hệ thống?").arg(name),
-                    "Vẫn tiếp tục xóa", "Quay lại")) {
-                    return;
-                }
+
+            if (upcomingCount > 0) {
+                UIHelper::showWarning(this, "Không thể xóa bác sĩ",
+                    QStringLiteral("Bác sĩ \"%1\" hiện vẫn còn %2 lịch hẹn chưa khám phụ trách.\nVui lòng hoàn tất, hủy hoặc chuyển bác sĩ phụ trách các lịch hẹn này trước khi xóa.")
+                        .arg(name).arg(upcomingCount));
+                return;
+            }
+
+            if (!UIHelper::confirmDelete(this, "Xác nhận xóa bác sĩ",
+                QStringLiteral("Bạn có chắc chắn muốn xóa bác sĩ \"%1\" khỏi hệ thống?\nThông tin bác sĩ sau khi xóa sẽ được loại bỏ khỏi danh sách.").arg(name),
+                "Xóa bác sĩ", "Không xóa")) {
+                return;
             }
 
             auto *doctors = mainWindow->getDoctors();
