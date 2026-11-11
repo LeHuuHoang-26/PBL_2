@@ -8,7 +8,7 @@
 
 using namespace std;
 
-Doctor::Doctor(string _id, string _fullName, string _phone, bool _gender, int _age, string _spId, bool _state, string _roomId, double _fee, double _rating)
+Doctor::Doctor(string _id, string _fullName, string _phone, bool _gender, int _age, string _spId, int _state, string _roomId, double _fee, double _rating)
     : Human(_id, _fullName, _phone, _gender, _age), spId(_spId), state(_state), roomId(_roomId), fee(_fee), rating(_rating) {}
 
 bool Doctor::isDefault() const {
@@ -22,20 +22,20 @@ void Doctor::setDefault() {
     gender = true;
     age = 0;
     spId = "";
-    state = true;
+    state = 1;
     roomId = "";
     fee = 0.0;
     rating = 5.0;
 }
 
 string Doctor::getSpId() const { return spId; }
-bool Doctor::getState() const { return state; }
+int Doctor::getState() const { return state; }
 string Doctor::getRoomId() const { return roomId; }
 double Doctor::getFee() const { return fee; }
 double Doctor::getRating() const { return rating; }
 
 void Doctor::setSpId(string _spId) { this->spId = _spId; }
-void Doctor::setState(bool _state) { this->state = _state; }
+void Doctor::setState(int _state) { this->state = _state; }
 void Doctor::setRoomId(string _roomId) { this->roomId = _roomId; }
 void Doctor::setFee(double _fee) { this->fee = _fee; }
 void Doctor::setRating(double _rating) { this->rating = _rating; }
@@ -48,7 +48,7 @@ string Doctor::toString() const {
         << libPBL2::padRightUtf8(gender ? "1" : "0", 8) << " | "
         << libPBL2::padRightUtf8(to_string(age), 5) << " | "
         << libPBL2::padRightUtf8(spId, 6) << " | "
-        << libPBL2::padRightUtf8(state ? "1" : "0", 7) << " | "
+        << libPBL2::padRightUtf8(to_string(state), 7) << " | "
         << libPBL2::padRightUtf8(roomId, 8) << " | "
         << libPBL2::padRightUtf8([&]() {
             ostringstream fss;
@@ -101,7 +101,10 @@ Doctor Doctor::loadFromString(const string &str) {
         if (!ageStr.empty()) age = stoi(ageStr);
     } catch (...) {}
 
-    bool state = (stateStr == "1");
+    int state = 1;
+    try {
+        if (!stateStr.empty()) state = stoi(stateStr);
+    } catch (...) {}
 
     double fee = 0.0;
     try {

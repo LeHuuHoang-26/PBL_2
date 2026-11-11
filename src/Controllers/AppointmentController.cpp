@@ -48,7 +48,7 @@ QList<Appointment*> AppointmentController::getAppointmentsForDate(const LinkList
 
     auto *n = appointments->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.isDefault()) {
+        if (!n->info.isDefault() && n->info.getState() != -2) {
             Date d = n->info.getDateGet();
             if (d.getYear() == targetDate.year() &&
                 d.getMonth() == targetDate.month() &&
@@ -70,7 +70,7 @@ QList<Appointment*> AppointmentController::getUpcomingAppointments(const LinkLis
 
     auto *n = appointments->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.isDefault()) {
+        if (!n->info.isDefault() && n->info.getState() != -2) {
             Date d = n->info.getDateGet();
             QDate appDay(d.getYear(), d.getMonth(), d.getDay());
             QTime appTime(d.getHour(), d.getMinute());
@@ -95,7 +95,7 @@ void AppointmentController::getMonthDayCounts(const LinkList<Appointment> *appoi
 
     auto *n = appointments->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.isDefault()) {
+        if (!n->info.isDefault() && n->info.getState() != -2) {
             Date d = n->info.getDateGet();
             if (d.getYear() == year && d.getMonth() == month) {
                 int day = d.getDay();
@@ -226,7 +226,7 @@ bool AppointmentController::isSlotBooked(const LinkList<Appointment> *appointmen
     }
     auto *n = appointments->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.isDefault()) {
+        if (!n->info.isDefault() && n->info.getState() != -2) {
             if (!excludeApptId.empty() && n->info.getId() == excludeApptId) {
                 n = n->next;
                 continue;

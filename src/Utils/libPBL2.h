@@ -65,6 +65,7 @@ namespace libPBL2 {
     inline std::string extractLastName(const std::string &fullName);
     inline int compareVietnameseNames(const std::string &name1, const std::string &name2);
     inline int compareDates(const Date &da, const Date &db);
+    inline int extractRoomNumber(const std::string &roomStr);
 
     // -------------------------------------------------------------
     // Patient Sorting

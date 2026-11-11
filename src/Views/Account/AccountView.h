@@ -32,8 +32,8 @@ private:
     QPushButton *nextBtn = nullptr;
 
     int currentPage = 0;
-    int sortColumn = -1;
-    bool sortAscending = true;
+    int sortColumn = 2;
+    bool sortAscending = false;
     static const int PAGE_SIZE = 8;
 
     void setupUI();

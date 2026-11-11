@@ -89,25 +89,29 @@ void MainWindow::resetTabOrderToId(int tabIndex)
     case 2:
         if (patients)
         {
-            libPBL2::sortPatients(patients, libPBL2::PatientSortBy::ID, true);
+            libPBL2::sortPatients(patients, libPBL2::PatientSortBy::ID, false);
         }
         break;
     case 3:
         if (doctors)
         {
-            libPBL2::sortDoctors(doctors, libPBL2::DoctorSortBy::ID, true);
+            libPBL2::sortDoctors(doctors, libPBL2::DoctorSortBy::ID, false);
         }
         break;
     case 4:
         if (appointments)
         {
-            libPBL2::sortAppointments(appointments, libPBL2::AppointmentSortBy::ID, true);
+            libPBL2::sortAppointments(appointments, libPBL2::AppointmentSortBy::ID, false);
+        }
+        if (appointmentView)
+        {
+            appointmentView->resetToFirstPage();
         }
         break;
     case 6:
         if (managers)
         {
-            libPBL2::sortManagers(managers, libPBL2::AccountSortBy::ID, true);
+            libPBL2::sortManagers(managers, libPBL2::AccountSortBy::ID, false);
         }
         break;
     default:
@@ -875,6 +879,7 @@ void MainWindow::refreshPage(int index)
     case 4:
         if (appointmentView)
         {
+            appointmentView->resetToFirstPage();
             QWidget *old = pages->widget(4);
             pages->removeWidget(old);
             if (old) old->deleteLater();
@@ -1071,11 +1076,11 @@ bool MainWindow::initApp()
         return false;
     }
 
-    // Sắp xếp mặc định ban đầu theo ID tăng dần
-    if (patients) libPBL2::sortPatients(patients, libPBL2::PatientSortBy::ID, true);
-    if (doctors) libPBL2::sortDoctors(doctors, libPBL2::DoctorSortBy::ID, true);
-    if (appointments) libPBL2::sortAppointments(appointments, libPBL2::AppointmentSortBy::ID, true);
-    if (managers) libPBL2::sortManagers(managers, libPBL2::AccountSortBy::ID, true);
+    // Sắp xếp mặc định ban đầu: Bệnh nhân/Bác sĩ/Lịch khám/Tài khoản theo ID giảm dần
+    if (patients) libPBL2::sortPatients(patients, libPBL2::PatientSortBy::ID, false);
+    if (doctors) libPBL2::sortDoctors(doctors, libPBL2::DoctorSortBy::ID, false);
+    if (appointments) libPBL2::sortAppointments(appointments, libPBL2::AppointmentSortBy::ID, false);
+    if (managers) libPBL2::sortManagers(managers, libPBL2::AccountSortBy::ID, false);
     if (symptomPatients) {
         libPBL2::qsort(symptomPatients, [](const SymptomPatient &a, const SymptomPatient &b) {
             return a.getSP_id() < b.getSP_id();

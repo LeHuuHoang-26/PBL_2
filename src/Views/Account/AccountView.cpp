@@ -74,12 +74,21 @@ static QIcon createEyeIcon(bool isVisible) {
 
 AccountView::AccountView(MainWindow *mainWindow, QWidget *parent)
     : QWidget(parent), mainWindow(mainWindow) {
+    if (mainWindow && mainWindow->getManagers()) {
+        libPBL2::sortManagers(mainWindow->getManagers(), libPBL2::AccountSortBy::ID, false);
+    }
+    sortColumn = -1;
+    sortAscending = false;
     setupUI();
     refresh(false);
 }
 
 void AccountView::reapplyCurrentSort() {
-    if (sortColumn < 0 || !mainWindow || !mainWindow->getManagers()) return;
+    if (!mainWindow || !mainWindow->getManagers()) return;
+    if (sortColumn < 0) {
+        libPBL2::sortManagers(mainWindow->getManagers(), libPBL2::AccountSortBy::ID, false);
+        return;
+    }
     libPBL2::AccountSortBy criteria = libPBL2::AccountSortBy::Name;
     switch (sortColumn) {
         case 0: criteria = libPBL2::AccountSortBy::Name; break;
@@ -93,14 +102,20 @@ void AccountView::reapplyCurrentSort() {
 
 void AccountView::resetToFirstPage() {
     sortColumn = -1;
-    sortAscending = true;
+    sortAscending = false;
+    if (mainWindow && mainWindow->getManagers()) {
+        libPBL2::sortManagers(mainWindow->getManagers(), libPBL2::AccountSortBy::ID, false);
+    }
     currentPage = 0;
     refresh(false);
 }
 
 void AccountView::showEvent(QShowEvent *event) {
     sortColumn = -1;
-    sortAscending = true;
+    sortAscending = false;
+    if (mainWindow && mainWindow->getManagers()) {
+        libPBL2::sortManagers(mainWindow->getManagers(), libPBL2::AccountSortBy::ID, false);
+    }
     QWidget::showEvent(event);
     currentPage = 0;
     refresh(false);

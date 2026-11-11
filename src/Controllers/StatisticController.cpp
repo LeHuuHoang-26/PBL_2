@@ -8,11 +8,25 @@ int StatisticController::patientCount(const LinkList<Patient> *items) {
 }
 
 int StatisticController::doctorCount(const LinkList<Doctor> *items) {
-    return items ? items->count : 0;
+    if (!items || !items->getHeader()) return 0;
+    int c = 0;
+    auto *n = items->getHeader()->next;
+    while (n && n->next) {
+        if (!n->info.isDefault() && n->info.getState() != -1) c++;
+        n = n->next;
+    }
+    return c;
 }
 
 int StatisticController::appointmentCount(const LinkList<Appointment> *items) {
-    return items ? items->count : 0;
+    if (!items || !items->getHeader()) return 0;
+    int c = 0;
+    auto *n = items->getHeader()->next;
+    while (n && n->next) {
+        if (!n->info.isDefault() && n->info.getState() != -2) c++;
+        n = n->next;
+    }
+    return c;
 }
 
 int StatisticController::pendingAppointmentCount(const LinkList<Appointment> *items) {
@@ -129,7 +143,7 @@ void StatisticController::todayAppointmentCounts(const LinkList<Appointment> *ap
 
     auto *n = appts->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.isDefault()) {
+        if (!n->info.isDefault() && n->info.getState() != -2) {
             Date dt = n->info.getDateGet();
             if (dt.getDay() == day && dt.getMonth() == month && dt.getYear() == year) {
                 totalToday++;

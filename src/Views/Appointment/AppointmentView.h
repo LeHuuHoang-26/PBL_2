@@ -31,11 +31,12 @@ public:
     void highlightCalendarAppointments(QCalendarWidget *cal, int year, int month);
     QList<Appointment*> getAppointmentsForDate(const QDate &targetDate) const;
     void reapplyCurrentSort();
+    void resetToFirstPage();
 
 private:
     MainWindow *mainWindow = nullptr;
     int listSortColumn = -1;
-    bool listSortAscending = true;
+    bool listSortAscending = false;
     int listCurrentPage = 0;
 };
 

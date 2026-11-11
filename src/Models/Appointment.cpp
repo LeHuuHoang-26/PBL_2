@@ -27,6 +27,7 @@ void Appointment::setState(int value) { state = value; }
 
 string Appointment::stateToString(int s) {
     switch (s) {
+        case -2: return "Dời lịch";
         case 1: return "Đã khám";
         case -1: return "Trễ hẹn";
         case 0:
@@ -35,6 +36,7 @@ string Appointment::stateToString(int s) {
 }
 
 int Appointment::stringToState(const string &str) {
+    if (str == "-2" || str == "Dời lịch" || str == "Rescheduled") return -2;
     if (str == "1" || str == "Đã khám" || str == "Completed") return 1;
     if (str == "-1" || str == "Trễ hẹn" || str == "Delayed") return -1;
     return 0; // Chưa khám
@@ -45,6 +47,7 @@ string Appointment::getStateString() const {
 }
 
 int Appointment::computeEffectiveState(int curDay, int curMonth, int curYear, int curHour, int curMin) const {
+    if (state == -2) return -2; // Dời lịch
     if (state == 1) return 1;   // Đã khám
     if (state == -1) return -1; // Trễ hẹn
 

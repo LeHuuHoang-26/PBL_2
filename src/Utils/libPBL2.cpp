@@ -263,6 +263,20 @@ inline int compareDates(const Date &da, const Date &db) {
     return 0;
 }
 
+inline int extractRoomNumber(const string &roomStr) {
+    int num = 0;
+    bool found = false;
+    for (char c : roomStr) {
+        if (isdigit(static_cast<unsigned char>(c))) {
+            num = num * 10 + (c - '0');
+            found = true;
+        } else if (found) {
+            break;
+        }
+    }
+    return found ? num : -1;
+}
+
 // -------------------------------------------------------------
 // Model Sorting Implementations
 // -------------------------------------------------------------
@@ -318,11 +332,18 @@ inline void sortDoctors(LinkList<Doctor> &list, DoctorSortBy criteria, bool asce
             case DoctorSortBy::Specialty:
                 cmp = compareNatural(a.getSpId(), b.getSpId());
                 break;
-            case DoctorSortBy::Room:
-                cmp = compareNatural(a.getRoomId(), b.getRoomId());
+            case DoctorSortBy::Room: {
+                int roomA = extractRoomNumber(a.getRoomId());
+                int roomB = extractRoomNumber(b.getRoomId());
+                if (roomA != roomB) {
+                    cmp = (roomA < roomB) ? -1 : 1;
+                } else {
+                    cmp = compareNatural(a.getRoomId(), b.getRoomId());
+                }
                 break;
+            }
             case DoctorSortBy::State:
-                if (a.getState() != b.getState()) cmp = a.getState() ? -1 : 1;
+                if (a.getState() != b.getState()) cmp = (a.getState() > b.getState()) ? -1 : 1;
                 break;
         }
         if (cmp == 0) cmp = compareNatural(a.getID(), b.getID());
