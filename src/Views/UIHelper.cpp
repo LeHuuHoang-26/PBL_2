@@ -176,62 +176,6 @@ protected:
     }
 };
 
-class CalendarPopupAligner : public QObject {
-public:
-    CalendarPopupAligner(QWidget *anchor, QCalendarWidget *cal, QObject *parent = nullptr)
-        : QObject(parent), m_anchor(anchor), m_cal(cal) {}
-
-    void align() {
-        if (!m_cal || !m_anchor) return;
-        QWidget *popup = m_cal->window();
-        if (!popup) return;
-
-        popup->setAttribute(Qt::WA_TranslucentBackground, true);
-        popup->setStyleSheet("background: transparent; border: none;");
-
-        if (popup->layout()) {
-            popup->layout()->setContentsMargins(0, 0, 0, 0);
-            popup->layout()->setSpacing(0);
-        }
-
-        int targetW = m_anchor->width();
-        if (targetW < 220) targetW = 220;
-        int targetH = 220;
-
-        m_cal->resize(targetW, targetH);
-        m_cal->setFixedWidth(targetW);
-        m_cal->setFixedHeight(targetH);
-        popup->resize(targetW, targetH);
-        popup->setFixedWidth(targetW);
-        popup->setFixedHeight(targetH);
-
-        if (auto *view = m_cal->findChild<QTableView*>("qt_calendar_calendarview")) {
-            if (view->horizontalHeader()) {
-                view->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
-            }
-        }
-
-        // Căn lề trái của popup thẳng hàng với mép trái của ô dateEdit
-        QPoint anchorGlobal = m_anchor->mapToGlobal(QPoint(0, m_anchor->height() + 2));
-        int py = popup->y();
-        if (py <= 10) py = anchorGlobal.y();
-        popup->move(anchorGlobal.x(), py);
-    }
-
-protected:
-    bool eventFilter(QObject *obj, QEvent *event) override {
-        if (event->type() == QEvent::Show) {
-            align();
-            QTimer::singleShot(0, this, [this]() { align(); });
-        }
-        return QObject::eventFilter(obj, event);
-    }
-
-private:
-    QWidget *m_anchor = nullptr;
-    QCalendarWidget *m_cal = nullptr;
-};
-
 } // namespace
 
 QWidget *UIHelper::page(const QString &title, const QString &subtitle, QWidget *parent) {
@@ -948,22 +892,6 @@ void UIHelper::applyCalendarStyle(QCalendarWidget *cal) {
             border-bottom-right-radius: 7px;
         }
     )");
-}
-
-void UIHelper::setupCalendarPopup(QDateTimeEdit *dateEdit, const QDate &minDate) {
-    if (!dateEdit) return;
-    dateEdit->setCalendarPopup(true);
-    if (auto *cal = dateEdit->calendarWidget()) {
-        UIHelper::applyCalendarStyle(cal);
-        if (minDate.isValid()) {
-            cal->setMinimumDate(minDate);
-        }
-        auto *aligner = new CalendarPopupAligner(dateEdit, cal, dateEdit);
-        cal->installEventFilter(aligner);
-        if (auto *pop = cal->window()) {
-            pop->installEventFilter(aligner);
-        }
-    }
 }
 
 void UIHelper::setupPhoneInput(QLineEdit *lineEdit) {

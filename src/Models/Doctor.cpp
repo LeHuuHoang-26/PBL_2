@@ -95,28 +95,14 @@ Doctor Doctor::loadFromString(const string &str) {
     if (id.empty()) return Doctor();
 
     bool gender = (genderStr == "1");
-    int age = 0;
-    try {
-        if (!ageStr.empty()) age = stoi(ageStr);
-    } catch (...) {}
+    int age = libPBL2::safeParseInt(ageStr, "Tuổi bác sĩ", 0);
+    int state = libPBL2::safeParseInt(stateStr, "Trạng thái công tác", 1);
+    double fee = libPBL2::safeParseDouble(feeStr, "Phí khám", 0.0);
 
-    int state = 1;
-    try {
-        if (!stateStr.empty()) state = stoi(stateStr);
-    } catch (...) {}
-
-    double fee = 0.0;
-    try {
-        if (!feeStr.empty()) fee = stod(feeStr);
-    } catch (...) {}
-
-    double rating = 5.0;
-    try {
-        size_t pipePos = ratingStr.find('|');
-        if (pipePos != string::npos) ratingStr = ratingStr.substr(0, pipePos);
-        libPBL2::trim(ratingStr);
-        if (!ratingStr.empty()) rating = stod(ratingStr);
-    } catch (...) {}
+    size_t pipePos = ratingStr.find('|');
+    if (pipePos != string::npos) ratingStr = ratingStr.substr(0, pipePos);
+    libPBL2::trim(ratingStr);
+    double rating = libPBL2::safeParseDouble(ratingStr, "Đánh giá chuyên môn", 5.0);
 
     return Doctor(id, fullName, phone, gender, age, spId, state, roomId, fee, rating);
 }
@@ -145,8 +131,8 @@ LinkList<Doctor>* Doctor::loadFromFile(const string &path) {
                 if (!doc.isDefault()) {
                     doctorList->insert(doc);
                 }
-            } catch (const AppException &) {
-                throw;
+            } catch (const AppException &e) {
+                throw DataFormatException(path, lineNo, e.what());
             } catch (const std::exception &e) {
                 throw DataFormatException(path, lineNo, e.what());
             }
@@ -165,22 +151,30 @@ bool Doctor::saveToFile(const string &path, const LinkList<Doctor> *list) {
     if (!list || list->getHeader() == nullptr)
         return false;
 
-    ofstream f(path);
+    string tempPath = path + ".tmp";
+    ofstream f(tempPath);
     if (!f.is_open()) {
-        throw FileIOException(path, "Không thể mở tệp để ghi dữ liệu.");
+        throw FileIOException(path, "Không thể mở tệp tạm để ghi dữ liệu.");
     }
 
-    f << "D_ID   | D_FullName           | D_Phone    | D_Gender | D_Age | Sp_ID  | D_State | Room_ID  | Consultation_Fee | Rating\n";
-    f << "-------+----------------------+------------+----------+-------+--------+---------+----------+------------------+-------\n";
+    try {
+        f << "D_ID   | D_FullName           | D_Phone    | D_Gender | D_Age | Sp_ID  | D_State | Room_ID  | Consultation_Fee | Rating\n";
+        f << "-------+----------------------+------------+----------+-------+--------+---------+----------+------------------+-------\n";
 
-    LinkList<Doctor>::Node *tmp = list->getHeader()->next;
-    while (tmp != nullptr && tmp->next != nullptr) {
-        if (!tmp->info.isDefault()) {
-            f << tmp->info.toString() << "\n";
+        LinkList<Doctor>::Node *tmp = list->getHeader()->next;
+        while (tmp != nullptr && tmp->next != nullptr) {
+            if (!tmp->info.isDefault()) {
+                f << tmp->info.toString() << "\n";
+            }
+            tmp = tmp->next;
         }
-        tmp = tmp->next;
-    }
 
-    f.close();
-    return true;
+        f.close();
+        libPBL2::safeAtomicCommit(tempPath, path);
+        return true;
+    } catch (...) {
+        f.close();
+        std::remove(tempPath.c_str());
+        throw;
+    }
 }

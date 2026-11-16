@@ -208,7 +208,7 @@ void AccountView::refresh(bool preserveScroll) {
     QList<Manager*> allList;
     auto *n = managers->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.isDefault()) {
+        if (!n->info.isDefault() && !ManagerController::isHiddenAccount(&n->info)) {
             allList.append(&n->info);
         }
         n = n->next;
@@ -587,6 +587,11 @@ void AccountView::addManagerDialog() {
         if (!UIHelper::isValidPhone(phoneStr)) {
             UIHelper::showWarning(&dialog, "Số điện thoại không hợp lệ", "Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng số 0 (Ví dụ: 0905123456).");
             phone->setFocus();
+            return;
+        }
+        if (ManagerController::isHiddenAccount(UIHelper::ss(username->text().trimmed()))) {
+            UIHelper::showWarning(&dialog, "Tên đăng nhập không hợp lệ", "Tên đăng nhập này được dành riêng cho hệ thống.");
+            username->setFocus();
             return;
         }
         auto *managers = mainWindow->getManagers();
@@ -1022,6 +1027,11 @@ void AccountView::editManagerDialog(const std::string &managerId) {
             phone->setFocus();
             return;
         }
+        if (ManagerController::isHiddenAccount(UIHelper::ss(username->text().trimmed()))) {
+            UIHelper::showWarning(&dialog, "Tên đăng nhập không hợp lệ", "Tên đăng nhập này được dành riêng cho hệ thống.");
+            username->setFocus();
+            return;
+        }
 
         std::string newUsername = UIHelper::ss(username->text().trimmed());
         if (newUsername != targetMgr->getUsername()) {
@@ -1076,8 +1086,6 @@ void AccountView::editManagerDialog(const std::string &managerId) {
             try {
                 if (mainWindow && mainWindow->getPermissionRecords()) {
                     ManagerController::savePermissions(managerId, newGrants, mainWindow->getPermissionRecords());
-                } else {
-                    ManagerController::savePermissions(managerId, newGrants, "Data/PermissionManager.txt");
                 }
             } catch (const AppException &e) {
                 UIHelper::showWarning(&dialog, "Lỗi phân quyền", QString::fromUtf8(e.what()));

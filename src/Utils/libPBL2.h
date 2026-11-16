@@ -2,10 +2,12 @@
 #define LIBPBL2_H
 
 #include <string>
+#include <cstdio>
 #include "../DataStructures/LinkList.h"
 #include "../Models/Permission.h"
 #include "../Models/PermissionManager.h"
 #include "Date.h"
+#include "AppExceptions.h"
 
 class Patient;
 class Doctor;
@@ -14,14 +16,17 @@ class Manager;
 
 namespace libPBL2 {
 
-    using Permission = ::Permission;
-    using PermissionType = ::PermissionType;
-    using PermissionManager = ::PermissionManager;
-
     // String utilities
     inline void trim(std::string &str);
     inline size_t utf8Length(const std::string &str);
     inline std::string padRightUtf8(const std::string &str, size_t targetWidth);
+
+    // Safe Data Parsing Utilities (ném DataFormatException có nguồn gốc rõ ràng)
+    inline int safeParseInt(const std::string &str, const std::string &fieldName, int defaultVal = 0, bool required = false);
+    inline double safeParseDouble(const std::string &str, const std::string &fieldName, double defaultVal = 0.0, bool required = false);
+
+    // Safe Atomic File Commit (ghi file tạm rồi đổi tên đè, chống mất dữ liệu khi mất điện/lỗi ổ đĩa)
+    inline void safeAtomicCommit(const std::string &tempPath, const std::string &finalPath);
 
     // -------------------------------------------------------------
     // Generic QuickSort Algorithm (Khai báo template)

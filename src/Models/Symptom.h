@@ -13,7 +13,6 @@ class Symptom {
         int sScore;
     public:
         Symptom();
-        Symptom(std::ifstream &f);
         Symptom(std::string S_id, std::string sName, std::string Sp_id, int sScore);
         Symptom(const Symptom &S);
         Symptom &operator=(const Symptom &S) = default;

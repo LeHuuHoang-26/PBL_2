@@ -4,7 +4,14 @@
 #include "../Utils/AppExceptions.h"
 
 int StatisticController::patientCount(const LinkList<Patient> *items) {
-    return items ? items->count : 0;
+    if (!items || !items->getHeader()) return 0;
+    int c = 0;
+    auto *n = items->getHeader()->next;
+    while (n && n->next) {
+        if (!n->info.isDefault() && n->info.getState() != -1) c++;
+        n = n->next;
+    }
+    return c;
 }
 
 int StatisticController::doctorCount(const LinkList<Doctor> *items) {
@@ -103,16 +110,11 @@ double StatisticController::completionRate(const LinkList<Appointment> *appts, i
     return (completedCount * 100.0) / totalUntilNow;
 }
 
-double StatisticController::completionRate(const LinkList<Appointment> *appts) {
-    int comp = 0, tot = 0;
-    Date now = Date::now();
-    return completionRate(appts, now.getDay(), now.getMonth(), now.getYear(), now.getHour(), now.getMinute(), comp, tot);
-}
-
-void StatisticController::appointmentStatusCounts(const LinkList<Appointment> *appts, int &completed, int &pending, int &delayed, int currentDay, int currentMonth, int currentYear, int currentHour, int currentMinute) {
+void StatisticController::appointmentStatusCounts(const LinkList<Appointment> *appts, int &completed, int &pending, int &delayed, int &rescheduled, int currentDay, int currentMonth, int currentYear, int currentHour, int currentMinute) {
     completed = 0;
     pending = 0;
     delayed = 0;
+    rescheduled = 0;
     if (!appts || !appts->getHeader()) return;
 
     auto *n = appts->getHeader()->next;
@@ -123,16 +125,12 @@ void StatisticController::appointmentStatusCounts(const LinkList<Appointment> *a
                 case 1: completed++; break;
                 case 0: pending++; break;
                 case -1: delayed++; break;
+                case -2: rescheduled++; break;
                 default: break;
             }
         }
         n = n->next;
     }
-}
-
-void StatisticController::appointmentStatusCounts(const LinkList<Appointment> *appts, int &completed, int &pending, int &delayed) {
-    Date now = Date::now();
-    appointmentStatusCounts(appts, completed, pending, delayed, now.getDay(), now.getMonth(), now.getYear(), now.getHour(), now.getMinute());
 }
 
 void StatisticController::todayAppointmentCounts(const LinkList<Appointment> *appts, int day, int month, int year, int &totalToday, int &completedToday, int &pendingToday) {
@@ -162,7 +160,7 @@ void StatisticController::patientGenderCounts(const LinkList<Patient> *patients,
 
     auto *n = patients->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.isDefault()) {
+        if (!n->info.isDefault() && n->info.getState() != -1) {
             if (n->info.getGender()) male++;
             else female++;
         }
@@ -179,7 +177,7 @@ void StatisticController::patientAgeDistribution(const LinkList<Patient> *patien
 
     auto *n = patients->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.isDefault()) {
+        if (!n->info.isDefault() && n->info.getState() != -1) {
             int age = n->info.getAge();
             if (age < 18) under18++;
             else if (age <= 45) from18to45++;

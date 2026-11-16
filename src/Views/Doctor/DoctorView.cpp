@@ -326,10 +326,14 @@ void DoctorView::refresh(bool preserveScroll) {
             auto *appointments = mainWindow->getAppointments();
             int upcomingCount = 0;
             if (appointments) {
+                Date now = Date::now();
                 auto *an = appointments->getHeader()->next;
                 while (an && an->next) {
-                    if (an->info.getDoctorId() == did && an->info.getState() == 0) {
-                        upcomingCount++;
+                    if (an->info.getDoctorId() == did) {
+                        int effState = an->info.computeEffectiveState(now.getDay(), now.getMonth(), now.getYear(), now.getHour(), now.getMinute());
+                        if (effState == 0) {
+                            upcomingCount++;
+                        }
                     }
                     an = an->next;
                 }
@@ -359,9 +363,15 @@ void DoctorView::refresh(bool preserveScroll) {
                     n = n->next;
                 }
             }
-            mainWindow->saveAll(SaveScope::Doctor, SaveAction::Normal);
-            refresh(true);
-            mainWindow->refreshPage(0);
+            try {
+                mainWindow->saveAll(SaveScope::Doctor, SaveAction::Normal);
+                refresh(true);
+                mainWindow->refreshPage(0);
+            } catch (const AppException &e) {
+                UIHelper::showWarning(this, "Lỗi lưu dữ liệu", QString::fromUtf8(e.what()));
+            } catch (const std::exception &e) {
+                UIHelper::showWarning(this, "Lỗi hệ thống", QString("Đã xảy ra ngoại lệ: %1").arg(e.what()));
+            }
         });
 
         table->setCellWidget(r, 6, action.first);

@@ -24,15 +24,17 @@ public:
     int completed = 0;
     int pending = 0;
     int delayed = 0;
+    int rescheduled = 0;
 
     explicit SegmentedStatusBar(QWidget *parent = nullptr) : QWidget(parent) {
         setFixedHeight(16);
     }
 
-    void setCounts(int c, int p, int d) {
+    void setCounts(int c, int p, int d, int r = 0) {
         completed = c;
         pending = p;
         delayed = d;
+        rescheduled = r;
         update();
     }
 
@@ -41,7 +43,7 @@ protected:
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
 
-        int total = completed + pending + delayed;
+        int total = completed + pending + delayed + rescheduled;
         if (total <= 0) {
             painter.setBrush(QColor("#e2e8f0"));
             painter.setPen(Qt::NoPen);
@@ -63,9 +65,10 @@ protected:
             x += segW;
         };
 
-        drawSegment(completed, QColor("#0d9488")); // Teal (Đã khám)
-        drawSegment(pending, QColor("#ea580c"));   // Orange (Chưa khám)
-        drawSegment(delayed, QColor("#f59e0b"));   // Amber (Trễ hẹn)
+        drawSegment(completed, QColor("#0d9488"));   // Teal (Đã khám)
+        drawSegment(pending, QColor("#ea580c"));     // Orange (Chưa khám)
+        drawSegment(delayed, QColor("#f59e0b"));     // Amber (Trễ hẹn)
+        drawSegment(rescheduled, QColor("#64748b")); // Slate (Đã dời lịch)
     }
 };
 
@@ -267,9 +270,9 @@ void StatisticView::refresh() {
     int compDone = 0, compTotalUntilNow = 0;
     double compRate = StatisticController::completionRate(appts, curDay, curMonth, curYear, curHour, curMin, compDone, compTotalUntilNow);
 
-    int completed = 0, pending = 0, delayed = 0;
-    StatisticController::appointmentStatusCounts(appts, completed, pending, delayed, curDay, curMonth, curYear, curHour, curMin);
-    int totalAppts = completed + pending + delayed;
+    int completed = 0, pending = 0, delayed = 0, rescheduled = 0;
+    StatisticController::appointmentStatusCounts(appts, completed, pending, delayed, rescheduled, curDay, curMonth, curYear, curHour, curMin);
+    int totalAppts = completed + pending + delayed + rescheduled;
 
     int totalToday = 0, completedToday = 0, pendingToday = 0;
     StatisticController::todayAppointmentCounts(appts, curDay, curMonth, curYear, totalToday, completedToday, pendingToday);
@@ -357,7 +360,7 @@ void StatisticView::refresh() {
     statusLayout->addWidget(statusTitle);
 
     auto *statusBar = new SegmentedStatusBar;
-    statusBar->setCounts(completed, pending, delayed);
+    statusBar->setCounts(completed, pending, delayed, rescheduled);
     statusLayout->addWidget(statusBar);
 
     auto *chipsGrid = new QGridLayout;
@@ -389,7 +392,8 @@ void StatisticView::refresh() {
 
     chipsGrid->addWidget(makeStatusChip("#0d9488", "Đã khám", completed, totalAppts), 0, 0);
     chipsGrid->addWidget(makeStatusChip("#ea580c", "Chưa khám", pending, totalAppts), 0, 1);
-    chipsGrid->addWidget(makeStatusChip("#f59e0b", "Trễ hẹn", delayed, totalAppts), 1, 0, 1, 2);
+    chipsGrid->addWidget(makeStatusChip("#f59e0b", "Trễ hẹn", delayed, totalAppts), 1, 0);
+    chipsGrid->addWidget(makeStatusChip("#64748b", "Đã dời lịch", rescheduled, totalAppts), 1, 1);
     statusLayout->addLayout(chipsGrid);
 
     row1->addWidget(statusCard, 1);

@@ -94,8 +94,6 @@ public:
     Date getDateSetForAppointment(const Appointment &a) const;
     bool isHoliday(const QDate &date) const;
     QString holidayNote(const QDate &date) const;
-    QString patientSymptoms(const std::string &patientId) const;
-    QString unresolvedPatientSymptoms(const std::string &patientId) const;
     void updatePatientSymptomStatus(const std::string &patientId);
     std::string nextAppointmentId() const;
 
@@ -104,7 +102,6 @@ public:
 
     // Giao diện và Phong cách
     QString style() const;
-    QPushButton *button(const QString &text, const QString &kind = "primary");
 
 protected:
     void closeEvent(QCloseEvent *event) override;

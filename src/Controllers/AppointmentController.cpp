@@ -10,10 +10,6 @@
 #include <sstream>
 #include <cstdio>
 
-int AppointmentController::count(const LinkList<Appointment> *appointments) {
-    return appointments ? appointments->count : 0;
-}
-
 static bool compareAppointmentDates(const Appointment *a, const Appointment *b) {
     if (!a || !b) return a != nullptr;
     Date da = a->getDateGet();
@@ -256,6 +252,31 @@ bool AppointmentController::isSlotBooked(const LinkList<Appointment> *appointmen
         n = n->next;
     }
     return false;
+}
+
+void AppointmentController::validateBooking(
+    const LinkList<Appointment> *appointments,
+    const std::string &doctorId,
+    const QDateTime &targetDateTime,
+    const std::string &excludeApptId,
+    bool checkHoliday,
+    const std::string &configPath
+) {
+    if (doctorId.empty()) {
+        throw ValidationException("Bác sĩ phụ trách không được để trống.");
+    }
+    if (!targetDateTime.isValid() || targetDateTime <= QDateTime::currentDateTime()) {
+        throw ValidationException("Thời gian đặt lịch phải ở tương lai.");
+    }
+    if (checkHoliday && !configPath.empty() && isHoliday(targetDateTime.date(), configPath)) {
+        QString note = getHolidayNote(targetDateTime.date(), configPath);
+        std::string msg = "Phòng khám nghỉ lễ vào ngày " + targetDateTime.date().toString("dd/MM/yyyy").toStdString() + " (" + note.toStdString() + "). Vui lòng chọn ngày khác.";
+        throw ValidationException(msg);
+    }
+    Date targetDate = Date::loadFromString(targetDateTime.toString("yyyy-MM-dd HH:mm").toStdString());
+    if (isSlotBooked(appointments, doctorId, targetDate, excludeApptId)) {
+        throw ValidationException("Bác sĩ đã có lịch hẹn khác vào khung giờ này. Vui lòng chọn khung giờ hoặc bác sĩ khác.");
+    }
 }
 
 QString AppointmentController::getHolidayNoteFromList(const QDate &date, const QList<HolidayEntry> &list) {
@@ -553,4 +574,22 @@ int AppointmentController::rescheduleAppointmentsLinear(
                            .arg(affectedAppointments.size())
                            .arg(detailLogs.join("\n"));
     return successCount;
+}
+
+int AppointmentController::syncExpiredAppointments(LinkList<Appointment> *appointments) {
+    if (!appointments || !appointments->getHeader()) return 0;
+    Date now = Date::now();
+    int changed = 0;
+    auto *n = appointments->getHeader()->next;
+    while (n && n->next) {
+        if (!n->info.isDefault() && n->info.getState() == 0) {
+            int effState = n->info.computeEffectiveState(now.getDay(), now.getMonth(), now.getYear(), now.getHour(), now.getMinute());
+            if (effState == -1) {
+                n->info.setState(-1);
+                changed++;
+            }
+        }
+        n = n->next;
+    }
+    return changed;
 }

@@ -239,17 +239,6 @@ QString MainWindow::holidayNote(const QDate &date) const
     return AppointmentController::getHolidayNote(date, holidayConfigPath);
 }
 
-QString MainWindow::patientSymptoms(const string &patientId) const
-{
-    QStringList names = PatientController::getSymptomsForPatient(patientId, symptomPatients, symptomPatientDetails, symptoms);
-    return names.isEmpty() ? QStringLiteral("Chưa ghi nhận") : names.join(QStringLiteral(", "));
-}
-
-QString MainWindow::unresolvedPatientSymptoms(const string &patientId) const
-{
-    return PatientController::getUnresolvedSymptoms(patientId, symptomPatients, symptomPatientDetails, symptoms, appointments);
-}
-
 void MainWindow::updatePatientSymptomStatus(const string &patientId)
 {
     PatientController::updateSymptomStatus(patientId, symptomPatients, appointments);
@@ -427,14 +416,6 @@ QString MainWindow::style() const
             QLabel#pill { background: #e6f5f2; color: #14756e; border-radius: 10px; padding: 5px 9px; font-size: 11px; font-weight: 700; }
             QCheckBox { spacing: 9px; }
         )");
-}
-
-QPushButton *MainWindow::button(const QString &text, const QString &kind)
-{
-    auto *b = new QPushButton(text);
-    b->setObjectName(kind);
-    b->setCursor(Qt::PointingHandCursor);
-    return b;
 }
 
 void MainWindow::setPage(int index)
@@ -683,7 +664,7 @@ void MainWindow::setupShell()
         "📊   Thống kê"};
     for (int i = 0; i < labels.size(); ++i)
     {
-        auto *b = button(labels[i], "nav");
+        auto *b = UIHelper::button(labels[i], "nav");
         navButtons.push_back(b);
         connect(b, &QPushButton::clicked, this, [this, i]
         {
@@ -698,7 +679,7 @@ void MainWindow::setupShell()
 
     if (isAdministrator())
     {
-        auto *b = button("♙   Quản lý tài khoản", "nav");
+        auto *b = UIHelper::button("♙   Quản lý tài khoản", "nav");
         navButtons.push_back(b);
         connect(b, &QPushButton::clicked, this, [this]
         {
@@ -973,7 +954,10 @@ void MainWindow::saveAll(SaveScope scope, SaveAction action)
         // 3. Lịch hẹn (+ Triệu chứng nếu có)
         if (scope == SaveScope::All || scope == SaveScope::Appointment)
         {
-            if (appointments) libPBL2::sortAppointments(appointments, libPBL2::AppointmentSortBy::ID, true);
+            if (appointments) {
+                AppointmentController::syncExpiredAppointments(appointments);
+                libPBL2::sortAppointments(appointments, libPBL2::AppointmentSortBy::ID, true);
+            }
             if (symptomPatients && scope == SaveScope::Appointment)
             {
                 libPBL2::qsort(symptomPatients, [](const SymptomPatient &a, const SymptomPatient &b) {
@@ -1068,6 +1052,10 @@ MainWindow::~MainWindow()
 
 bool MainWindow::initApp()
 {
+    // Đảm bảo cache chuyên khoa và ngày nghỉ được làm mới
+    DoctorController::clearSpecialtyCache();
+    AppointmentController::clearHolidayCache();
+
     // Nạp dữ liệu phân quyền vào RAM 1 lần duy nhất
     try {
         permissionRecords = PermissionManager::loadFromFile(permissionManagerPath);
@@ -1096,6 +1084,12 @@ bool MainWindow::initApp()
         symptomPatients = SymptomPatient::loadFromFile(symptomPatientPath);
         symptomPatientDetails = SymptomPatientDetail::loadFromFile(symptomPatientDetailPath);
         appointments = Appointment::loadFromFile(appointmentPath);
+        if (appointments) {
+            int synced = AppointmentController::syncExpiredAppointments(appointments);
+            if (synced > 0) {
+                Appointment::saveToFile(appointmentPath, appointments);
+            }
+        }
     } catch (const FileIOException &e) {
         UIHelper::showWarning(this, "Lỗi tệp dữ liệu", QString::fromUtf8(e.what()) + "\nVui lòng kiểm tra lại thư mục Data/.");
         return false;

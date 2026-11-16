@@ -16,13 +16,6 @@ private:
     int state;
 
 public:
-    enum State {
-        Rescheduled = -2, // Dời lịch
-        Delayed = -1,     // Trễ hẹn
-        Pending = 0,      // Chưa khám
-        Completed = 1     // Đã khám
-    };
-
     Appointment(std::string id = "", std::string symptomPatientId = "", std::string doctorId = "", const Date &dateGet = Date(), int state = 0);
 
     std::string getId() const;

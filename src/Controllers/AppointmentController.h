@@ -3,8 +3,10 @@
 
 #include "../Models/Appointment.h"
 #include "../DataStructures/LinkList.h"
+#include "../Utils/AppExceptions.h"
 #include <QList>
 #include <QDate>
+#include <QDateTime>
 #include <QString>
 #include <string>
 
@@ -29,7 +31,6 @@ struct RescheduledResultItem {
 
 class AppointmentController {
 public:
-    static int count(const LinkList<Appointment> *appointments);
     static QList<Appointment*> getAppointmentsForDate(const LinkList<Appointment> *appointments, const QDate &targetDate);
     static QList<Appointment*> getUpcomingAppointments(const LinkList<Appointment> *appointments, const QDate &today);
     static void sortAppointmentsByDate(QList<Appointment*> &list);
@@ -40,6 +41,14 @@ public:
     static bool isHoliday(const QDate &date, const std::string &configPath);
     static bool isHolidayInList(const QDate &date, const QList<HolidayEntry> &list);
     static bool isSlotBooked(const LinkList<Appointment> *appointments, const std::string &doctorId, const Date &targetTime, const std::string &excludeApptId = "");
+    static void validateBooking(
+        const LinkList<Appointment> *appointments,
+        const std::string &doctorId,
+        const QDateTime &targetDateTime,
+        const std::string &excludeApptId = "",
+        bool checkHoliday = false,
+        const std::string &configPath = ""
+    );
     static QString getHolidayNote(const QDate &date, const std::string &configPath);
     static QString getHolidayNoteFromList(const QDate &date, const QList<HolidayEntry> &list);
     static QList<HolidayEntry> loadHolidays(const std::string &configPath);
@@ -63,6 +72,8 @@ public:
         QString &outSummaryReport,
         QList<RescheduledResultItem> *outResultItems = nullptr
     );
+
+    static int syncExpiredAppointments(LinkList<Appointment> *appointments);
 };
 
 #endif // APPOINTMENTCONTROLLER_H

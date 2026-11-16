@@ -37,20 +37,6 @@ void Permission::setDefault() {
 }
 
 // ==========================================
-// Type Conversions
-// ==========================================
-string Permission::permissionTypeToString(PermissionType per) {
-    switch (per) {
-        case PermissionType::Per_1: return "Per_1";
-        case PermissionType::Per_2: return "Per_2";
-        case PermissionType::Per_3: return "Per_3";
-        case PermissionType::Per_4: return "Per_4";
-        case PermissionType::Per_5: return "Per_5";
-        default:                    return "Empty";
-    }
-}
-
-// ==========================================
 // System Permission Catalog
 // ==========================================
 LinkList<Permission>* Permission::getSystemCatalog() {

@@ -30,11 +30,9 @@ public:
 
     static double totalRevenue(const LinkList<Appointment> *appts, const LinkList<Doctor> *docs);
     static double todayRevenue(const LinkList<Appointment> *appts, const LinkList<Doctor> *docs, int day, int month, int year);
-    static double completionRate(const LinkList<Appointment> *appts);
     static double completionRate(const LinkList<Appointment> *appts, int currentDay, int currentMonth, int currentYear, int currentHour, int currentMinute, int &completedCount, int &totalUntilNow);
 
-    static void appointmentStatusCounts(const LinkList<Appointment> *appts, int &completed, int &pending, int &delayed);
-    static void appointmentStatusCounts(const LinkList<Appointment> *appts, int &completed, int &pending, int &delayed, int currentDay, int currentMonth, int currentYear, int currentHour, int currentMinute);
+    static void appointmentStatusCounts(const LinkList<Appointment> *appts, int &completed, int &pending, int &delayed, int &rescheduled, int currentDay, int currentMonth, int currentYear, int currentHour, int currentMinute);
     static void todayAppointmentCounts(const LinkList<Appointment> *appts, int day, int month, int year, int &totalToday, int &completedToday, int &pendingToday);
 
     static void patientGenderCounts(const LinkList<Patient> *patients, int &male, int &female);

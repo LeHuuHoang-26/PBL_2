@@ -13,17 +13,6 @@ Doctor *DoctorController::findById(LinkList<Doctor> *doctors, const std::string 
     return nullptr;
 }
 
-int DoctorController::count(const LinkList<Doctor> *doctors) {
-    if (!doctors || !doctors->getHeader()) return 0;
-    int c = 0;
-    auto *n = doctors->getHeader()->next;
-    while (n && n->next) {
-        if (!n->info.isDefault() && n->info.getState() != -1) c++;
-        n = n->next;
-    }
-    return c;
-}
-
 std::string DoctorController::generateNextId(const LinkList<Doctor> *doctors) {
     int maxId = 0;
     if (doctors && doctors->getHeader()) {

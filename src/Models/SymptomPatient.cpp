@@ -113,24 +113,32 @@ bool SymptomPatient::saveToFile(const string &path, const LinkList<SymptomPatien
     if (!list || list->getHeader() == nullptr)
         return false;
 
-    ofstream f(path);
+    string tempPath = path + ".tmp";
+    ofstream f(tempPath);
     if (!f.is_open()) {
-        throw FileIOException(path, "Không thể mở tệp để ghi dữ liệu.");
+        throw FileIOException(path, "Không thể mở tệp tạm để ghi dữ liệu.");
     }
 
-    f << "SP_ID  | P_ID   | Sp_ID  | Date            \n";
-    f << "-------+--------+--------+-----------------\n";
+    try {
+        f << "SP_ID  | P_ID   | Sp_ID  | Date            \n";
+        f << "-------+--------+--------+-----------------\n";
 
-    LinkList<SymptomPatient>::Node *tmp = list->getHeader()->next;
-    while (tmp != nullptr && tmp->next != nullptr) {
-        if (!tmp->info.isDefault()) {
-            f << tmp->info.toString() << "\n";
+        LinkList<SymptomPatient>::Node *tmp = list->getHeader()->next;
+        while (tmp != nullptr && tmp->next != nullptr) {
+            if (!tmp->info.isDefault()) {
+                f << tmp->info.toString() << "\n";
+            }
+            tmp = tmp->next;
         }
-        tmp = tmp->next;
-    }
 
-    f.close();
-    return true;
+        f.close();
+        libPBL2::safeAtomicCommit(tempPath, path);
+        return true;
+    } catch (...) {
+        f.close();
+        std::remove(tempPath.c_str());
+        throw;
+    }
 }
 
 string SymptomPatient::generateNextId(const LinkList<SymptomPatient> *list) {

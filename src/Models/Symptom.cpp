@@ -11,42 +11,6 @@ using namespace std;
 Symptom::Symptom()
     : S_id(""), sName(""), Sp_id(""), sScore(0) {}
 
-Symptom::Symptom(std::ifstream &f) {
-    string tmp;
-    if (!getline(f, S_id, '|')) {
-        setDefault();
-        return;
-    }
-    libPBL2::trim(S_id);
-
-    if (!getline(f, sName, '|')) {
-        setDefault();
-        return;
-    }
-    libPBL2::trim(sName);
-
-    if (!getline(f, Sp_id, '|')) {
-        setDefault();
-        return;
-    }
-    libPBL2::trim(Sp_id);
-
-    if (!getline(f, tmp, '\n')) {
-        setDefault();
-        return;
-    }
-    libPBL2::trim(tmp);
-    if (tmp.empty()) {
-        setDefault();
-        return;
-    }
-    try {
-        sScore = stoi(tmp);
-    } catch (...) {
-        sScore = 0;
-    }
-}
-
 Symptom::Symptom(std::string S_id, std::string sName, std::string Sp_id, int sScore)
     : S_id(S_id), sName(sName), Sp_id(Sp_id), sScore(sScore) {}
 
@@ -99,10 +63,7 @@ Symptom Symptom::loadFromString(const string &str) {
     libPBL2::trim(scoreStr);
 
     if (sId.empty()) return Symptom();
-    int sc = 0;
-    try {
-        if (!scoreStr.empty()) sc = stoi(scoreStr);
-    } catch (...) {}
+    int sc = libPBL2::safeParseInt(scoreStr, "Điểm triệu chứng", 0);
 
     return Symptom(sId, name, spId, sc);
 }
@@ -121,12 +82,20 @@ LinkList<Symptom>* Symptom::loadFromFile(const string &path) {
         getline(f, tmp); // Bỏ qua dòng phân cách
 
         string line;
+        int lineNo = 2;
         while (getline(f, line)) {
+            lineNo++;
             libPBL2::trim(line);
             if (line.empty()) continue;
-            Symptom S = Symptom::loadFromString(line);
-            if (!S.isDefault()) {
-                symptomList->insert(S);
+            try {
+                Symptom S = Symptom::loadFromString(line);
+                if (!S.isDefault()) {
+                    symptomList->insert(S);
+                }
+            } catch (const AppException &e) {
+                throw DataFormatException(path, lineNo, e.what());
+            } catch (const std::exception &e) {
+                throw DataFormatException(path, lineNo, e.what());
             }
         }
         f.close();
@@ -142,22 +111,30 @@ bool Symptom::saveToFile(const string &path, const LinkList<Symptom> *list) {
     if (!list || list->getHeader() == nullptr)
         return false;
 
-    ofstream f(path);
+    string tempPath = path + ".tmp";
+    ofstream f(tempPath);
     if (!f.is_open()) {
-        throw FileIOException(path, "Không thể mở tệp để ghi dữ liệu.");
+        throw FileIOException(path, "Không thể mở tệp tạm để ghi dữ liệu.");
     }
 
-    f << "S_ID  | S_Name              | Sp_ID  | S_Score\n";
-    f << "------+---------------------+--------+--------\n";
+    try {
+        f << "S_ID  | S_Name              | Sp_ID  | S_Score\n";
+        f << "------+---------------------+--------+--------\n";
 
-    LinkList<Symptom>::Node *tmp = list->getHeader()->next;
-    while (tmp != nullptr && tmp->next != nullptr) {
-        if (!tmp->info.isDefault()) {
-            f << tmp->info.toString() << "\n";
+        LinkList<Symptom>::Node *tmp = list->getHeader()->next;
+        while (tmp != nullptr && tmp->next != nullptr) {
+            if (!tmp->info.isDefault()) {
+                f << tmp->info.toString() << "\n";
+            }
+            tmp = tmp->next;
         }
-        tmp = tmp->next;
-    }
 
-    f.close();
-    return true;
+        f.close();
+        libPBL2::safeAtomicCommit(tempPath, path);
+        return true;
+    } catch (...) {
+        f.close();
+        std::remove(tempPath.c_str());
+        throw;
+    }
 }

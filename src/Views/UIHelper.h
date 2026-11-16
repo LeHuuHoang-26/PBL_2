@@ -46,7 +46,6 @@ public:
     static QPair<QWidget*, QPushButton*> createActionCell(const QIcon &icon, const QString &tooltip);
     static QString dialogFormStyle();
     static void applyCalendarStyle(QCalendarWidget *cal);
-    static void setupCalendarPopup(QDateTimeEdit *dateEdit, const QDate &minDate = QDate());
     static void setupPhoneInput(QLineEdit *lineEdit);
     static void setupCccdInput(QLineEdit *lineEdit);
     static bool isValidPhone(const QString &phone);

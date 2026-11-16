@@ -217,6 +217,10 @@ void PatientView::refresh(bool preserveScroll) {
 
     auto *n = patients->getHeader()->next;
     while (n && n->next) {
+        if (n->info.isDefault() || n->info.getState() == -1) {
+            n = n->next;
+            continue;
+        }
         QString name = UIHelper::qs(n->info.getfullName());
         QString id = UIHelper::qs(n->info.getID());
         QString phone = UIHelper::qs(n->info.getPhone());
@@ -293,89 +297,60 @@ void PatientView::refresh(bool preserveScroll) {
                 UIHelper::showWarning(this, "Không có quyền", "Bạn không có quyền thực hiện xóa hồ sơ bệnh nhân.");
                 return;
             }
-            QString name = UIHelper::qs(p->getfullName());
-            if (!UIHelper::confirmDelete(this, "Xác nhận xóa hồ sơ bệnh nhân",
-                QStringLiteral("Bạn có chắc chắn muốn xóa hồ sơ bệnh nhân \"%1\" khỏi hệ thống?\nHồ sơ sau khi xóa sẽ được loại bỏ khỏi danh sách quản lý.").arg(name),
-                "Xóa hồ sơ", "Không xóa")) {
-                return;
-            }
-
             std::string pid = p->getID();
+            QString name = UIHelper::qs(p->getfullName());
+
+            // 1. Kiểm tra ràng buộc ca khám chờ (RESTRICT)
             auto *appointments = mainWindow->getAppointments();
-            bool hasUpcoming = false;
+            int upcomingCount = 0;
             if (appointments) {
+                Date now = Date::now();
                 auto *an = appointments->getHeader()->next;
                 while (an && an->next) {
-                    if (mainWindow->getPatientIdForAppointment(an->info) == pid && an->info.getState() == 0) {
-                        hasUpcoming = true;
-                        break;
+                    if (mainWindow->getPatientIdForAppointment(an->info) == pid) {
+                        int effState = an->info.computeEffectiveState(now.getDay(), now.getMonth(), now.getYear(), now.getHour(), now.getMinute());
+                        if (effState == 0) {
+                            upcomingCount++;
+                        }
                     }
                     an = an->next;
                 }
             }
-            if (hasUpcoming) {
-                if (!UIHelper::confirmWarning(this, "Cảnh báo lịch khám chưa hoàn tất",
-                    QStringLiteral("Bệnh nhân \"%1\" hiện vẫn còn lịch hẹn chưa khám trong hệ thống.\nBạn vẫn muốn tiếp tục xóa hồ sơ này?").arg(name),
-                    "Vẫn tiếp tục xóa", "Quay lại")) {
-                    return;
-                }
+            if (upcomingCount > 0) {
+                UIHelper::showWarning(this, "Không thể xóa",
+                    QStringLiteral("Bệnh nhân \"%1\" hiện vẫn còn %2 lịch hẹn chưa khám trong hệ thống. Vui lòng hoàn tất hoặc hủy các lịch khám này trước khi xóa hồ sơ bệnh nhân.").arg(name).arg(upcomingCount));
+                return;
             }
 
+            // 2. Xác nhận xóa mềm
+            if (!UIHelper::confirmDelete(this, "Xác nhận xóa hồ sơ bệnh nhân",
+                QStringLiteral("Bạn có chắc chắn muốn xóa hồ sơ bệnh nhân \"%1\" khỏi hệ thống?\nHồ sơ sau khi xóa sẽ được chuyển sang trạng thái ngừng hoạt động. Lịch sử các ca khám trước đây vẫn được lưu trữ an toàn.").arg(name),
+                "Xóa hồ sơ", "Hủy bỏ")) {
+                return;
+            }
+
+            // 3. Thực hiện Xóa mềm (Soft delete: state = -1), giữ nguyên lịch sử khám
             auto *patients = mainWindow->getPatients();
             if (patients) {
                 auto *n = patients->getHeader()->next;
                 while (n && n->next) {
                     if (n->info.getID() == pid) {
-                        patients->remove(n);
+                        n->info.setState(-1); // Đánh dấu đã xóa mềm
                         break;
                     }
                     n = n->next;
                 }
             }
 
-            // Dọn dẹp SymptomPatient và Appointment liên kết với bệnh nhân bị xóa
-            auto *symptomPatients = mainWindow->getSymptomPatients();
-            if (symptomPatients && symptomPatients->getHeader()) {
-                auto *spNode = symptomPatients->getHeader()->next;
-                while (spNode && spNode->next) {
-                    if (spNode->info.getP_id() == pid) {
-                        std::string spId = spNode->info.getSP_id();
-                        auto *spdList = mainWindow->getSymptomPatientDetails();
-                        if (spdList && spdList->getHeader()) {
-                            auto *spdNode = spdList->getHeader()->next;
-                            while (spdNode && spdNode->next) {
-                                if (spdNode->info.getSP_id() == spId) {
-                                    auto *toDelSpd = spdNode;
-                                    spdNode = spdNode->next;
-                                    spdList->remove(toDelSpd);
-                                    continue;
-                                }
-                                spdNode = spdNode->next;
-                            }
-                        }
-                        if (appointments && appointments->getHeader()) {
-                            auto *aNode = appointments->getHeader()->next;
-                            while (aNode && aNode->next) {
-                                if (aNode->info.getSymptomPatientId() == spId) {
-                                    auto *toDelA = aNode;
-                                    aNode = aNode->next;
-                                    appointments->remove(toDelA);
-                                    continue;
-                                }
-                                aNode = aNode->next;
-                            }
-                        }
-                        auto *toDelSp = spNode;
-                        spNode = spNode->next;
-                        symptomPatients->remove(toDelSp);
-                        continue;
-                    }
-                    spNode = spNode->next;
-                }
+            try {
+                mainWindow->saveAll(SaveScope::Patient, SaveAction::Normal);
+                refresh(true);
+                mainWindow->refreshPage(0);
+            } catch (const AppException &e) {
+                UIHelper::showWarning(this, "Lỗi lưu dữ liệu", QString::fromUtf8(e.what()));
+            } catch (const std::exception &e) {
+                UIHelper::showWarning(this, "Lỗi hệ thống", QString("Đã xảy ra ngoại lệ: %1").arg(e.what()));
             }
-            mainWindow->saveAll(SaveScope::All, SaveAction::Normal);
-            refresh(true);
-            mainWindow->refreshPage(0);
         });
 
         table->setCellWidget(r, 5, action.first);
@@ -640,7 +615,7 @@ void PatientView::addPatientDialog() {
         if (patients) {
             auto *n = patients->getHeader()->next;
             while (n && n->next) {
-                if (n->info.getPhone() == UIHelper::ss(phoneStr) || n->info.getCCCD() == UIHelper::ss(cccdStr)) {
+                if (n->info.getState() != -1 && (n->info.getPhone() == UIHelper::ss(phoneStr) || n->info.getCCCD() == UIHelper::ss(cccdStr))) {
                     UIHelper::showWarning(&dialog, "Trùng hồ sơ", "Số điện thoại hoặc CCCD đã tồn tại.");
                     return;
                 }
@@ -651,7 +626,7 @@ void PatientView::addPatientDialog() {
         std::string id = Patient::generateNextId(patients);
         try {
             if (patients) {
-                patients->insert(Patient(id, UIHelper::ss(nameStr), UIHelper::ss(phoneStr), gender->currentIndex() == 0, age->value(), UIHelper::ss(cccdStr)));
+                patients->insert(Patient(id, UIHelper::ss(nameStr), UIHelper::ss(phoneStr), gender->currentIndex() == 0, age->value(), UIHelper::ss(cccdStr), 1));
             }
 
             mainWindow->saveAll(SaveScope::Patient, SaveAction::Normal);
@@ -921,7 +896,7 @@ void PatientView::editPatientDialog(const std::string &id) {
             if (patients) {
                 auto *n = patients->getHeader()->next;
                 while (n && n->next) {
-                    if (&n->info != patient && (n->info.getPhone() == UIHelper::ss(phoneStr) || n->info.getCCCD() == UIHelper::ss(cccdStr))) {
+                    if (&n->info != patient && n->info.getState() != -1 && (n->info.getPhone() == UIHelper::ss(phoneStr) || n->info.getCCCD() == UIHelper::ss(cccdStr))) {
                         UIHelper::showWarning(&dialog, "Trùng hồ sơ", "Số điện thoại hoặc CCCD đã tồn tại trên một bệnh nhân khác.");
                         return;
                     }

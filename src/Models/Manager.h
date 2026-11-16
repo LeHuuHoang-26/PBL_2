@@ -21,7 +21,6 @@ class Manager: public Human {
         ManagerRole role;
         int state;
     public:
-        Manager(std::ifstream &f);
         Manager(std::string id, std::string fullName, std::string phone, bool gender, int age, std::string username, std::string password, ManagerRole role, int state);
         Manager(const Manager &M);
         Manager();
@@ -47,7 +46,6 @@ class Manager: public Human {
         static Manager loadFromString(const std::string &str);
         static LinkList<Manager>* loadFromFile(const std::string &path);
         static bool saveToFile(const std::string &path, const LinkList<Manager> *list);
-        static std::string roleToString(ManagerRole role);
         static ManagerRole roleFromString(const std::string &str);
 };
 

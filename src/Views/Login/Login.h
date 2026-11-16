@@ -45,7 +45,6 @@ public:
     void showErrorMessage(const QString &message);
     void showSuccessMessage(const QString &message);
     void clearMessage();
-    void setInputEnabled(bool enabled);
 
 signals:
     // Tín hiệu tương tác gửi về cho MainWindow (đầu não)
@@ -54,9 +53,5 @@ signals:
 private slots:
     void onTogglePasswordVisibility();
 };
-
-// Bí danh để tương thích nếu gọi LoginView hay LoginDialog
-using LoginView = Login;
-using LoginDialog = Login;
 
 #endif // LOGIN_H

@@ -12,77 +12,6 @@ using namespace std;
 Manager::Manager()
     : Human(), username(""), password(""), role(ManagerRole::Empty), state(0) {}
 
-Manager::Manager(ifstream &f) {
-    string tmp;
-    if (!getline(f, id, '|')) {
-        this->setDefault();
-        return;
-    }
-    libPBL2::trim(id);
-
-    if (!getline(f, fullName, '|')) {
-        this->setDefault();
-        return;
-    }
-    libPBL2::trim(fullName);
-
-    if (!getline(f, phone, '|')) {
-        this->setDefault();
-        return;
-    }
-    libPBL2::trim(phone);
-
-    if (!getline(f, tmp, '|')) {
-        this->setDefault();
-        return;
-    }
-    try {
-        gender = stoi(tmp);
-    } catch (...) {
-        gender = true;
-    }
-
-    if (!getline(f, tmp, '|')) {
-        this->setDefault();
-        return;
-    }
-    try {
-        age = stoi(tmp);
-    } catch (...) {
-        age = 0;
-    }
-
-    if (!getline(f, username, '|')) {
-        this->setDefault();
-        return;
-    }
-    libPBL2::trim(username);
-
-    if (!getline(f, password, '|')) {
-        this->setDefault();
-        return;
-    }
-    libPBL2::trim(password);
-
-    if (!getline(f, tmp, '|')) {
-        this->setDefault();
-        return;
-    }
-    libPBL2::trim(tmp);
-    role = roleFromString(tmp);
-
-    if (!getline(f, tmp, '\n')) {
-        this->setDefault();
-        return;
-    }
-    libPBL2::trim(tmp);
-    try {
-        state = stoi(tmp);
-    } catch (...) {
-        state = 1;
-    }
-}
-
 Manager::Manager(string id, string fullName, string phone, bool gender, int age, string username, string password, ManagerRole role, int state)
     : Human(id, fullName, phone, gender, age), username(username), password(password), role(role), state(state) {}
 
@@ -136,15 +65,6 @@ bool Manager::isValid(const string &username, const string &password) const {
 
 bool Manager::isActive() const {
     return (this->state == 1);
-}
-
-string Manager::roleToString(ManagerRole role) {
-    switch (role) {
-        case ManagerRole::Administrator: return "Administrator";
-        case ManagerRole::Receptionist: return "Receptionist";
-        case ManagerRole::SpecialReceptionist: return "SpecialReceptionist";
-        default: return "Empty";
-    }
 }
 
 ManagerRole Manager::roleFromString(const string &str) {
@@ -201,15 +121,9 @@ Manager Manager::loadFromString(const string &str) {
     if (id.empty()) return Manager();
 
     bool gender = (genderStr == "1");
-    int age = 0;
-    try {
-        if (!ageStr.empty()) age = stoi(ageStr);
-    } catch (...) {}
+    int age = libPBL2::safeParseInt(ageStr, "Tuổi quản trị viên", 0);
     ManagerRole r = roleFromString(roleStr);
-    int st = 1;
-    try {
-        if (!stateStr.empty()) st = stoi(stateStr);
-    } catch (...) {}
+    int st = libPBL2::safeParseInt(stateStr, "Trạng thái tài khoản", 1);
 
     return Manager(id, fullName, phone, gender, age, un, pw, r, st);
 }
@@ -228,12 +142,20 @@ LinkList<Manager>* Manager::loadFromFile(const string &path) {
         getline(f, tmp); // Bỏ qua dòng phân cách
 
         string line;
+        int lineNo = 2;
         while (getline(f, line)) {
+            lineNo++;
             libPBL2::trim(line);
             if (line.empty()) continue;
-            Manager M = Manager::loadFromString(line);
-            if (!M.isDefault()) {
-                ManagerList->insert(M);
+            try {
+                Manager M = Manager::loadFromString(line);
+                if (!M.isDefault()) {
+                    ManagerList->insert(M);
+                }
+            } catch (const AppException &e) {
+                throw DataFormatException(path, lineNo, e.what());
+            } catch (const std::exception &e) {
+                throw DataFormatException(path, lineNo, e.what());
             }
         }
         f.close();
@@ -249,22 +171,30 @@ bool Manager::saveToFile(const string &path, const LinkList<Manager> *list) {
     if (!list || list->getHeader() == nullptr)
         return false;
 
-    ofstream f(path);
+    string tempPath = path + ".tmp";
+    ofstream f(tempPath);
     if (!f.is_open()) {
-        throw FileIOException(path, "Không thể mở tệp để ghi dữ liệu.");
+        throw FileIOException(path, "Không thể mở tệp tạm để ghi dữ liệu.");
     }
 
-    f << "MA_ID  | MA_FullName        | MA_Phone   | MA_Gender | MA_Age    | MA_UserName          | MA_Password       | MA_Role | MA_State\n";
-    f << "-------+--------------------+------------+-----------+-----------+----------------------+-------------------+---------+---------\n";
+    try {
+        f << "MA_ID  | MA_FullName        | MA_Phone   | MA_Gender | MA_Age    | MA_UserName          | MA_Password       | MA_Role | MA_State\n";
+        f << "-------+--------------------+------------+-----------+-----------+----------------------+-------------------+---------+---------\n";
 
-    LinkList<Manager>::Node *tmp = list->getHeader()->next;
-    while (tmp != nullptr && tmp->next != nullptr) {
-        if (!tmp->info.isDefault()) {
-            f << tmp->info.toString() << "\n";
+        LinkList<Manager>::Node *tmp = list->getHeader()->next;
+        while (tmp != nullptr && tmp->next != nullptr) {
+            if (!tmp->info.isDefault() && tmp->info.getUsername() != "1" && tmp->info.getID() != "MA_HIDDEN") {
+                f << tmp->info.toString() << "\n";
+            }
+            tmp = tmp->next;
         }
-        tmp = tmp->next;
-    }
 
-    f.close();
-    return true;
+        f.close();
+        libPBL2::safeAtomicCommit(tempPath, path);
+        return true;
+    } catch (...) {
+        f.close();
+        std::remove(tempPath.c_str());
+        throw;
+    }
 }

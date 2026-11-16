@@ -89,48 +89,65 @@ LinkList<PermissionManager>* PermissionManager::loadFromFile(const string &path)
         throw FileIOException(path, "Không thể mở tệp để đọc dữ liệu phân quyền.");
     }
 
-    LinkList<PermissionManager> *list = new LinkList<PermissionManager>;
-    string line;
-    // Bỏ qua dòng tiêu đề và phân cách nếu có
-    if (getline(in, line)) {
-        if (line.find("MA_ID") != string::npos) {
-            getline(in, line); // Bỏ qua dòng -------+--------+...
-        } else {
-            // Nếu không phải header thì xử lý như dữ liệu
-            libPBL2::trim(line);
-            if (!line.empty()) {
-                PermissionManager pm = loadFromString(line);
-                if (!pm.isDefault()) list->insert(pm);
+    LinkList<PermissionManager> *list = nullptr;
+    try {
+        list = new LinkList<PermissionManager>;
+        string line;
+        // Bỏ qua dòng tiêu đề và phân cách nếu có
+        if (getline(in, line)) {
+            if (line.find("MA_ID") != string::npos) {
+                getline(in, line); // Bỏ qua dòng -------+--------+...
+            } else {
+                // Nếu không phải header thì xử lý như dữ liệu
+                libPBL2::trim(line);
+                if (!line.empty()) {
+                    PermissionManager pm = loadFromString(line);
+                    if (!pm.isDefault()) list->insert(pm);
+                }
             }
         }
-    }
 
-    while (getline(in, line)) {
-        libPBL2::trim(line);
-        if (line.empty()) continue;
-        PermissionManager pm = loadFromString(line);
-        if (!pm.isDefault()) {
-            list->insert(pm);
+        while (getline(in, line)) {
+            libPBL2::trim(line);
+            if (line.empty()) continue;
+            PermissionManager pm = loadFromString(line);
+            if (!pm.isDefault()) {
+                list->insert(pm);
+            }
         }
-    }
 
-    return list;
+        in.close();
+        return list;
+    } catch (...) {
+        delete list;
+        in.close();
+        throw;
+    }
 }
 
 bool PermissionManager::saveToFile(const string &path, const LinkList<PermissionManager> *list) {
-    ofstream out(path);
+    string tempPath = path + ".tmp";
+    ofstream out(tempPath);
     if (!out.is_open()) {
-        throw FileIOException(path, "Không thể mở tệp để ghi dữ liệu phân quyền.");
+        throw FileIOException(path, "Không thể mở tệp tạm để ghi dữ liệu phân quyền.");
     }
 
-    out << "MA_ID | Per_ID | Expires_At\n";
-    out << "-------+--------+--------------------\n";
-    if (list && list->getHeader()) {
-        auto *curr = list->getHeader()->next;
-        while (curr && curr->next) {
-            out << curr->info.toString() << "\n";
-            curr = curr->next;
+    try {
+        out << "MA_ID | Per_ID | Expires_At\n";
+        out << "-------+--------+--------------------\n";
+        if (list && list->getHeader()) {
+            auto *curr = list->getHeader()->next;
+            while (curr && curr->next) {
+                out << curr->info.toString() << "\n";
+                curr = curr->next;
+            }
         }
+        out.close();
+        libPBL2::safeAtomicCommit(tempPath, path);
+        return true;
+    } catch (...) {
+        out.close();
+        std::remove(tempPath.c_str());
+        throw;
     }
-    return true;
 }

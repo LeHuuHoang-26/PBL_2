@@ -9,60 +9,13 @@
 using namespace std;
 
 Patient::Patient()
-    : Human(), CCCD("") {}
+    : Human(), CCCD(""), state(1) {}
 
-Patient::Patient(std::ifstream &f) {
-    string tmp;
-    if (!getline(f, id, '|')) {
-        setDefault();
-        return;
-    }
-    libPBL2::trim(id);
-
-    if (!getline(f, fullName, '|')) {
-        setDefault();
-        return;
-    }
-    libPBL2::trim(fullName);
-
-    if (!getline(f, phone, '|')) {
-        setDefault();
-        return;
-    }
-    libPBL2::trim(phone);
-
-    if (!getline(f, tmp, '|')) {
-        setDefault();
-        return;
-    }
-    try {
-        gender = stoi(tmp);
-    } catch (...) {
-        gender = true;
-    }
-
-    if (!getline(f, tmp, '|')) {
-        setDefault();
-        return;
-    }
-    try {
-        age = stoi(tmp);
-    } catch (...) {
-        age = 0;
-    }
-
-    if (!getline(f, CCCD, '\n')) {
-        setDefault();
-        return;
-    }
-    libPBL2::trim(CCCD);
-}
-
-Patient::Patient(std::string id, std::string fullName, std::string phone, bool gender, int age, std::string CCCD)
-    : Human(id, fullName, phone, gender, age), CCCD(CCCD) {}
+Patient::Patient(std::string id, std::string fullName, std::string phone, bool gender, int age, std::string CCCD, int state)
+    : Human(id, fullName, phone, gender, age), CCCD(CCCD), state(state) {}
 
 Patient::Patient(const Patient &P)
-    : Human(P.id, P.fullName, P.phone, P.gender, P.age), CCCD(P.CCCD) {}
+    : Human(P.id, P.fullName, P.phone, P.gender, P.age), CCCD(P.CCCD), state(P.state) {}
 
 
 void Patient::setDefault() {
@@ -80,7 +33,9 @@ bool Patient::isDefault() const {
 }
 
 string Patient::getCCCD() const { return this->CCCD; }
+int Patient::getState() const { return this->state; }
 void Patient::setCCCD(string CCCD) { this->CCCD = CCCD; }
+void Patient::setState(int state) { this->state = state; }
 
 string Patient::toString() const {
     return libPBL2::padRightUtf8(id, 5) + " | "
@@ -88,21 +43,34 @@ string Patient::toString() const {
          + libPBL2::padRightUtf8(phone, 10) + " | "
          + libPBL2::padRightUtf8(gender ? "1" : "0", 8) + " | "
          + libPBL2::padRightUtf8(to_string(age), 5) + " | "
-         + CCCD;
+         + libPBL2::padRightUtf8(CCCD, 13) + " | "
+         + to_string(state);
 }
 
 Patient Patient::loadFromString(const std::string &str) {
     if (str.empty()) return Patient();
     stringstream ss(str);
-    string id, fullName, phone, genderStr, ageStr, cccd;
+    string id, fullName, phone, genderStr, ageStr, cccd, stateStr;
 
     if (!getline(ss, id, '|') ||
         !getline(ss, fullName, '|') ||
         !getline(ss, phone, '|') ||
         !getline(ss, genderStr, '|') ||
         !getline(ss, ageStr, '|') ||
-        !getline(ss, cccd)) {
-        return Patient();
+        !getline(ss, cccd, '|')) {
+        // Trường hợp file cũ chỉ có 6 trường
+        stringstream ss6(str);
+        if (!getline(ss6, id, '|') ||
+            !getline(ss6, fullName, '|') ||
+            !getline(ss6, phone, '|') ||
+            !getline(ss6, genderStr, '|') ||
+            !getline(ss6, ageStr, '|') ||
+            !getline(ss6, cccd)) {
+            return Patient();
+        }
+        stateStr = "1";
+    } else {
+        getline(ss, stateStr);
     }
 
     libPBL2::trim(id);
@@ -111,16 +79,15 @@ Patient Patient::loadFromString(const std::string &str) {
     libPBL2::trim(genderStr);
     libPBL2::trim(ageStr);
     libPBL2::trim(cccd);
+    libPBL2::trim(stateStr);
 
     if (id.empty()) return Patient();
 
     bool gender = (genderStr == "1");
-    int age = 0;
-    try {
-        age = stoi(ageStr);
-    } catch (...) {}
+    int age = libPBL2::safeParseInt(ageStr, "Tuổi bệnh nhân", 0);
+    int state = libPBL2::safeParseInt(stateStr, "Trạng thái bệnh nhân", 1);
 
-    return Patient(id, fullName, phone, gender, age, cccd);
+    return Patient(id, fullName, phone, gender, age, cccd, state);
 }
 
 LinkList<Patient>* Patient::loadFromFile(const std::string &path) {
@@ -137,12 +104,20 @@ LinkList<Patient>* Patient::loadFromFile(const std::string &path) {
         getline(f, tmp); // Bỏ qua dòng phân cách
 
         string line;
+        int lineNo = 2;
         while (getline(f, line)) {
+            lineNo++;
             libPBL2::trim(line);
             if (line.empty()) continue;
-            Patient P = Patient::loadFromString(line);
-            if (!P.isDefault()) {
-                patientList->insert(P);
+            try {
+                Patient P = Patient::loadFromString(line);
+                if (!P.isDefault()) {
+                    patientList->insert(P);
+                }
+            } catch (const AppException &e) {
+                throw DataFormatException(path, lineNo, e.what());
+            } catch (const std::exception &e) {
+                throw DataFormatException(path, lineNo, e.what());
             }
         }
         f.close();
@@ -158,24 +133,32 @@ bool Patient::saveToFile(const std::string &path, const LinkList<Patient> *list)
     if (!list || list->getHeader() == nullptr)
         return false;
 
-    ofstream f(path);
+    string tempPath = path + ".tmp";
+    ofstream f(tempPath);
     if (!f.is_open()) {
-        throw FileIOException(path, "Không thể mở tệp để ghi dữ liệu.");
+        throw FileIOException(path, "Không thể mở tệp tạm để ghi dữ liệu.");
     }
 
-    f << "P_ID  | P_FullName              | P_Phone    | P_Gender | P_Age | P_CCCD\n";
-    f << "------+-------------------------+------------+----------+-------+-------------\n";
+    try {
+        f << "P_ID  | P_FullName              | P_Phone    | P_Gender | P_Age | P_CCCD        | P_State\n";
+        f << "------+-------------------------+------------+----------+-------+---------------+--------\n";
 
-    LinkList<Patient>::Node *tmp = list->getHeader()->next;
-    while (tmp != nullptr && tmp->next != nullptr) {
-        if (!tmp->info.isDefault()) {
-            f << tmp->info.toString() << "\n";
+        LinkList<Patient>::Node *tmp = list->getHeader()->next;
+        while (tmp != nullptr && tmp->next != nullptr) {
+            if (!tmp->info.isDefault()) {
+                f << tmp->info.toString() << "\n";
+            }
+            tmp = tmp->next;
         }
-        tmp = tmp->next;
-    }
 
-    f.close();
-    return true;
+        f.close();
+        libPBL2::safeAtomicCommit(tempPath, path);
+        return true;
+    } catch (...) {
+        f.close();
+        std::remove(tempPath.c_str());
+        throw;
+    }
 }
 
 string Patient::generateNextId(const LinkList<Patient> *list) {

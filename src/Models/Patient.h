@@ -9,10 +9,10 @@
 class Patient: public Human {
     private:
         std::string CCCD;
+        int state;
     public:
         Patient();
-        Patient(std::ifstream &f);
-        Patient(std::string id, std::string fullName, std::string phone, bool gender, int age, std::string CCCD);
+        Patient(std::string id, std::string fullName, std::string phone, bool gender, int age, std::string CCCD, int state = 1);
         Patient(const Patient &P);
         Patient &operator=(const Patient &P) = default;
         ~Patient() = default;
@@ -20,7 +20,9 @@ class Patient: public Human {
         void setDefault();
         bool isDefault() const;
         std::string getCCCD() const;
+        int getState() const;
         void setCCCD(std::string CCCD);
+        void setState(int state);
 
         std::string toString() const;
         static Patient loadFromString(const std::string &str);

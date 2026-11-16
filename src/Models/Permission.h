@@ -4,15 +4,6 @@
 #include <string>
 #include "LinkList.h"
 
-enum class PermissionType {
-    Empty = 0,
-    Per_1,
-    Per_2,
-    Per_3,
-    Per_4,
-    Per_5
-};
-
 class Permission {
 private:
     std::string Per_id;
@@ -38,9 +29,6 @@ public:
     // State Helpers
     bool isDefault() const;
     void setDefault();
-
-    // Type Conversions
-    static std::string permissionTypeToString(PermissionType per);
 
     // System Permission Catalog
     static LinkList<Permission>* getSystemCatalog();

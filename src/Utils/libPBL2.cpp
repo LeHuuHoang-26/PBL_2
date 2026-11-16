@@ -46,6 +46,56 @@ inline string padRightUtf8(const string &str, size_t targetWidth) {
     return str + string(targetWidth - ulen, ' ');
 }
 
+inline int safeParseInt(const string &str, const string &fieldName, int defaultVal, bool required) {
+    string s = str;
+    trim(s);
+    if (s.empty()) {
+        if (required) throw DataFormatException("Trường [" + fieldName + "] không được để trống.");
+        return defaultVal;
+    }
+    try {
+        size_t idx = 0;
+        int val = stoi(s, &idx);
+        if (idx != s.length()) {
+            throw DataFormatException("Trường [" + fieldName + "] chứa ký tự không hợp lệ: '" + str + "'");
+        }
+        return val;
+    } catch (const invalid_argument &) {
+        throw DataFormatException("Trường [" + fieldName + "] không đúng định dạng số nguyên: '" + str + "'");
+    } catch (const out_of_range &) {
+        throw DataFormatException("Trường [" + fieldName + "] vượt quá giới hạn số nguyên: '" + str + "'");
+    }
+}
+
+inline double safeParseDouble(const string &str, const string &fieldName, double defaultVal, bool required) {
+    string s = str;
+    trim(s);
+    if (s.empty()) {
+        if (required) throw DataFormatException("Trường [" + fieldName + "] không được để trống.");
+        return defaultVal;
+    }
+    try {
+        size_t idx = 0;
+        double val = stod(s, &idx);
+        if (idx != s.length()) {
+            throw DataFormatException("Trường [" + fieldName + "] chứa ký tự không hợp lệ: '" + str + "'");
+        }
+        return val;
+    } catch (const invalid_argument &) {
+        throw DataFormatException("Trường [" + fieldName + "] không đúng định dạng số thực: '" + str + "'");
+    } catch (const out_of_range &) {
+        throw DataFormatException("Trường [" + fieldName + "] vượt quá giới hạn số thực: '" + str + "'");
+    }
+}
+
+inline void safeAtomicCommit(const string &tempPath, const string &finalPath) {
+    std::remove(finalPath.c_str());
+    if (std::rename(tempPath.c_str(), finalPath.c_str()) != 0) {
+        std::remove(tempPath.c_str());
+        throw FileIOException(finalPath, "Không thể cập nhật tệp dữ liệu sau khi ghi tạm.");
+    }
+}
+
 // -------------------------------------------------------------
 // Generic QuickSort Algorithm Implementation (Định nghĩa template)
 // -------------------------------------------------------------

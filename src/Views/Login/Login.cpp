@@ -633,9 +633,3 @@ void Login::clearMessage() {
     m_lblMessage->clear();
     m_lblMessage->hide();
 }
-
-void Login::setInputEnabled(bool enabled) {
-    m_txtUsername->setEnabled(enabled);
-    m_txtPassword->setEnabled(enabled);
-    m_btnLogin->setEnabled(enabled);
-}

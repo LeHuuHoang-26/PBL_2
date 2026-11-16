@@ -102,10 +102,7 @@ Appointment Appointment::loadFromString(const string &str) {
         return Appointment();
 
     Date dGet = Date::loadFromString(dateGetStr);
-    int st = 0;
-    try {
-        if (!stateStr.empty()) st = stoi(stateStr);
-    } catch (...) {}
+    int st = libPBL2::safeParseInt(stateStr, "Trạng thái cuộc hẹn", 0);
 
     return Appointment(id, spId, doctorId, dGet, st);
 }
@@ -134,8 +131,8 @@ LinkList<Appointment>* Appointment::loadFromFile(const string &path) {
                 if (!app.isDefault()) {
                     list->insert(app);
                 }
-            } catch (const AppException &) {
-                throw;
+            } catch (const AppException &e) {
+                throw DataFormatException(path, lineNo, e.what());
             } catch (const std::exception &e) {
                 throw DataFormatException(path, lineNo, e.what());
             }
@@ -154,22 +151,30 @@ bool Appointment::saveToFile(const string &path, const LinkList<Appointment> *li
     if (!list || list->getHeader() == nullptr)
         return false;
 
-    ofstream f(path);
+    string tempPath = path + ".tmp";
+    ofstream f(tempPath);
     if (!f.is_open()) {
-        throw FileIOException(path, "Không thể mở tệp để ghi dữ liệu.");
+        throw FileIOException(path, "Không thể mở tệp tạm để ghi dữ liệu.");
     }
 
-    f << "A_ID  | SP_ID  | D_ID  | A_DateGet        | A_State\n";
-    f << "------+--------+-------+------------------+---------\n";
+    try {
+        f << "A_ID  | SP_ID  | D_ID  | A_DateGet        | A_State\n";
+        f << "------+--------+-------+------------------+---------\n";
 
-    LinkList<Appointment>::Node *tmp = list->getHeader()->next;
-    while (tmp != nullptr && tmp->next != nullptr) {
-        if (!tmp->info.isDefault()) {
-            f << tmp->info.toString() << "\n";
+        LinkList<Appointment>::Node *tmp = list->getHeader()->next;
+        while (tmp != nullptr && tmp->next != nullptr) {
+            if (!tmp->info.isDefault()) {
+                f << tmp->info.toString() << "\n";
+            }
+            tmp = tmp->next;
         }
-        tmp = tmp->next;
-    }
 
-    f.close();
-    return true;
+        f.close();
+        libPBL2::safeAtomicCommit(tempPath, path);
+        return true;
+    } catch (...) {
+        f.close();
+        std::remove(tempPath.c_str());
+        throw;
+    }
 }
