@@ -229,8 +229,9 @@ void DoctorView::refresh(bool preserveScroll) {
         QString spec = mainWindow->specialty(n->info.getSpId());
         QString room = UIHelper::formatRoom(UIHelper::qs(n->info.getRoomId()));
         QString id = UIHelper::qs(n->info.getID());
+        QString phone = UIHelper::qs(n->info.getPhone());
 
-        if (q.isEmpty() || name.toLower().contains(q) || spec.toLower().contains(q) || room.toLower().contains(q) || id.toLower().contains(q)) {
+        if (q.isEmpty() || name.toLower().contains(q) || spec.toLower().contains(q) || room.toLower().contains(q) || id.toLower().contains(q) || phone.contains(q)) {
             matched.append(&n->info);
             if (n->info.getState() == 1) {
                 activeCount++;
@@ -657,6 +658,17 @@ void DoctorView::editDoctorDialog(const std::string &id) {
                 phone->setFocus();
                 return;
             }
+            if (mainWindow && mainWindow->getDoctors()) {
+                auto *dn = mainWindow->getDoctors()->getHeader()->next;
+                while (dn && dn->next) {
+                    if (dn->info.getID() != doctor->getID() && dn->info.getState() != -1 && dn->info.getPhone() == UIHelper::ss(phoneStr)) {
+                        UIHelper::showWarning(&dialog, "Trùng thông tin", "Số điện thoại này đã được sử dụng bởi một bác sĩ khác.");
+                        phone->setFocus();
+                        return;
+                    }
+                    dn = dn->next;
+                }
+            }
             doctor->setfullName(UIHelper::ss(nameStr));
             doctor->setPhone(UIHelper::ss(phoneStr));
             doctor->setAge(age->value());
@@ -667,9 +679,15 @@ void DoctorView::editDoctorDialog(const std::string &id) {
             doctor->setRating(rating->value());
             doctor->setState(state->currentIndex() == 0 ? 1 : 0);
 
-            mainWindow->saveAll(SaveScope::Doctor, SaveAction::Normal);
-            UIHelper::showSuccess(&dialog, "Thành công", "Cập nhật thông tin bác sĩ thành công.");
-            dialog.accept();
+            try {
+                mainWindow->saveAll(SaveScope::Doctor, SaveAction::Normal);
+                UIHelper::showSuccess(&dialog, "Thành công", "Cập nhật thông tin bác sĩ thành công.");
+                dialog.accept();
+            } catch (const AppException &e) {
+                UIHelper::showWarning(&dialog, "Lỗi cập nhật bác sĩ", QString::fromUtf8(e.what()));
+            } catch (const std::exception &e) {
+                UIHelper::showWarning(&dialog, "Lỗi hệ thống", QString("Đã xảy ra ngoại lệ: %1").arg(e.what()));
+            }
         });
 
         leftBtnBox->addWidget(cancelBtn);
@@ -884,7 +902,7 @@ void DoctorView::editDoctorDialog(const std::string &id) {
 
         auto *n = mainWindow->getAppointments()->getHeader()->next;
         while (n && n->next) {
-            if (n->info.getDoctorId() == docId && n->info.getState() != -2) {
+            if (n->info.getDoctorId() == docId) {
                 allAppts.append(&n->info);
                 totalCount++;
             }
@@ -1014,9 +1032,8 @@ void DoctorView::editDoctorDialog(const std::string &id) {
             // 4. Trạng thái ca khám (căn giữa)
             int st = a->getState();
             if (st == 0) {
-                QDateTime now = QDateTime::currentDateTime();
-                QDateTime apptDt(QDate(ad.getYear(), ad.getMonth(), ad.getDay()), QTime(ad.getHour(), ad.getMinute()));
-                if (apptDt < now) st = -1;
+                Date now = Date::now();
+                st = a->computeEffectiveState(now.getDay(), now.getMonth(), now.getYear(), now.getHour(), now.getMinute());
             }
             QString badgeText = "● Chưa khám";
             QString badgeStyle = "QLabel { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; border-radius: 10px; font-size: 11px; font-weight: 750; padding: 3px 8px; }";
@@ -1026,6 +1043,9 @@ void DoctorView::editDoctorDialog(const std::string &id) {
             } else if (st == -1) {
                 badgeText = "● Trễ hẹn";
                 badgeStyle = "QLabel { background: #fff7ed; color: #ea580c; border: 1px solid #ffedd5; border-radius: 10px; font-size: 11px; font-weight: 750; padding: 3px 8px; }";
+            } else if (st == -2) {
+                badgeText = "● Đã dời lịch";
+                badgeStyle = "QLabel { background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 11px; font-weight: 750; padding: 3px 8px; }";
             }
             auto *badgeLbl = new QLabel(badgeText);
             badgeLbl->setStyleSheet(badgeStyle);
@@ -1375,6 +1395,17 @@ void DoctorView::addDoctorDialog() {
             phone->setFocus();
             return;
         }
+        if (mainWindow && mainWindow->getDoctors()) {
+            auto *dn = mainWindow->getDoctors()->getHeader()->next;
+            while (dn && dn->next) {
+                if (dn->info.getState() != -1 && dn->info.getPhone() == UIHelper::ss(phoneStr)) {
+                    UIHelper::showWarning(&dialog, "Trùng thông tin", "Số điện thoại này đã được sử dụng bởi một bác sĩ khác.");
+                    phone->setFocus();
+                    return;
+                }
+                dn = dn->next;
+            }
+        }
         if (roomStr.isEmpty()) {
             roomStr = "Room 101";
         }
@@ -1392,12 +1423,20 @@ void DoctorView::addDoctorDialog() {
             rating->value()
         );
 
-        auto *docList = mainWindow->getDoctors();
-        if (docList) {
-            docList->insert(newDoctor);
-            mainWindow->saveAll(SaveScope::Doctor, SaveAction::Normal);
+        try {
+            auto *docList = mainWindow->getDoctors();
+            if (docList) {
+                docList->insert(newDoctor);
+                mainWindow->saveAll(SaveScope::Doctor, SaveAction::Normal);
+            }
+            dialog.accept();
+            refresh(true);
+            UIHelper::showSuccess(this, "Thành công", "Đã thêm bác sĩ mới thành công.");
+        } catch (const AppException &e) {
+            UIHelper::showWarning(&dialog, "Lỗi thêm bác sĩ", QString::fromUtf8(e.what()));
+        } catch (const std::exception &e) {
+            UIHelper::showWarning(&dialog, "Lỗi hệ thống", QString("Đã xảy ra ngoại lệ: %1").arg(e.what()));
         }
-        dialog.accept();
     });
 
     dialog.setFocusPolicy(Qt::StrongFocus);

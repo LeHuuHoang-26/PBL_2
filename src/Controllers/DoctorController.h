@@ -15,6 +15,7 @@ public:
     static std::string generateNextId(const LinkList<Doctor> *doctors);
     static QString getSpecialty(const std::string &spId, const std::string &specPath);
     static QList<QPair<QString, QString>> getSpecializationList(const std::string &specPath);
+    static void clearSpecialtyCache();
 };
 
 #endif // DOCTORCONTROLLER_H

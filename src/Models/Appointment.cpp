@@ -1,50 +1,27 @@
 #include <fstream>
-#include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
 #include "Appointment.h"
 #include "libPBL2.h"
 #include "../Utils/AppExceptions.h"
 
 using namespace std;
 
-Appointment::Appointment(string id, string symptomPatientId, string doctorId, const Date &dateSet, const Date &dateGet, int state)
-    : id(id), symptomPatientId(symptomPatientId), doctorId(doctorId), dateSet(dateSet), dateGet(dateGet), state(state) {}
+Appointment::Appointment(string id, string symptomPatientId, string doctorId, const Date &dateGet, int state)
+    : id(id), symptomPatientId(symptomPatientId), doctorId(doctorId), dateGet(dateGet), state(state) {}
 
 string Appointment::getId() const { return id; }
 string Appointment::getSymptomPatientId() const { return symptomPatientId; }
 string Appointment::getDoctorId() const { return doctorId; }
-Date Appointment::getDateSet() const { return dateSet; }
 Date Appointment::getDateGet() const { return dateGet; }
 int Appointment::getState() const { return state; }
 
 void Appointment::setId(const string &value) { id = value; }
 void Appointment::setSymptomPatientId(const string &value) { symptomPatientId = value; }
 void Appointment::setDoctorId(const string &value) { doctorId = value; }
-void Appointment::setDateSet(const Date &value) { dateSet = value; }
 void Appointment::setDateGet(const Date &value) { dateGet = value; }
 void Appointment::setState(int value) { state = value; }
-
-string Appointment::stateToString(int s) {
-    switch (s) {
-        case -2: return "Dời lịch";
-        case 1: return "Đã khám";
-        case -1: return "Trễ hẹn";
-        case 0:
-        default: return "Chưa khám";
-    }
-}
-
-int Appointment::stringToState(const string &str) {
-    if (str == "-2" || str == "Dời lịch" || str == "Rescheduled") return -2;
-    if (str == "1" || str == "Đã khám" || str == "Completed") return 1;
-    if (str == "-1" || str == "Trễ hẹn" || str == "Delayed") return -1;
-    return 0; // Chưa khám
-}
-
-string Appointment::getStateString() const {
-    return stateToString(state);
-}
 
 int Appointment::computeEffectiveState(int curDay, int curMonth, int curYear, int curHour, int curMin) const {
     if (state == -2) return -2; // Dời lịch
@@ -58,8 +35,10 @@ int Appointment::computeEffectiveState(int curDay, int curMonth, int curYear, in
         return -1; // Trễ hẹn (ngày hẹn đã qua)
     }
     if (ad.getYear() == curYear && ad.getMonth() == curMonth && ad.getDay() == curDay) {
-        if (ad.getHour() < curHour || (ad.getHour() == curHour && ad.getMinute() <= curMin)) {
-            return -1; // Trễ hẹn (hôm nay nhưng đã quá giờ hẹn)
+        int apptMinutes = ad.getHour() * 60 + ad.getMinute();
+        int curMinutes = curHour * 60 + curMin;
+        if (apptMinutes + 30 <= curMinutes) {
+            return -1; // Trễ hẹn (hôm nay nhưng đã quá 30 phút so với giờ hẹn)
         }
     }
     return 0; // Chưa khám (chưa đến giờ)
@@ -73,7 +52,6 @@ void Appointment::setDefault() {
     id = "";
     symptomPatientId = "";
     doctorId = "";
-    dateSet = Date();
     dateGet = Date();
     state = 0;
 }
@@ -86,7 +64,6 @@ string Appointment::toString() const {
     return libPBL2::padRightUtf8(id, 5) + " | "
          + libPBL2::padRightUtf8(symptomPatientId, 6) + " | "
          + libPBL2::padRightUtf8(doctorId, 5) + " | "
-         + libPBL2::padRightUtf8(dateSet.toString(), 16) + " | "
          + libPBL2::padRightUtf8(dateGet.toString(), 16) + " | "
          + stStr;
 }
@@ -94,35 +71,43 @@ string Appointment::toString() const {
 Appointment Appointment::loadFromString(const string &str) {
     if (str.empty()) return Appointment();
     stringstream ss(str);
-    string id, spId, doctorId, dateSetStr, dateGetStr, stateStr;
+    string token;
+    vector<string> parts;
+    while (getline(ss, token, '|')) {
+        libPBL2::trim(token);
+        parts.push_back(token);
+    }
 
-    if (!getline(ss, id, '|') ||
-        !getline(ss, spId, '|') ||
-        !getline(ss, doctorId, '|') ||
-        !getline(ss, dateSetStr, '|') ||
-        !getline(ss, dateGetStr, '|') ||
-        !getline(ss, stateStr)) {
+    if (parts.size() < 5) {
         return Appointment();
     }
 
-    libPBL2::trim(id);
-    libPBL2::trim(spId);
-    libPBL2::trim(doctorId);
-    libPBL2::trim(dateSetStr);
-    libPBL2::trim(dateGetStr);
-    libPBL2::trim(stateStr);
+    string id = parts[0];
+    string spId = parts[1];
+    string doctorId = parts[2];
+    string dateGetStr;
+    string stateStr;
+
+    if (parts.size() >= 6) {
+        // Cấu trúc cũ (tương thích ngược): ID | SP_ID | D_ID | DateSet | DateGet | State
+        dateGetStr = parts[4];
+        stateStr = parts[5];
+    } else {
+        // Cấu trúc mới: ID | SP_ID | D_ID | DateGet | State
+        dateGetStr = parts[3];
+        stateStr = parts[4];
+    }
 
     if (id.empty() || spId.empty() || doctorId.empty())
         return Appointment();
 
-    Date dSet = Date::loadFromString(dateSetStr);
     Date dGet = Date::loadFromString(dateGetStr);
     int st = 0;
     try {
         if (!stateStr.empty()) st = stoi(stateStr);
     } catch (...) {}
 
-    return Appointment(id, spId, doctorId, dSet, dGet, st);
+    return Appointment(id, spId, doctorId, dGet, st);
 }
 
 LinkList<Appointment>* Appointment::loadFromFile(const string &path) {
@@ -174,8 +159,8 @@ bool Appointment::saveToFile(const string &path, const LinkList<Appointment> *li
         throw FileIOException(path, "Không thể mở tệp để ghi dữ liệu.");
     }
 
-    f << "A_ID  | SP_ID  | D_ID  | A_DateSet        | A_DateGet        | A_State\n";
-    f << "------+--------+-------+------------------+------------------+---------\n";
+    f << "A_ID  | SP_ID  | D_ID  | A_DateGet        | A_State\n";
+    f << "------+--------+-------+------------------+---------\n";
 
     LinkList<Appointment>::Node *tmp = list->getHeader()->next;
     while (tmp != nullptr && tmp->next != nullptr) {

@@ -2,6 +2,8 @@
 #include "libPBL2.h"
 #include "MainWindow.h"
 #include "ManagerController.h"
+#include "Permission.h"
+#include "PermissionManager.h"
 #include "UIHelper.h"
 
 #include <QVBoxLayout>
@@ -23,54 +25,7 @@
 #include <QAction>
 #include <QIcon>
 #include <QTimer>
-
-struct PermissionDef {
-    const char *id;
-    const char *name;
-};
-
-static const PermissionDef permissionDefinitions[] = {
-    {"Per_1", "Cấp quyền tạm thời làm admin có thời hạn"},
-    {"Per_2", "Chỉnh sửa thông tin bác sĩ"},
-    {"Per_3", "Chỉnh sửa thông tin bệnh nhân"},
-    {"Per_4", "Chỉnh sửa thông tin lịch hẹn khám bệnh"},
-    {"Per_5", "Chỉnh sửa lịch nghỉ lễ / Tết"}
-};
-static const int permissionDefinitionCount = 5;
-
-static QIcon createEyeIcon(bool isVisible) {
-    int size = 48;
-    QPixmap pix(size, size);
-    pix.fill(Qt::transparent);
-    QPainter p(&pix);
-    p.setRenderHint(QPainter::Antialiasing);
-    p.scale(size / 24.0, size / 24.0);
-
-    QColor color = isVisible ? QColor("#0d9488") : QColor("#94a3b8");
-    QPen pen(color, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-    p.setPen(pen);
-    p.setBrush(Qt::NoBrush);
-
-    QPainterPath eyePath;
-    eyePath.moveTo(3.0, 12.0);
-    eyePath.quadTo(12.0, 5.0, 21.0, 12.0);
-    eyePath.quadTo(12.0, 19.0, 3.0, 12.0);
-    p.drawPath(eyePath);
-
-    if (isVisible) {
-        p.setBrush(color);
-        p.drawEllipse(QPointF(12.0, 12.0), 3.5, 3.5);
-        p.setPen(Qt::NoPen);
-        p.setBrush(Qt::white);
-        p.drawEllipse(QPointF(13.2, 10.8), 1.0, 1.0);
-    } else {
-        p.drawEllipse(QPointF(12.0, 12.0), 2.5, 2.5);
-        p.drawLine(QPointF(4.5, 4.5), QPointF(19.5, 19.5));
-    }
-
-    pix.setDevicePixelRatio(2.0);
-    return QIcon(pix);
-}
+#include <memory>
 
 AccountView::AccountView(MainWindow *mainWindow, QWidget *parent)
     : QWidget(parent), mainWindow(mainWindow) {
@@ -327,41 +282,53 @@ void AccountView::refresh(bool preserveScroll) {
             action.second->setToolTip("Bạn không có quyền xóa tài khoản (Yêu cầu quyền Quản trị viên)");
         }
 
-        connect(action.second, &QPushButton::clicked, this, [this, m]() {
+        connect(action.second, &QPushButton::clicked, this, [this, mid = m->getID(), name = UIHelper::qs(m->getfullName())]() {
             if (!mainWindow) return;
+            auto *managers = mainWindow->getManagers();
+            if (!managers) return;
+            Manager *target = ManagerController::findById(managers, mid);
+            if (!target) return;
             if (!mainWindow->isAdministrator()) {
                 UIHelper::showWarning(this, "Không có quyền", "Chỉ quản trị viên mới có quyền xóa tài khoản.");
                 return;
             }
             Manager *cur = mainWindow->getCurrentManager();
-            if (cur && cur->getID() == m->getID()) {
+            if (cur && cur->getID() == mid) {
                 UIHelper::showWarning(this, "Không thể xóa", "Bạn không thể xóa tài khoản hiện đang đăng nhập vào hệ thống.");
                 return;
             }
-            if (ManagerController::isRootAdmin(m)) {
+            if (ManagerController::isRootAdmin(target)) {
                 UIHelper::showWarning(this, "Không thể xóa", "Không thể xóa tài khoản Quản trị viên gốc của hệ thống.");
                 return;
             }
-            if (ManagerController::isAdministrator(m, "Data/PermissionManager.txt") && !mainWindow->isRootAdmin()) {
+            if (ManagerController::isAdministrator(target, mainWindow ? mainWindow->getPermissionRecords() : nullptr) && !mainWindow->isRootAdmin()) {
                 UIHelper::showWarning(this, "Không có quyền", "Chỉ Quản trị viên gốc mới có quyền xóa tài khoản Quản trị viên.");
                 return;
             }
-            QString name = UIHelper::qs(m->getfullName());
             if (!UIHelper::confirmDelete(this, "Xác nhận xóa tài khoản",
                 QStringLiteral("Bạn có chắc chắn muốn xóa tài khoản \"%1\" khỏi hệ thống?\nTài khoản sau khi xóa sẽ bị xóa khỏi danh sách.").arg(name),
                 "Xóa tài khoản", "Không xóa")) {
                 return;
             }
-            std::string mid = m->getID();
-            auto *managers = mainWindow->getManagers();
-            if (managers) {
-                auto *n = managers->getHeader()->next;
-                while (n && n->next) {
-                    if (n->info.getID() == mid) {
-                        managers->remove(n);
-                        break;
+            auto *n = managers->getHeader()->next;
+            while (n && n->next) {
+                if (n->info.getID() == mid) {
+                    managers->remove(n);
+                    break;
+                }
+                n = n->next;
+            }
+            auto *pRecords = mainWindow->getPermissionRecords();
+            if (pRecords && pRecords->getHeader()) {
+                auto *pn = pRecords->getHeader()->next;
+                while (pn && pn->next) {
+                    if (pn->info.getMA_id() == mid) {
+                        auto *toDel = pn;
+                        pn = pn->next;
+                        pRecords->remove(toDel);
+                        continue;
                     }
-                    n = n->next;
+                    pn = pn->next;
                 }
             }
             mainWindow->saveAll(SaveScope::Account, SaveAction::Normal);
@@ -582,11 +549,11 @@ void AccountView::addManagerDialog() {
 
     auto *password = new QLineEdit;
     password->setEchoMode(QLineEdit::Normal);
-    auto *toggleAddAction = password->addAction(createEyeIcon(true), QLineEdit::TrailingPosition);
+    auto *toggleAddAction = password->addAction(UIHelper::createEyeIcon(true), QLineEdit::TrailingPosition);
     connect(toggleAddAction, &QAction::triggered, password, [password, toggleAddAction]() {
         bool isNormal = (password->echoMode() == QLineEdit::Normal);
         password->setEchoMode(isNormal ? QLineEdit::Password : QLineEdit::Normal);
-        toggleAddAction->setIcon(createEyeIcon(!isNormal));
+        toggleAddAction->setIcon(UIHelper::createEyeIcon(!isNormal));
     });
     cardLayout->addLayout(makeField("MẬT KHẨU *", password));
 
@@ -638,12 +605,18 @@ void AccountView::addManagerDialog() {
         ManagerRole r = role->currentIndex() == 2 ? ManagerRole::Administrator :
                        (role->currentIndex() == 1 ? ManagerRole::SpecialReceptionist : ManagerRole::Receptionist);
 
-        if (managers) {
-            managers->insert(Manager(id, UIHelper::ss(name->text().trimmed()), UIHelper::ss(phoneStr), gender->currentIndex() == 0, age->value(), UIHelper::ss(username->text().trimmed()), UIHelper::ss(password->text()), r, 1));
+        try {
+            if (managers) {
+                managers->insert(Manager(id, UIHelper::ss(name->text().trimmed()), UIHelper::ss(phoneStr), gender->currentIndex() == 0, age->value(), UIHelper::ss(username->text().trimmed()), UIHelper::ss(password->text()), r, 1));
+            }
+            mainWindow->saveAll(SaveScope::Account, SaveAction::Normal);
+            dialog.accept();
+            UIHelper::showSuccess(this, "Thành công", "Tài khoản quản lý mới đã được tạo thành công.");
+        } catch (const AppException &e) {
+            UIHelper::showWarning(&dialog, "Lỗi tạo tài khoản", QString::fromUtf8(e.what()));
+        } catch (const std::exception &e) {
+            UIHelper::showWarning(&dialog, "Lỗi hệ thống", QString("Đã xảy ra ngoại lệ: %1").arg(e.what()));
         }
-        mainWindow->saveAll(SaveScope::Account, SaveAction::Normal);
-        dialog.accept();
-        UIHelper::showSuccess(this, "Thành công", "Tài khoản quản lý mới đã được tạo thành công.");
     });
 
     btnBox->addWidget(cancelBtn);
@@ -877,11 +850,11 @@ void AccountView::editManagerDialog(const std::string &managerId) {
 
     auto *password = new QLineEdit(UIHelper::qs(targetMgr->getPassword()));
     password->setEchoMode(QLineEdit::Normal);
-    auto *toggleEditAction = password->addAction(createEyeIcon(true), QLineEdit::TrailingPosition);
+    auto *toggleEditAction = password->addAction(UIHelper::createEyeIcon(true), QLineEdit::TrailingPosition);
     connect(toggleEditAction, &QAction::triggered, password, [password, toggleEditAction]() {
         bool isNormal = (password->echoMode() == QLineEdit::Normal);
         password->setEchoMode(isNormal ? QLineEdit::Password : QLineEdit::Normal);
-        toggleEditAction->setIcon(createEyeIcon(!isNormal));
+        toggleEditAction->setIcon(UIHelper::createEyeIcon(!isNormal));
     });
     cardLayout->addLayout(makeField("MẬT KHẨU *", password));
 
@@ -909,10 +882,12 @@ void AccountView::editManagerDialog(const std::string &managerId) {
 
     // Phân quyền đặc biệt: Hiển thị khi Root Admin chỉnh sửa tài khoản nhân viên
     struct PermCheckItem {
-        QCheckBox *box;
-        QSpinBox *spin;
+        QCheckBox *box = nullptr;
+        QSpinBox *spin = nullptr;
+        int baseDays = 30;
+        QDateTime baseExpiry;
     };
-    auto *checks = new QList<PermCheckItem>;
+    auto checks = std::make_shared<QList<PermCheckItem>>();
 
     if (isCurrentRoot && !isTargetRoot) {
         auto *permDivider = new QFrame;
@@ -924,74 +899,99 @@ void AccountView::editManagerDialog(const std::string &managerId) {
         permTitle->setStyleSheet("font-size: 13px; font-weight: 750; color: #0d9488;");
         cardLayout->addWidget(permTitle);
 
-        QStringList granted = ManagerController::getGrantedPermissions(managerId, "Data/PermissionManager.txt");
+        QStringList granted = ManagerController::getGrantedPermissions(managerId, mainWindow ? mainWindow->getPermissionRecords() : nullptr);
 
-        for (int i = 0; i < permissionDefinitionCount; ++i) {
-            const auto &entry = permissionDefinitions[i];
-            auto *check = new QCheckBox(QString::fromUtf8(entry.name));
-            check->setStyleSheet("QCheckBox { font-size: 12.5px; color: #334155; } QCheckBox:hover { color: #0d9488; }");
-            check->setChecked(granted.contains(QString::fromUtf8(entry.id)));
-            check->setProperty("permissionId", QString::fromUtf8(entry.id));
+        LinkList<Permission> *catalog = Permission::getSystemCatalog();
+        if (catalog && catalog->getHeader()) {
+            auto *node = catalog->getHeader()->next;
+            while (node && node->next) {
+                const auto &entry = node->info;
+                std::string pId = entry.getPer_id();
+                QString pName = QString::fromUtf8(entry.getPer_Name().c_str());
 
-            auto *rowLayout = new QHBoxLayout;
-            rowLayout->setContentsMargins(0, 0, 0, 0);
-            rowLayout->setSpacing(8);
-            rowLayout->addWidget(check);
+                auto *check = new QCheckBox(pName);
+                check->setStyleSheet("QCheckBox { font-size: 12.5px; color: #334155; } QCheckBox:hover { color: #0d9488; }");
+                check->setChecked(granted.contains(QString::fromUtf8(pId.c_str())));
+                check->setProperty("permissionId", QString::fromUtf8(pId.c_str()));
 
-            QLabel *badgeLabel = nullptr;
-            if (std::string(entry.id) == "Per_1") {
-                badgeLabel = new QLabel;
-                badgeLabel->setStyleSheet("font-size: 11.5px; font-weight: 700; color: #0f766e; background-color: #ccfbf1; border: 1px solid #99f6e4; border-radius: 6px; padding: 2px 8px;");
-                badgeLabel->setVisible(false);
-                rowLayout->addWidget(badgeLabel);
+                auto *rowLayout = new QHBoxLayout;
+                rowLayout->setContentsMargins(0, 0, 0, 0);
+                rowLayout->setSpacing(8);
+                rowLayout->addWidget(check);
 
-                QDateTime currentExpiry = ManagerController::permissionExpiry(managerId, entry.id, "Data/PermissionManager.txt");
-                if (granted.contains(QString::fromUtf8(entry.id)) && currentExpiry.isValid() && currentExpiry > QDateTime::currentDateTime()) {
-                    badgeLabel->setText(currentExpiry.toString("dd-MM-yyyy | HH:mm"));
-                    badgeLabel->setVisible(true);
-                }
-            }
-            rowLayout->addStretch();
-            cardLayout->addLayout(rowLayout);
+                QLabel *badgeLabel = nullptr;
+                QSpinBox *duration = nullptr;
+                int baseDays = 30;
+                QDateTime baseExpiry;
 
-            QSpinBox *duration = nullptr;
-            if (std::string(entry.id) == "Per_1") {
-                auto *durRow = new QHBoxLayout;
-                durRow->setContentsMargins(20, 0, 0, 0);
-                auto *durLbl = new QLabel("Thời hạn hiệu lực (ngày):");
-                durLbl->setStyleSheet("font-size: 12px; color: #64748b; font-weight: 600;");
-                duration = new QSpinBox;
-                duration->setRange(1, 3650);
-                duration->setValue(30);
-                durRow->addWidget(durLbl);
-                durRow->addWidget(duration);
-                durRow->addStretch();
-                cardLayout->addLayout(durRow);
+                if (pId == "Per_1") {
+                    badgeLabel = new QLabel;
+                    badgeLabel->setStyleSheet("font-size: 11.5px; font-weight: 700; color: #0f766e; background-color: #ccfbf1; border: 1px solid #99f6e4; border-radius: 6px; padding: 2px 8px;");
+                    badgeLabel->setVisible(false);
+                    rowLayout->addWidget(badgeLabel);
 
-                durLbl->setVisible(check->isChecked());
-                duration->setVisible(check->isChecked());
-
-                auto updateBadge = [check, duration, badgeLabel]() {
-                    if (badgeLabel) {
-                        if (check->isChecked()) {
-                            QDateTime newExp = QDateTime::currentDateTime().addDays(duration->value());
-                            badgeLabel->setText(newExp.toString("dd-MM-yyyy | HH:mm"));
-                            badgeLabel->setVisible(true);
-                        } else {
-                            badgeLabel->setVisible(false);
-                        }
+                    QDateTime now = QDateTime::currentDateTime();
+                    QDateTime currentExpiry = ManagerController::permissionExpiry(managerId, pId, mainWindow ? mainWindow->getPermissionRecords() : nullptr);
+                    if (granted.contains(QString::fromUtf8(pId.c_str())) && currentExpiry.isValid() && currentExpiry > now) {
+                        qint64 secsRemaining = now.secsTo(currentExpiry);
+                        // Làm tròn lên ngày: bất kỳ phần giờ/phút lẻ nào đều tính thành 1 ngày (ví dụ: 1h - 0h = 1 ngày)
+                        int remainingDays = static_cast<int>((secsRemaining + 86399) / 86400);
+                        if (remainingDays < 1) remainingDays = 1;
+                        baseDays = remainingDays;
+                        baseExpiry = currentExpiry;
+                        badgeLabel->setText(currentExpiry.toString("dd-MM-yyyy | HH:mm"));
+                        badgeLabel->setVisible(check->isChecked());
+                    } else {
+                        baseDays = 30;
+                        baseExpiry = now.addDays(30);
+                        badgeLabel->setText(baseExpiry.toString("dd-MM-yyyy | HH:mm"));
+                        badgeLabel->setVisible(check->isChecked());
                     }
-                };
+                }
+                rowLayout->addStretch();
+                cardLayout->addLayout(rowLayout);
 
-                connect(duration, qOverload<int>(&QSpinBox::valueChanged), updateBadge);
-                connect(check, &QCheckBox::toggled, [durLbl, duration, updateBadge](bool c) {
-                    durLbl->setVisible(c);
-                    duration->setVisible(c);
-                    updateBadge();
-                });
+                if (pId == "Per_1") {
+                    auto *durRow = new QHBoxLayout;
+                    durRow->setContentsMargins(20, 0, 0, 0);
+                    auto *durLbl = new QLabel("Thời hạn hiệu lực (ngày):");
+                    durLbl->setStyleSheet("font-size: 12px; color: #64748b; font-weight: 600;");
+                    duration = new QSpinBox;
+                    duration->setRange(1, 3650);
+                    duration->setValue(baseDays);
+                    durRow->addWidget(durLbl);
+                    durRow->addWidget(duration);
+                    durRow->addStretch();
+                    cardLayout->addLayout(durRow);
+
+                    durLbl->setVisible(check->isChecked());
+                    duration->setVisible(check->isChecked());
+
+                    auto updateBadge = [check, duration, badgeLabel, baseDays, baseExpiry]() {
+                        if (badgeLabel) {
+                            if (check->isChecked()) {
+                                int delta = duration->value() - baseDays;
+                                QDateTime newExp = baseExpiry.addDays(delta);
+                                badgeLabel->setText(newExp.toString("dd-MM-yyyy | HH:mm"));
+                                badgeLabel->setVisible(true);
+                            } else {
+                                badgeLabel->setVisible(false);
+                            }
+                        }
+                    };
+
+                    connect(duration, qOverload<int>(&QSpinBox::valueChanged), updateBadge);
+                    connect(check, &QCheckBox::toggled, [durLbl, duration, updateBadge](bool c) {
+                        durLbl->setVisible(c);
+                        duration->setVisible(c);
+                        updateBadge();
+                    });
+                }
+                checks->append({check, duration, baseDays, baseExpiry});
+                node = node->next;
             }
-            checks->append({check, duration});
         }
+        delete catalog;
     }
 
     root->addWidget(card);
@@ -1057,26 +1057,45 @@ void AccountView::editManagerDialog(const std::string &managerId) {
 
         if (isSelf && mainWindow && mainWindow->getCurrentManager()) {
             *mainWindow->getCurrentManager() = *targetMgr;
+            mainWindow->updateUserProfileDisplay();
         }
 
         if (isCurrentRoot && !isTargetRoot) {
-            QList<PermissionRecord> newGrants;
+            LinkList<PermissionManager> newGrants;
             for (const auto &entry : *checks) {
                 if (entry.box->isChecked()) {
                     std::string expiry;
                     if (entry.spin) {
-                        expiry = UIHelper::ss(QDateTime::currentDateTime().addDays(entry.spin->value()).toString(Qt::ISODate));
+                        int delta = entry.spin->value() - entry.baseDays;
+                        QDateTime finalExpiry = entry.baseExpiry.addDays(delta);
+                        expiry = UIHelper::ss(finalExpiry.toString(Qt::ISODate));
                     }
-                    newGrants.append({managerId, UIHelper::ss(entry.box->property("permissionId").toString()), expiry});
+                    newGrants.insert(PermissionManager(managerId, UIHelper::ss(entry.box->property("permissionId").toString()), expiry));
                 }
             }
-            ManagerController::savePermissions(managerId, newGrants, "Data/PermissionManager.txt");
+            try {
+                if (mainWindow && mainWindow->getPermissionRecords()) {
+                    ManagerController::savePermissions(managerId, newGrants, mainWindow->getPermissionRecords());
+                } else {
+                    ManagerController::savePermissions(managerId, newGrants, "Data/PermissionManager.txt");
+                }
+            } catch (const AppException &e) {
+                UIHelper::showWarning(&dialog, "Lỗi phân quyền", QString::fromUtf8(e.what()));
+            } catch (const std::exception &e) {
+                UIHelper::showWarning(&dialog, "Lỗi phân quyền", QString("Đã xảy ra ngoại lệ: %1").arg(e.what()));
+            }
         }
 
-        mainWindow->saveAll(SaveScope::Account, SaveAction::Normal);
-        refresh(true);
-        dialog.accept();
-        UIHelper::showSuccess(this, "Thành công", "Thông tin tài khoản đã được cập nhật thành công.");
+        try {
+            mainWindow->saveAll(SaveScope::Account, SaveAction::Normal);
+            refresh(true);
+            dialog.accept();
+            UIHelper::showSuccess(this, "Thành công", "Thông tin tài khoản đã được cập nhật thành công.");
+        } catch (const AppException &e) {
+            UIHelper::showWarning(&dialog, "Lỗi cập nhật tài khoản", QString::fromUtf8(e.what()));
+        } catch (const std::exception &e) {
+            UIHelper::showWarning(&dialog, "Lỗi hệ thống", QString("Đã xảy ra ngoại lệ: %1").arg(e.what()));
+        }
     });
 
     btnBox->addWidget(cancelBtn);

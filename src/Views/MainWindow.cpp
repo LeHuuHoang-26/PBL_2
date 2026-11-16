@@ -119,6 +119,20 @@ void MainWindow::resetTabOrderToId(int tabIndex)
     }
 }
 
+void MainWindow::updateUserProfileDisplay()
+{
+    Manager *curM = getCurrentManager();
+    QString currentName = curM ? UIHelper::qs(curM->getfullName()) : "Quản trị viên";
+    if (sidebarAvatarLabel)
+    {
+        sidebarAvatarLabel->setPixmap(UIHelper::createAvatar(currentName, 38));
+    }
+    if (sidebarNameLabel)
+    {
+        sidebarNameLabel->setText(currentName);
+    }
+}
+
 // --- KIỂM TRA PHÂN QUYỀN (Ủy thác ManagerController) ---
 bool MainWindow::isRootAdmin() const
 {
@@ -127,12 +141,12 @@ bool MainWindow::isRootAdmin() const
 
 bool MainWindow::isAdministrator() const
 {
-    return ManagerController::isAdministrator(getCurrentManager(), permissionManagerPath);
+    return ManagerController::isAdministrator(getCurrentManager(), permissionRecords);
 }
 
 bool MainWindow::hasPermission(const string &permissionId) const
 {
-    return ManagerController::hasPermission(getCurrentManager(), permissionId, permissionManagerPath);
+    return ManagerController::hasPermission(getCurrentManager(), permissionId, permissionRecords);
 }
 
 // --- TIỆN ÍCH DỮ LIỆU (Ủy thác Controllers) ---
@@ -207,6 +221,12 @@ QString MainWindow::getSymptomNamesForAppointment(const Appointment &a) const
     }
     names.removeDuplicates();
     return names.isEmpty() ? QStringLiteral("Chưa ghi nhận") : names.join(QStringLiteral(", "));
+}
+
+Date MainWindow::getDateSetForAppointment(const Appointment &a) const
+{
+    SymptomPatient *sp = findSymptomPatient(a.getSymptomPatientId());
+    return sp ? sp->getDate() : Date();
 }
 
 bool MainWindow::isHoliday(const QDate &date) const
@@ -433,9 +453,14 @@ void MainWindow::updateNavigation()
 {
     for (int i = 0; i < navButtons.size(); ++i)
     {
-        navButtons[i]->setProperty("active", i == activeNav);
-        navButtons[i]->style()->unpolish(navButtons[i]);
-        navButtons[i]->style()->polish(navButtons[i]);
+        bool wasActive = navButtons[i]->property("active").toBool();
+        bool isActive = (i == activeNav);
+        if (wasActive != isActive)
+        {
+            navButtons[i]->setProperty("active", isActive);
+            navButtons[i]->style()->unpolish(navButtons[i]);
+            navButtons[i]->style()->polish(navButtons[i]);
+        }
     }
 }
 
@@ -665,9 +690,8 @@ void MainWindow::setupShell()
             if (i != activeNav)
             {
                 resetTabOrderToId(activeNav);
+                setPage(i);
             }
-            refreshPage(i);
-            setPage(i);
         });
         side->addWidget(b);
     }
@@ -681,9 +705,8 @@ void MainWindow::setupShell()
             if (6 != activeNav)
             {
                 resetTabOrderToId(activeNav);
+                setPage(6);
             }
-            refreshPage(6);
-            setPage(6);
         });
         side->addWidget(b);
     }
@@ -707,23 +730,23 @@ void MainWindow::setupShell()
     auto *profileRow = new QHBoxLayout;
     profileRow->setSpacing(10);
 
-    QLabel *avatarLabel = new QLabel;
-    avatarLabel->setFixedSize(38, 38);
+    sidebarAvatarLabel = new QLabel;
+    sidebarAvatarLabel->setFixedSize(38, 38);
     Manager *curM = getCurrentManager();
     QString currentName = curM ? UIHelper::qs(curM->getfullName()) : "Quản trị viên";
-    avatarLabel->setPixmap(UIHelper::createAvatar(currentName, 38));
-    profileRow->addWidget(avatarLabel);
+    sidebarAvatarLabel->setPixmap(UIHelper::createAvatar(currentName, 38));
+    profileRow->addWidget(sidebarAvatarLabel);
 
     auto *nameCol = new QVBoxLayout;
     nameCol->setSpacing(2);
-    QLabel *nameLabel = new QLabel(currentName);
-    nameLabel->setStyleSheet("color: white; font-weight: 700; font-size: 13px;");
-    nameLabel->setWordWrap(true);
+    sidebarNameLabel = new QLabel(currentName);
+    sidebarNameLabel->setStyleSheet("color: white; font-weight: 700; font-size: 13px;");
+    sidebarNameLabel->setWordWrap(true);
 
     QLabel *roleLabel = new QLabel(curM ? ManagerController::roleName(curM->getRole()) : "Quản trị hệ thống");
     roleLabel->setStyleSheet("color: #8faec0; font-size: 11px; font-weight: 500;");
 
-    nameCol->addWidget(nameLabel);
+    nameCol->addWidget(sidebarNameLabel);
     nameCol->addWidget(roleLabel);
     profileRow->addLayout(nameCol, 1);
     userLayout->addLayout(profileRow);
@@ -980,6 +1003,10 @@ void MainWindow::saveAll(SaveScope scope, SaveAction action)
             if (managers) libPBL2::sortManagers(managers, libPBL2::AccountSortBy::ID, true);
             ok = Manager::saveToFile(managerPath, managers) && ok;
 
+            if (permissionRecords) {
+                ok = PermissionManager::saveToFile(permissionManagerPath, permissionRecords) && ok;
+            }
+
             if (action == SaveAction::Normal && accountView)
             {
                 accountView->reapplyCurrentSort();
@@ -1036,12 +1063,29 @@ MainWindow::~MainWindow()
     delete symptomPatients;
     delete symptomPatientDetails;
     delete appointments;
+    delete permissionRecords;
 }
 
 bool MainWindow::initApp()
 {
-    // Dọn dẹp các quyền đã hết hạn trong file phân quyền
-    ManagerController::cleanExpiredPermissions(permissionManagerPath);
+    // Nạp dữ liệu phân quyền vào RAM 1 lần duy nhất
+    try {
+        permissionRecords = PermissionManager::loadFromFile(permissionManagerPath);
+    } catch (const FileIOException &) {
+        permissionRecords = new LinkList<PermissionManager>;
+    } catch (const std::exception &e) {
+        permissionRecords = new LinkList<PermissionManager>;
+        UIHelper::showWarning(this, "Cảnh báo phân quyền", QString("Không thể nạp cấu hình phân quyền đầy đủ: %1").arg(e.what()));
+    }
+
+    // Dọn dẹp các quyền đã hết hạn trực tiếp trên bộ nhớ RAM
+    if (ManagerController::cleanExpiredPermissions(permissionRecords)) {
+        try {
+            PermissionManager::saveToFile(permissionManagerPath, permissionRecords);
+        } catch (const std::exception &e) {
+            UIHelper::showWarning(this, "Lỗi cập nhật quyền hạn", QString("Không thể lưu lại bảng phân quyền sau khi dọn dẹp: %1").arg(e.what()));
+        }
+    }
 
     try {
         // Nạp dữ liệu từ các file

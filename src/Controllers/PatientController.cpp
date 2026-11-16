@@ -64,7 +64,8 @@ QString PatientController::getUnresolvedSymptoms(const std::string &patientId,
             if (aList && aList->getHeader()) {
                 auto *aNode = aList->getHeader()->next;
                 while (aNode && aNode->next) {
-                    if (aNode->info.getSymptomPatientId() == record->info.getSP_id() && aNode->info.getState() == 1) {
+                    if (aNode->info.getSymptomPatientId() == record->info.getSP_id() && 
+                        (aNode->info.getState() == 1 || aNode->info.getState() == -2)) {
                         isResolved = true;
                         break;
                     }

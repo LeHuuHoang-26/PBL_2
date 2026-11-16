@@ -19,6 +19,7 @@
 #include "Symptom.h"
 #include "SymptomPatient.h"
 #include "SymptomPatientDetail.h"
+#include "PermissionManager.h"
 
 class QStackedWidget;
 class QPushButton;
@@ -72,8 +73,10 @@ public:
     LinkList<SymptomPatient> *getSymptomPatients() const { return symptomPatients; }
     LinkList<SymptomPatientDetail> *getSymptomPatientDetails() const { return symptomPatientDetails; }
     LinkList<Appointment> *getAppointments() const { return appointments; }
+    LinkList<PermissionManager> *getPermissionRecords() const { return permissionRecords; }
     Manager *getCurrentManager() const;
     void resetTabOrderToId(int tabIndex);
+    void updateUserProfileDisplay();
 
     // Kiểm tra phân quyền (ủy thác ManagerController)
     bool isRootAdmin() const;
@@ -88,19 +91,13 @@ public:
     Patient *findPatientForAppointment(const Appointment &a) const;
     std::string getPatientIdForAppointment(const Appointment &a) const;
     QString getSymptomNamesForAppointment(const Appointment &a) const;
+    Date getDateSetForAppointment(const Appointment &a) const;
     bool isHoliday(const QDate &date) const;
     QString holidayNote(const QDate &date) const;
     QString patientSymptoms(const std::string &patientId) const;
     QString unresolvedPatientSymptoms(const std::string &patientId) const;
     void updatePatientSymptomStatus(const std::string &patientId);
     std::string nextAppointmentId() const;
-
-    // View pointers và điều phối hộp thoại
-    AppointmentView *getAppointmentView() const { return appointmentView; }
-    PatientView *getPatientView() const { return patientView; }
-    DoctorView *getDoctorView() const { return doctorView; }
-    AccountView *getAccountView() const { return accountView; }
-    StatisticView *getStatisticView() const { return statisticView; }
 
     bool showBookingDialog(const QDate &defaultDate = QDate::currentDate());
     void editAppointmentDialog(const std::string &id);
@@ -120,6 +117,7 @@ private:
     LinkList<SymptomPatient> *symptomPatients = nullptr;
     LinkList<SymptomPatientDetail> *symptomPatientDetails = nullptr;
     LinkList<Appointment> *appointments = nullptr;
+    LinkList<PermissionManager> *permissionRecords = nullptr;
 
     Manager *currentManager = nullptr;
     std::string currentManagerId;
@@ -137,6 +135,9 @@ private:
     DoctorView *doctorView = nullptr;
     AccountView *accountView = nullptr;
     StatisticView *statisticView = nullptr;
+
+    QLabel *sidebarAvatarLabel = nullptr;
+    QLabel *sidebarNameLabel = nullptr;
 
     void updateNavigation();
     void setupShell();

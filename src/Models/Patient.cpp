@@ -136,11 +136,14 @@ LinkList<Patient>* Patient::loadFromFile(const std::string &path) {
         getline(f, tmp); // Bỏ qua tiêu đề
         getline(f, tmp); // Bỏ qua dòng phân cách
 
-        while (f.peek() != EOF) {
-            Patient P(f);
-            if (P.isDefault())
-                break;
-            patientList->insert(P);
+        string line;
+        while (getline(f, line)) {
+            libPBL2::trim(line);
+            if (line.empty()) continue;
+            Patient P = Patient::loadFromString(line);
+            if (!P.isDefault()) {
+                patientList->insert(P);
+            }
         }
         f.close();
         return patientList;

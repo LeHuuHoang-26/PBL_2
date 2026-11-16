@@ -35,12 +35,14 @@ std::string DoctorController::generateNextId(const LinkList<Doctor> *doctors) {
                     try {
                         int val = std::stoi(id.substr(2));
                         if (val > maxId) maxId = val;
-                    } catch (...) {}
+                    } catch (const std::invalid_argument &) {
+                    } catch (const std::out_of_range &) {}
                 } else if (id.rfind("D", 0) == 0) {
                     try {
                         int val = std::stoi(id.substr(1));
                         if (val > maxId) maxId = val;
-                    } catch (...) {}
+                    } catch (const std::invalid_argument &) {
+                    } catch (const std::out_of_range &) {}
                 }
             }
             n = n->next;
@@ -51,7 +53,19 @@ std::string DoctorController::generateNextId(const LinkList<Doctor> *doctors) {
     return std::string(buf);
 }
 
+#include <QMap>
+
+static QMap<std::string, QList<QPair<QString, QString>>> s_specListCache;
+
+void DoctorController::clearSpecialtyCache() {
+    s_specListCache.clear();
+}
+
 QList<QPair<QString, QString>> DoctorController::getSpecializationList(const std::string &specPath) {
+    if (s_specListCache.contains(specPath)) {
+        return s_specListCache[specPath];
+    }
+
     QList<QPair<QString, QString>> result;
     std::ifstream file(specPath);
     if (!file.is_open()) return result;
@@ -67,6 +81,7 @@ QList<QPair<QString, QString>> DoctorController::getSpecializationList(const std
         libPBL2::trim(label);
         result.append(qMakePair(QString::fromUtf8(label.c_str()), QString::fromUtf8(id.c_str())));
     }
+    s_specListCache[specPath] = result;
     return result;
 }
 

@@ -39,8 +39,6 @@ public:
     // Các phương thức cung cấp dữ liệu cho MainWindow / Controller
     QString getUsername() const;
     QString getPassword() const;
-    void setUsername(const QString &username);
-    void setPassword(const QString &password);
     void clearInputs();
 
     // Các phương thức phản hồi hiển thị

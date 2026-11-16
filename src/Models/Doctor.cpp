@@ -1,7 +1,6 @@
 #include "Doctor.h"
 #include "libPBL2.h"
 #include "../Utils/AppExceptions.h"
-#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <iomanip>

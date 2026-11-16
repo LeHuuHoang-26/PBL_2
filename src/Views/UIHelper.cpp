@@ -748,29 +748,6 @@ QString UIHelper::dialogFormStyle() {
     )");
 }
 
-QHBoxLayout *UIHelper::createDialogHeader(const QString &iconText, const QString &titleText, const QString &subtitleText) {
-    auto *headerBox = new QHBoxLayout;
-    headerBox->setSpacing(12);
-
-    auto *icon = new QLabel(iconText);
-    icon->setFixedSize(46, 46);
-    icon->setAlignment(Qt::AlignCenter);
-    icon->setStyleSheet("background: #f0fdfa; border: 1.5px solid #99f6e4; border-radius: 12px; font-size: 22px;");
-
-    auto *titleCol = new QVBoxLayout;
-    titleCol->setSpacing(2);
-    auto *title = new QLabel(titleText);
-    title->setStyleSheet("font-size: 18px; font-weight: 800; color: #0f172a;");
-    auto *sub = new QLabel(subtitleText);
-    sub->setStyleSheet("font-size: 12.5px; color: #64748b;");
-    titleCol->addWidget(title);
-    titleCol->addWidget(sub);
-
-    headerBox->addWidget(icon);
-    headerBox->addLayout(titleCol, 1);
-    return headerBox;
-}
-
 void UIHelper::applyCalendarStyle(QCalendarWidget *cal) {
     if (!cal) return;
     // Cài đặt ngôn ngữ tiếng Anh: Sun, Mon, Tue, Wed, Thu, Fri, Sat và Tháng bằng tiếng Anh (October, ...)
@@ -833,19 +810,22 @@ void UIHelper::applyCalendarStyle(QCalendarWidget *cal) {
         yearEdit->setEnabled(false);
     }
 
-    // 4. Chuẩn hóa tiêu đề thứ trong tuần (Sun..Sat) sang màu slate thanh lịch, bỏ màu đỏ gắt
+    // 4. Chuẩn hóa tiêu đề thứ trong tuần (Sun..Sat) sang màu slate thanh lịch, cùng 1 kiểu font chuẩn
     QTextCharFormat weekdayFmt;
     weekdayFmt.setForeground(QColor("#475569"));
-    weekdayFmt.setFontWeight(QFont::DemiBold);
+    weekdayFmt.setFontWeight(QFont::Normal);
     weekdayFmt.setFontPointSize(8.5);
     for (int dow = 1; dow <= 7; ++dow) {
         cal->setWeekdayTextFormat(static_cast<Qt::DayOfWeek>(dow), weekdayFmt);
     }
 
-    // 5. Cấu hình bảng ngày: kéo dãn đều 7 cột theo bề rộng của lịch
+    // 5. Cấu hình bảng ngày: kéo dãn đều 7 cột theo bề rộng và 6 hàng theo chiều cao của lịch
     if (auto *view = cal->findChild<QTableView*>("qt_calendar_calendarview")) {
         if (view->horizontalHeader()) {
             view->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+        }
+        if (view->verticalHeader()) {
+            view->verticalHeader()->setSectionResizeMode(QHeaderView::Stretch);
         }
     }
 
@@ -921,11 +901,11 @@ void UIHelper::applyCalendarStyle(QCalendarWidget *cal) {
         }
         QCalendarWidget QTableView {
             background-color: #ffffff;
-            selection-background-color: #0d9488;
+            selection-background-color: transparent;
             selection-color: #ffffff;
             color: #1e293b;
             font-size: 11px;
-            font-weight: 600;
+            font-weight: normal;
             outline: none;
             border: none;
             gridline-color: transparent;
@@ -933,7 +913,7 @@ void UIHelper::applyCalendarStyle(QCalendarWidget *cal) {
         QCalendarWidget QTableView QHeaderView::section {
             background-color: #f8fafc;
             color: #475569;
-            font-weight: 700;
+            font-weight: normal;
             font-size: 9.5px;
             border: none;
             border-bottom: 1px solid #e2e8f0;
@@ -944,21 +924,23 @@ void UIHelper::applyCalendarStyle(QCalendarWidget *cal) {
             border-radius: 4px;
             padding: 1px;
             margin: 1px;
-            color: #1e293b;
-            background-color: #ffffff;
+            background-color: transparent;
+            font-weight: normal;
         }
         QCalendarWidget QTableView::item:hover {
             background-color: #ccfbf1;
             color: #0f766e;
+            font-weight: normal;
         }
         QCalendarWidget QTableView::item:selected {
             background-color: #0d9488;
             color: #ffffff;
-            font-weight: bold;
+            font-weight: normal;
         }
         QCalendarWidget QTableView::item:disabled {
             color: #94a3b8;
-            background-color: #ffffff;
+            background-color: transparent;
+            font-weight: normal;
         }
         QCalendarWidget QWidget#qt_calendar_calendarview {
             background-color: #ffffff;

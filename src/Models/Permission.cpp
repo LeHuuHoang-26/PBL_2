@@ -1,42 +1,43 @@
 #include "Permission.h"
 #include "libPBL2.h"
-#include "../Utils/AppExceptions.h"
-#include <fstream>
-#include <sstream>
 
 using namespace std;
 
 // ==========================================
 // Constructors & Destructor
 // ==========================================
-Permission::Permission(string maId, PermissionType perId)
-    : MA_id(maId), Per_id(perId) {}
+Permission::Permission(string perId, string perName, string desc)
+    : Per_id(perId), Per_Name(perName), description(desc) {}
 
 Permission::Permission(const Permission &other)
-    : MA_id(other.MA_id), Per_id(other.Per_id) {}
+    : Per_id(other.Per_id), Per_Name(other.Per_Name), description(other.description) {}
 
 // ==========================================
 // Getters & Setters
 // ==========================================
-string Permission::getMA_id() const { return MA_id; }
-PermissionType Permission::getPer_id() const { return Per_id; }
-void Permission::setMA_id(const string &maId) { MA_id = maId; }
-void Permission::setPer_id(PermissionType perId) { Per_id = perId; }
+string Permission::getPer_id() const { return Per_id; }
+string Permission::getPer_Name() const { return Per_Name; }
+string Permission::getDescription() const { return description; }
+
+void Permission::setPer_id(const string &id) { Per_id = id; }
+void Permission::setPer_Name(const string &name) { Per_Name = name; }
+void Permission::setDescription(const string &desc) { description = desc; }
 
 // ==========================================
 // State Helpers
 // ==========================================
 bool Permission::isDefault() const {
-    return MA_id.empty() && Per_id == PermissionType::Empty;
+    return Per_id.empty() && Per_Name.empty();
 }
 
 void Permission::setDefault() {
-    MA_id = "";
-    Per_id = PermissionType::Empty;
+    Per_id.clear();
+    Per_Name.clear();
+    description.clear();
 }
 
 // ==========================================
-// Type Conversions & Serialization
+// Type Conversions
 // ==========================================
 string Permission::permissionTypeToString(PermissionType per) {
     switch (per) {
@@ -49,97 +50,15 @@ string Permission::permissionTypeToString(PermissionType per) {
     }
 }
 
-PermissionType Permission::permissionTypeFromString(const string &str) {
-    if (str == "Per_1" || str == "1") return PermissionType::Per_1;
-    if (str == "Per_2" || str == "2") return PermissionType::Per_2;
-    if (str == "Per_3" || str == "3") return PermissionType::Per_3;
-    if (str == "Per_4" || str == "4") return PermissionType::Per_4;
-    if (str == "Per_5" || str == "5") return PermissionType::Per_5;
-    return PermissionType::Empty;
-}
-
-string Permission::toString() const {
-    return libPBL2::padRightUtf8(MA_id, 6) + " | " + permissionTypeToString(Per_id);
-}
-
-Permission Permission::loadFromString(const string &str) {
-    if (str.empty()) return Permission();
-
-    stringstream ss(str);
-    string maId, perStr;
-    if (!getline(ss, maId, '|') || !getline(ss, perStr)) {
-        return Permission();
-    }
-
-    libPBL2::trim(maId);
-    libPBL2::trim(perStr);
-
-    return Permission(maId, permissionTypeFromString(perStr));
-}
-
 // ==========================================
-// File I/O
+// System Permission Catalog
 // ==========================================
-LinkList<Permission>* Permission::loadFromFile(const string &path) {
-    ifstream f(path);
-    if (!f.is_open()) {
-        throw FileIOException(path, "Không thể mở tệp để đọc dữ liệu.");
-    }
-
-    LinkList<Permission> *PerList = nullptr;
-    try {
-        PerList = new LinkList<Permission>;
-        string tmp;
-        getline(f, tmp); // Bỏ qua dòng tiêu đề
-        getline(f, tmp); // Bỏ qua dòng phân cách
-
-        string line;
-        int lineNo = 2;
-        while (getline(f, line)) {
-            lineNo++;
-            libPBL2::trim(line);
-            if (line.empty()) continue;
-            try {
-                Permission p = Permission::loadFromString(line);
-                if (!p.MA_id.empty() && p.Per_id != PermissionType::Empty) {
-                    PerList->insert(p);
-                }
-            } catch (const AppException &) {
-                throw;
-            } catch (const std::exception &e) {
-                throw DataFormatException(path, lineNo, e.what());
-            }
-        }
-
-        f.close();
-        return PerList;
-    } catch (...) {
-        delete PerList;
-        f.close();
-        throw;
-    }
-}
-
-bool Permission::saveToFile(const string &path, const LinkList<Permission> *list) {
-    if (!list || list->getHeader() == nullptr)
-        return false;
-
-    ofstream f(path);
-    if (!f.is_open()) {
-        throw FileIOException(path, "Không thể mở tệp để ghi dữ liệu.");
-    }
-
-    f << "MA_ID  | Per_ID\n";
-    f << "-------+---------\n";
-
-    LinkList<Permission>::Node *tmp = list->getHeader()->next;
-    while (tmp != nullptr && tmp->next != nullptr) {
-        if (!tmp->info.MA_id.empty()) {
-            f << tmp->info.toString() << "\n";
-        }
-        tmp = tmp->next;
-    }
-
-    f.close();
-    return true;
+LinkList<Permission>* Permission::getSystemCatalog() {
+    auto *catalog = new LinkList<Permission>;
+    catalog->insert(Permission("Per_1", "Cấp quyền tạm thời làm admin có thời hạn", "Cho phép tài khoản tạm thời có toàn quyền quản trị phòng khám."));
+    catalog->insert(Permission("Per_2", "Chỉnh sửa thông tin bác sĩ", "Cho phép thêm, sửa, khóa hoặc điều chỉnh hồ sơ bác sĩ."));
+    catalog->insert(Permission("Per_3", "Chỉnh sửa thông tin bệnh nhân", "Cho phép quản lý và cập nhật thông tin hồ sơ bệnh nhân."));
+    catalog->insert(Permission("Per_4", "Chỉnh sửa thông tin lịch hẹn khám bệnh", "Cho phép lên lịch hẹn, dời lịch, hủy hoặc sửa trạng thái lịch khám."));
+    catalog->insert(Permission("Per_5", "Chỉnh sửa lịch nghỉ lễ / Tết", "Cho phép điều chỉnh danh sách các ngày nghỉ lễ của phòng khám."));
+    return catalog;
 }

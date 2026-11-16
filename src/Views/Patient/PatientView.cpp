@@ -340,6 +340,19 @@ void PatientView::refresh(bool preserveScroll) {
                 while (spNode && spNode->next) {
                     if (spNode->info.getP_id() == pid) {
                         std::string spId = spNode->info.getSP_id();
+                        auto *spdList = mainWindow->getSymptomPatientDetails();
+                        if (spdList && spdList->getHeader()) {
+                            auto *spdNode = spdList->getHeader()->next;
+                            while (spdNode && spdNode->next) {
+                                if (spdNode->info.getSP_id() == spId) {
+                                    auto *toDelSpd = spdNode;
+                                    spdNode = spdNode->next;
+                                    spdList->remove(toDelSpd);
+                                    continue;
+                                }
+                                spdNode = spdNode->next;
+                            }
+                        }
                         if (appointments && appointments->getHeader()) {
                             auto *aNode = appointments->getHeader()->next;
                             while (aNode && aNode->next) {
@@ -636,13 +649,20 @@ void PatientView::addPatientDialog() {
         }
 
         std::string id = Patient::generateNextId(patients);
-        if (patients) {
-            patients->insert(Patient(id, UIHelper::ss(nameStr), UIHelper::ss(phoneStr), gender->currentIndex() == 0, age->value(), UIHelper::ss(cccdStr)));
-        }
+        try {
+            if (patients) {
+                patients->insert(Patient(id, UIHelper::ss(nameStr), UIHelper::ss(phoneStr), gender->currentIndex() == 0, age->value(), UIHelper::ss(cccdStr)));
+            }
 
-        mainWindow->saveAll(SaveScope::Patient, SaveAction::Normal);
-        refresh();
-        dialog.accept();
+            mainWindow->saveAll(SaveScope::Patient, SaveAction::Normal);
+            refresh();
+            dialog.accept();
+            UIHelper::showSuccess(this, "Thành công", "Đã thêm hồ sơ bệnh nhân mới thành công.");
+        } catch (const AppException &e) {
+            UIHelper::showWarning(&dialog, "Lỗi thêm bệnh nhân", QString::fromUtf8(e.what()));
+        } catch (const std::exception &e) {
+            UIHelper::showWarning(&dialog, "Lỗi hệ thống", QString("Đã xảy ra ngoại lệ: %1").arg(e.what()));
+        }
     });
     dialog.setFocusPolicy(Qt::StrongFocus);
     dialog.setFocus();
@@ -915,9 +935,15 @@ void PatientView::editPatientDialog(const std::string &id) {
             patient->setAge(age->value());
             patient->setGender(gender->currentIndex() == 0);
 
-            mainWindow->saveAll(SaveScope::Patient, SaveAction::Normal);
-            UIHelper::showSuccess(&dialog, "Thành công", "Cập nhật thông tin bệnh nhân thành công.");
-            dialog.accept();
+            try {
+                mainWindow->saveAll(SaveScope::Patient, SaveAction::Normal);
+                UIHelper::showSuccess(&dialog, "Thành công", "Cập nhật thông tin bệnh nhân thành công.");
+                dialog.accept();
+            } catch (const AppException &e) {
+                UIHelper::showWarning(&dialog, "Lỗi cập nhật bệnh nhân", QString::fromUtf8(e.what()));
+            } catch (const std::exception &e) {
+                UIHelper::showWarning(&dialog, "Lỗi hệ thống", QString("Đã xảy ra ngoại lệ: %1").arg(e.what()));
+            }
         });
 
         leftBtnBox->addWidget(cancelBtn);
@@ -1154,7 +1180,7 @@ void PatientView::editPatientDialog(const std::string &id) {
         auto *n = mainWindow->getAppointments()->getHeader()->next;
         while (n && n->next) {
             std::string apptPid = mainWindow->getPatientIdForAppointment(n->info);
-            if (apptPid == pId && n->info.getState() != -2) {
+            if (apptPid == pId) {
                 allAppts.append(&n->info);
                 totalCount++;
             }
@@ -1291,9 +1317,8 @@ void PatientView::editPatientDialog(const std::string &id) {
             // 4. Trạng thái ca khám (căn giữa)
             int st = a->getState();
             if (st == 0) {
-                QDateTime now = QDateTime::currentDateTime();
-                QDateTime apptDt(QDate(ad.getYear(), ad.getMonth(), ad.getDay()), QTime(ad.getHour(), ad.getMinute()));
-                if (apptDt < now) st = -1;
+                Date now = Date::now();
+                st = a->computeEffectiveState(now.getDay(), now.getMonth(), now.getYear(), now.getHour(), now.getMinute());
             }
             QString badgeText = "● Chưa khám";
             QString badgeStyle = "QLabel { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; border-radius: 10px; font-size: 11px; font-weight: 750; padding: 3px 8px; }";
@@ -1303,6 +1328,9 @@ void PatientView::editPatientDialog(const std::string &id) {
             } else if (st == -1) {
                 badgeText = "● Trễ hẹn";
                 badgeStyle = "QLabel { background: #fff7ed; color: #ea580c; border: 1px solid #ffedd5; border-radius: 10px; font-size: 11px; font-weight: 750; padding: 3px 8px; }";
+            } else if (st == -2) {
+                badgeText = "● Đã dời lịch";
+                badgeStyle = "QLabel { background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 11px; font-weight: 750; padding: 3px 8px; }";
             }
             auto *badgeLbl = new QLabel(badgeText);
             badgeLbl->setStyleSheet(badgeStyle);

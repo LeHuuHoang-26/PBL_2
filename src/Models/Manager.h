@@ -39,7 +39,6 @@ class Manager: public Human {
 
         void setDefault();
         bool isDefault() const;
-        friend std::ostream &operator << (std::ostream &out, const Manager &M);
         Manager &operator = (const Manager &M);
         bool isValid(const std::string &username, const std::string &password) const;
         bool isActive() const;

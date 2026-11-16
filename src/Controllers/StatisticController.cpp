@@ -224,7 +224,7 @@ int StatisticController::getTopDoctors(const LinkList<Appointment> *appts, const
     if (appts && appts->getHeader()) {
         auto *an = appts->getHeader()->next;
         while (an && an->next) {
-            if (!an->info.isDefault()) {
+            if (!an->info.isDefault() && an->info.getState() != -2) {
                 std::string did = an->info.getDoctorId();
                 for (int i = 0; i < validDoctors; ++i) {
                     if (allItems[i].doctorId == did) {
@@ -269,7 +269,7 @@ int StatisticController::getSpecialtyDemand(const LinkList<Appointment> *appts, 
 
     auto *an = appts->getHeader()->next;
     while (an && an->next) {
-        if (!an->info.isDefault()) {
+        if (!an->info.isDefault() && an->info.getState() != -2) {
             Doctor *d = DoctorController::findById(docList, an->info.getDoctorId());
             if (d) {
                 std::string spId = d->getSpId();
@@ -322,7 +322,7 @@ void StatisticController::getWeeklyTrend(const LinkList<Appointment> *appts, int
 
     auto *an = appts->getHeader()->next;
     while (an && an->next) {
-        if (!an->info.isDefault()) {
+        if (!an->info.isDefault() && an->info.getState() != -2) {
             Date dt = an->info.getDateGet();
             for (int i = 0; i < 7; ++i) {
                 if (dt.getDay() == days[i].getDay() &&

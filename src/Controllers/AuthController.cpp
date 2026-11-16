@@ -1,14 +1,5 @@
 #include "AuthController.h"
-
-Manager *AuthController::authenticate(LinkList<Manager> *managers, const std::string &username, const std::string &password) {
-    if (!managers || !managers->getHeader()) return nullptr;
-    auto *node = managers->getHeader()->next;
-    while (node && node->next) {
-        if (node->info.isActive() && node->info.isValid(username, password)) return &node->info;
-        node = node->next;
-    }
-    return nullptr;
-}
+#include <exception>
 
 bool AuthController::login(LinkList<Manager> *managers, const QString &username, const QString &password, QString &errorMessage, Manager *&outManager) {
     outManager = nullptr;
@@ -26,35 +17,40 @@ bool AuthController::login(LinkList<Manager> *managers, const QString &username,
         return false;
     }
 
-    std::string su = u.toStdString();
-    std::string sp = password.toStdString();
+    try {
+        std::string su = u.toStdString();
+        std::string sp = password.toStdString();
 
-    // Tìm kiếm tài khoản trong danh sách
-    Manager *found = nullptr;
-    auto *n = managers->getHeader()->next;
-    while (n && n->next) {
-        if (n->info.getUsername() == su) {
-            found = &n->info;
-            break;
+        // Tìm kiếm tài khoản trong danh sách
+        Manager *found = nullptr;
+        auto *n = managers->getHeader()->next;
+        while (n && n->next) {
+            if (n->info.getUsername() == su) {
+                found = &n->info;
+                break;
+            }
+            n = n->next;
         }
-        n = n->next;
-    }
 
-    if (!found) {
-        errorMessage = QStringLiteral("Tài khoản không tồn tại trên hệ thống!");
+        if (!found) {
+            errorMessage = QStringLiteral("Tài khoản không tồn tại trên hệ thống!");
+            return false;
+        }
+
+        if (!found->isActive()) {
+            errorMessage = QStringLiteral("Tài khoản này hiện đang bị khóa!");
+            return false;
+        }
+
+        if (!found->isValid(su, sp)) {
+            errorMessage = QStringLiteral("Mật khẩu không chính xác, vui lòng thử lại!");
+            return false;
+        }
+
+        outManager = found;
+        return true;
+    } catch (const std::exception &e) {
+        errorMessage = QStringLiteral("Lỗi xử lý xác thực: ") + QString::fromUtf8(e.what());
         return false;
     }
-
-    if (!found->isActive()) {
-        errorMessage = QStringLiteral("Tài khoản này hiện đang bị khóa!");
-        return false;
-    }
-
-    if (!found->isValid(su, sp)) {
-        errorMessage = QStringLiteral("Mật khẩu không chính xác, vui lòng thử lại!");
-        return false;
-    }
-
-    outManager = found;
-    return true;
 }

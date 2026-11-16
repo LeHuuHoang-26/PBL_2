@@ -4,6 +4,7 @@
 #include <string>
 #include "../DataStructures/LinkList.h"
 #include "../Models/Permission.h"
+#include "../Models/PermissionManager.h"
 #include "Date.h"
 
 class Patient;
@@ -15,15 +16,12 @@ namespace libPBL2 {
 
     using Permission = ::Permission;
     using PermissionType = ::PermissionType;
+    using PermissionManager = ::PermissionManager;
 
     // String utilities
     inline void trim(std::string &str);
-    inline void filterNewline(std::string &str);
     inline size_t utf8Length(const std::string &str);
     inline std::string padRightUtf8(const std::string &str, size_t targetWidth);
-
-    // Permission checking
-    inline bool isAllowed(const Manager &M, PermissionType Per, const LinkList<Permission> *PermissionList = nullptr);
 
     // -------------------------------------------------------------
     // Generic QuickSort Algorithm (Khai báo template)

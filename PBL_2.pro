@@ -34,6 +34,7 @@ SOURCES += \
     src/Models/Manager.cpp \
     src/Models/Patient.cpp \
     src/Models/Permission.cpp \
+    src/Models/PermissionManager.cpp \
     src/Models/Symptom.cpp \
     src/Models/SymptomPatient.cpp \
     src/Models/SymptomPatientDetail.cpp \
@@ -63,6 +64,7 @@ HEADERS += \
     src/Models/Manager.h \
     src/Models/Patient.h \
     src/Models/Permission.h \
+    src/Models/PermissionManager.h \
     src/Models/Symptom.h \
     src/Models/SymptomPatient.h \
     src/Models/SymptomPatientDetail.h \

@@ -120,11 +120,14 @@ LinkList<Symptom>* Symptom::loadFromFile(const string &path) {
         getline(f, tmp); // Bỏ qua tiêu đề
         getline(f, tmp); // Bỏ qua dòng phân cách
 
-        while (f.peek() != EOF) {
-            Symptom S(f);
-            if (S.isDefault())
-                break;
-            symptomList->insert(S);
+        string line;
+        while (getline(f, line)) {
+            libPBL2::trim(line);
+            if (line.empty()) continue;
+            Symptom S = Symptom::loadFromString(line);
+            if (!S.isDefault()) {
+                symptomList->insert(S);
+            }
         }
         f.close();
         return symptomList;

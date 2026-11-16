@@ -5,7 +5,6 @@
 #include <string>
 #include <fstream>
 #include <sstream>
-#include <iostream>
 #include <iomanip>
 
 using namespace std;
@@ -114,13 +113,6 @@ void Manager::setDefault() {
 
 bool Manager::isDefault() const {
     return id.empty() && fullName.empty() && username.empty() && password.empty() && role == ManagerRole::Empty;
-}
-
-ostream &operator << (ostream &out, const Manager &M) {
-    out << M.id << " " << M.fullName << " " << M.phone << " "
-        << (M.gender ? "Nam" : "Nu") << " " << M.age << " "
-        << M.username << " " << Manager::roleToString(M.role) << " " << M.state;
-    return out;
 }
 
 Manager &Manager::operator = (const Manager &M) {
@@ -235,11 +227,14 @@ LinkList<Manager>* Manager::loadFromFile(const string &path) {
         getline(f, tmp); // Bỏ qua tiêu đề
         getline(f, tmp); // Bỏ qua dòng phân cách
 
-        while (f.peek() != EOF) {
-            Manager M(f);
-            if (M.isDefault())
-                break;
-            ManagerList->insert(M);
+        string line;
+        while (getline(f, line)) {
+            libPBL2::trim(line);
+            if (line.empty()) continue;
+            Manager M = Manager::loadFromString(line);
+            if (!M.isDefault()) {
+                ManagerList->insert(M);
+            }
         }
         f.close();
         return ManagerList;

@@ -45,7 +45,6 @@ public:
     static QIcon trashIcon(const QColor &color = QColor("#ef4444"));
     static QPair<QWidget*, QPushButton*> createActionCell(const QIcon &icon, const QString &tooltip);
     static QString dialogFormStyle();
-    static QHBoxLayout *createDialogHeader(const QString &iconText, const QString &titleText, const QString &subtitleText);
     static void applyCalendarStyle(QCalendarWidget *cal);
     static void setupCalendarPopup(QDateTimeEdit *dateEdit, const QDate &minDate = QDate());
     static void setupPhoneInput(QLineEdit *lineEdit);

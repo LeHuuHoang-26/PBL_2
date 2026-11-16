@@ -25,43 +25,11 @@ void Date::setYear(int y) { year = y; }
 void Date::setHour(int h) { hour = h; }
 void Date::setMinute(int min) { minute = min; }
 
-istream &operator >> (istream &in, Date &D) {
-    cout << "Date and time (dd/mm/yyyy hh:mm): ";
-    char c1, c2, c3;
-    int flag;
-    do {
-        flag = 0;
-        in >> D.day >> c1 >> D.month >> c2 >> D.year;
-        if (in.peek() == ' ' || in.peek() == '\t') {
-            in >> D.hour >> c3 >> D.minute;
-        } else {
-            D.hour = 0;
-            D.minute = 0;
-        }
-
-        if (D.year < 1 || D.month < 1 || D.month > 12 || D.hour < 0 || D.hour >= 24 || D.minute < 0 || D.minute >= 60) {
-            flag = 1;
-        } else {
-            int dayinmonth = D.posofdayinmonth();
-            if (D.day < 1 || D.day > dayinmonth)
-                flag = 1;
-        }
-
-        if (flag)
-            cout << "Nhap lai (dd/mm/yyyy hh:mm): ";
-    } while (flag);
-
-    return in;
-}
-
-ostream &operator << (ostream &out, const Date &D) {
-    out << D.toString();
-    return out;
-}
-
 int Date::posofdayinmonth(int monthVar) const {
     if (monthVar == 0)
         monthVar = month;
+    if (monthVar < 1 || monthVar > 12)
+        return 0;
     int dayinmonth_list[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
     if (this->isLeapYear() && monthVar == 2)
         return 29;
@@ -94,7 +62,6 @@ Date Date::operator ++ (int) {
 Date Date::operator -- (int) {
     Date tmp = *this;
     if (day == 1 && month == 1 && year == 1) {
-        cout << "Can't decrease this date!\nIt's not change!\n";
         return tmp;
     }
     day--;
@@ -126,7 +93,6 @@ Date Date::operator ++ () {
 
 Date Date::operator -- () {
     if (day == 1 && month == 1 && year == 1) {
-        cout << "Can't decrease this date!\nIt's not change!\n";
         return *this;
     }
     day--;
@@ -203,18 +169,6 @@ Date Date::operator - (const int &value) {
 
     tmp.day -= valueVar;
     return tmp;
-}
-
-void Date::insert(int dd, int mm, int yyyy, int hh, int min) {
-    day = dd;
-    month = mm;
-    year = yyyy;
-    hour = hh;
-    minute = min;
-}
-
-void Date::show() const {
-    cout << "Date and time: " << toString() << "\n";
 }
 
 bool Date::isDefault() const {

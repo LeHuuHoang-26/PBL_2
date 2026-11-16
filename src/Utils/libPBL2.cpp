@@ -30,16 +30,6 @@ inline void trim(string &str) {
     str = str.substr(start, end - start + 1);
 }
 
-inline void filterNewline(string &str) {
-    string res = "";
-    for (char c : str) {
-        if (c != '\r' && c != '\n') {
-            res += c;
-        }
-    }
-    str = res;
-}
-
 inline size_t utf8Length(const string &str) {
     size_t len = 0;
     for (unsigned char c : str) {
@@ -54,29 +44,6 @@ inline string padRightUtf8(const string &str, size_t targetWidth) {
     size_t ulen = utf8Length(str);
     if (ulen >= targetWidth) return str;
     return str + string(targetWidth - ulen, ' ');
-}
-
-inline bool isAllowed(const Manager &M, PermissionType Per, const LinkList<Permission> *PermissionList) {
-    if (!M.isActive())
-        return false;
-
-    if (Per == PermissionType::Empty)
-        return true;
-
-    if (M.getRole() == ManagerRole::Administrator)
-        return true;
-
-    if (PermissionList == nullptr || PermissionList->getHeader() == nullptr)
-        return false;
-
-    LinkList<Permission>::Node *tmp = PermissionList->getHeader()->next;
-    while (tmp != nullptr && tmp->next != nullptr) {
-        if (M.getID() == tmp->info.getMA_id() && tmp->info.getPer_id() == Per)
-            return true;
-        tmp = tmp->next;
-    }
-
-    return false;
 }
 
 // -------------------------------------------------------------

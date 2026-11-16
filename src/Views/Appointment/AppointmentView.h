@@ -5,6 +5,7 @@
 #include <QDate>
 #include <QList>
 #include <string>
+#include "../../Controllers/AppointmentController.h"
 
 class MainWindow;
 class QCalendarWidget;
@@ -22,7 +23,6 @@ public:
     QWidget *createDashboardWidget(QWidget *parent = nullptr);
     QWidget *createBookingWidget(QWidget *parent = nullptr);
     QWidget *createAppointmentListWidget(QWidget *parent = nullptr);
-    QWidget *createHolidayWidget(QWidget *parent = nullptr);
 
     bool showBookingDialog(const QDate &defaultDate = QDate::currentDate());
     void showHolidayManagementDialog(QWidget *parent = nullptr);
@@ -38,6 +38,19 @@ private:
     int listSortColumn = -1;
     bool listSortAscending = false;
     int listCurrentPage = 0;
+
+    bool processHolidayAdditionWithReschedule(
+        QWidget *parentDialog,
+        const QList<HolidayEntry> &curList,
+        const QList<HolidayEntry> &prospectiveList,
+        const std::string &configPath = "Config/Lichnghile.txt"
+    );
+
+    void showRescheduledSummaryDialog(
+        QWidget *parent,
+        const QList<RescheduledResultItem> &items,
+        int totalAffected
+    );
 };
 
 #endif // APPOINTMENTVIEW_H

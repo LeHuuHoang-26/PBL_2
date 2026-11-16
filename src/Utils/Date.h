@@ -1,7 +1,6 @@
 #ifndef DATE_H
 #define DATE_H
 
-#include <iostream>
 #include <string>
 
 class Date {
@@ -36,10 +35,6 @@ class Date {
         static Date loadFromString(const std::string &str);
         static Date now();
 
-        void insert(int dd, int mm, int yyyy, int hh = 0, int min = 0);
-        void show() const;
-        friend std::istream &operator >> (std::istream &in, Date &D);
-        friend std::ostream &operator << (std::ostream &out, const Date &D);
         Date operator ++ (int);
         Date operator -- (int);
         Date operator ++ ();
