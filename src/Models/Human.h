@@ -21,9 +21,9 @@ public:
     bool getGender() const;
     int getAge() const;
 
-    void setID(std::string id);
-    void setfullName(std::string fullName);
-    void setPhone(std::string phone);
+    void setID(const std::string &id);
+    void setfullName(const std::string &fullName);
+    void setPhone(const std::string &phone);
     void setGender(bool gender);
     void setAge(int age);
 };

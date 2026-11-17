@@ -33,9 +33,9 @@ string Doctor::getRoomId() const { return roomId; }
 double Doctor::getFee() const { return fee; }
 double Doctor::getRating() const { return rating; }
 
-void Doctor::setSpId(string _spId) { this->spId = _spId; }
+void Doctor::setSpId(const string &_spId) { this->spId = _spId; }
 void Doctor::setState(int _state) { this->state = _state; }
-void Doctor::setRoomId(string _roomId) { this->roomId = _roomId; }
+void Doctor::setRoomId(const string &_roomId) { this->roomId = _roomId; }
 void Doctor::setFee(double _fee) { this->fee = _fee; }
 void Doctor::setRating(double _rating) { this->rating = _rating; }
 

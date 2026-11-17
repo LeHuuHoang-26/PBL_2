@@ -40,7 +40,6 @@ SOURCES += \
     src/Models/SymptomPatientDetail.cpp \
     src/Utils/AppExceptions.cpp \
     src/Utils/Date.cpp \
-    src/Utils/libPBL2.cpp \
     src/Controllers/AuthController.cpp \
     src/Controllers/ManagerController.cpp \
     src/Controllers/DoctorController.cpp \

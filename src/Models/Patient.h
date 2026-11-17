@@ -21,7 +21,7 @@ class Patient: public Human {
         bool isDefault() const;
         std::string getCCCD() const;
         int getState() const;
-        void setCCCD(std::string CCCD);
+        void setCCCD(const std::string &CCCD);
         void setState(int state);
 
         std::string toString() const;

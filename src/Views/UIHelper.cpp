@@ -1050,6 +1050,10 @@ bool UIHelper::confirmDelete(QWidget *parent, const QString &title, const QStrin
     QPushButton *confirmBtn = box.addButton(confirmText, QMessageBox::AcceptRole);
     QPushButton *cancelBtn = box.addButton(cancelText, QMessageBox::RejectRole);
     box.setDefaultButton(cancelBtn);
+
+    confirmBtn->setObjectName("confirmBtnNeutral");
+    cancelBtn->setObjectName("cancelBtnRed");
+
     box.setStyleSheet(R"(
         QMessageBox {
             background-color: #ffffff;
@@ -1064,24 +1068,27 @@ bool UIHelper::confirmDelete(QWidget *parent, const QString &title, const QStrin
             padding: 6px 18px;
             font-size: 13px;
             font-weight: 700;
-            min-width: 75px;
-            min-height: 22px;
+            min-width: 80px;
+            min-height: 24px;
         }
-        QPushButton[text="Xóa"], QPushButton[text="Hủy lịch"], QPushButton[text="Hủy lịch hẹn"] {
+        /* Nút Hủy bỏ: Highlight ô màu đỏ */
+        QPushButton#cancelBtnRed, QPushButton[text="Hủy bỏ"], QPushButton[text="Không xóa"], QPushButton[text="Không hủy"] {
             background-color: #dc2626;
             color: #ffffff;
             border: none;
         }
-        QPushButton[text="Xóa"]:hover, QPushButton[text="Hủy lịch"]:hover, QPushButton[text="Hủy lịch hẹn"]:hover {
+        QPushButton#cancelBtnRed:hover, QPushButton[text="Hủy bỏ"]:hover, QPushButton[text="Không xóa"]:hover, QPushButton[text="Không hủy"]:hover {
             background-color: #b91c1c;
         }
-        QPushButton[text="Không xóa"], QPushButton[text="Không hủy"], QPushButton[text="Quay lại"] {
+        /* Nút xác nhận xóa: Viền xám trung tính */
+        QPushButton#confirmBtnNeutral, QPushButton[text="Xóa hồ sơ"], QPushButton[text="Xóa bác sĩ"], QPushButton[text="Xóa lịch khám"], QPushButton[text="Xóa tài khoản"], QPushButton[text="Xóa ngày nghỉ"], QPushButton[text="Xóa"] {
             background-color: #f1f5f9;
             color: #475569;
             border: 1px solid #cbd5e1;
         }
-        QPushButton[text="Không xóa"]:hover, QPushButton[text="Không hủy"]:hover, QPushButton[text="Quay lại"]:hover {
+        QPushButton#confirmBtnNeutral:hover, QPushButton[text="Xóa hồ sơ"]:hover, QPushButton[text="Xóa bác sĩ"]:hover, QPushButton[text="Xóa lịch khám"]:hover, QPushButton[text="Xóa tài khoản"]:hover, QPushButton[text="Xóa ngày nghỉ"]:hover, QPushButton[text="Xóa"]:hover {
             background-color: #e2e8f0;
+            color: #1e293b;
         }
     )");
     box.setWindowModality(Qt::ApplicationModal);
@@ -1136,9 +1143,4 @@ bool UIHelper::confirmWarning(QWidget *parent, const QString &title, const QStri
     box.activateWindow();
     box.exec();
     return box.clickedButton() == confirmBtn;
-}
-
-bool UIHelper::confirmCancel(QWidget *parent, const QString &title, const QString &message,
-                             const QString &confirmText, const QString &cancelText) {
-    return confirmDelete(parent, title, message, confirmText, cancelText);
 }

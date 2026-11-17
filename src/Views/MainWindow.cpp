@@ -239,19 +239,14 @@ QString MainWindow::holidayNote(const QDate &date) const
     return AppointmentController::getHolidayNote(date, holidayConfigPath);
 }
 
-void MainWindow::updatePatientSymptomStatus(const string &patientId)
-{
-    PatientController::updateSymptomStatus(patientId, symptomPatients, appointments);
-}
-
 string MainWindow::nextAppointmentId() const
 {
     return AppointmentController::generateNextId(appointments);
 }
 
-bool MainWindow::showBookingDialog(const QDate &defaultDate)
+bool MainWindow::showBookingDialog(const QDate &defaultDate, const std::string &preselectedPatientId)
 {
-    return appointmentView ? appointmentView->showBookingDialog(defaultDate) : false;
+    return appointmentView ? appointmentView->showBookingDialog(defaultDate, preselectedPatientId) : false;
 }
 
 void MainWindow::editAppointmentDialog(const string &id)
@@ -1034,7 +1029,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     if (!appIcon.isNull())
         setWindowIcon(appIcon);
 
-    initApp();
+    appInitialized = initApp();
 }
 
 MainWindow::~MainWindow()

@@ -37,6 +37,9 @@ int main(int argc, char *argv[]) {
 
     // Khởi tạo cửa sổ chính và thực thi ứng dụng
     MainWindow window;
+    if (!window.isInitialized()) {
+        return 1;
+    }
     window.showMaximized();
 
     return app.exec();

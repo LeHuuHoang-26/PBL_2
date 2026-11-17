@@ -89,7 +89,7 @@ double StatisticController::todayRevenue(const LinkList<Appointment> *appts, con
 double StatisticController::completionRate(const LinkList<Appointment> *appts, int currentDay, int currentMonth, int currentYear, int currentHour, int currentMinute, int &completedCount, int &totalUntilNow) {
     completedCount = 0;
     totalUntilNow = 0;
-    if (!appts || !appts->getHeader() || appts->count == 0) return 0.0;
+    if (!appts || !appts->getHeader() || appts->getCount() == 0) return 0.0;
 
     auto *n = appts->getHeader()->next;
     while (n && n->next) {
@@ -191,7 +191,7 @@ void StatisticController::patientAgeDistribution(const LinkList<Patient> *patien
 int StatisticController::getTopDoctors(const LinkList<Appointment> *appts, const LinkList<Doctor> *docs, DoctorLeaderboardItem outList[], int maxCount) {
     if (!docs || !docs->getHeader() || maxCount <= 0) return 0;
 
-    int totalDocs = docs->count;
+    int totalDocs = docs->getCount();
     if (totalDocs <= 0) return 0;
 
     // Allocate buffer for all doctors
@@ -256,7 +256,7 @@ int StatisticController::getSpecialtyDemand(const LinkList<Appointment> *appts, 
     if (!appts || !appts->getHeader() || !docs || maxCount <= 0) return 0;
 
     auto *docList = const_cast<LinkList<Doctor>*>(docs);
-    int cap = (docs->count > 0 ? docs->count : 20);
+    int cap = (docs->getCount() > 0 ? docs->getCount() : 20);
     SpecialtyDemandItem *items = nullptr;
     try {
         items = new SpecialtyDemandItem[cap];

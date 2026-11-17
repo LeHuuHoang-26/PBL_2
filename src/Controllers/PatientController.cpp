@@ -11,11 +11,3 @@ Patient *PatientController::findById(LinkList<Patient> *patients, const std::str
     }
     return nullptr;
 }
-
-void PatientController::updateSymptomStatus(const std::string &patientId,
-                                           LinkList<SymptomPatient> *spList,
-                                           const LinkList<Appointment> *aList) {
-    (void)patientId;
-    (void)spList;
-    (void)aList;
-}

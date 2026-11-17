@@ -254,8 +254,52 @@ bool AppointmentController::isSlotBooked(const LinkList<Appointment> *appointmen
     return false;
 }
 
+bool AppointmentController::isPatientSlotBooked(
+    const LinkList<Appointment> *appointments,
+    const LinkList<SymptomPatient> *symptomPatients,
+    const std::string &patientId,
+    const Date &targetTime,
+    const std::string &excludeApptId
+) {
+    if (!appointments || !appointments->getHeader() || !symptomPatients || !symptomPatients->getHeader() || patientId.empty() || targetTime.isDefault()) {
+        return false;
+    }
+    auto *an = appointments->getHeader()->next;
+    while (an && an->next) {
+        if (!an->info.isDefault() && an->info.getState() != -2 && an->info.getState() != -1) {
+            if (!excludeApptId.empty() && an->info.getId() == excludeApptId) {
+                an = an->next;
+                continue;
+            }
+            Date ad = an->info.getDateGet();
+            if (ad.getYear() == targetTime.getYear() &&
+                ad.getMonth() == targetTime.getMonth() &&
+                ad.getDay() == targetTime.getDay() &&
+                ad.getHour() == targetTime.getHour() &&
+                ad.getMinute() == targetTime.getMinute()) {
+
+                std::string spId = an->info.getSymptomPatientId();
+                auto *spn = symptomPatients->getHeader()->next;
+                while (spn && spn->next) {
+                    if (spn->info.getSP_id() == spId) {
+                        if (spn->info.getP_id() == patientId) {
+                            return true;
+                        }
+                        break;
+                    }
+                    spn = spn->next;
+                }
+            }
+        }
+        an = an->next;
+    }
+    return false;
+}
+
 void AppointmentController::validateBooking(
     const LinkList<Appointment> *appointments,
+    const LinkList<SymptomPatient> *symptomPatients,
+    const std::string &patientId,
     const std::string &doctorId,
     const QDateTime &targetDateTime,
     const std::string &excludeApptId,
@@ -276,6 +320,11 @@ void AppointmentController::validateBooking(
     Date targetDate = Date::loadFromString(targetDateTime.toString("yyyy-MM-dd HH:mm").toStdString());
     if (isSlotBooked(appointments, doctorId, targetDate, excludeApptId)) {
         throw ValidationException("Bác sĩ đã có lịch hẹn khác vào khung giờ này. Vui lòng chọn khung giờ hoặc bác sĩ khác.");
+    }
+    if (!patientId.empty() && symptomPatients && isPatientSlotBooked(appointments, symptomPatients, patientId, targetDate, excludeApptId)) {
+        throw ValidationException("Bệnh nhân đã có một lịch khám khác vào cùng khung giờ này (" +
+                                  targetDateTime.toString("dd/MM/yyyy lúc HH:mm").toStdString() +
+                                  "). Bệnh nhân có thể khám nhiều chuyên khoa trong cùng một ngày nhưng không được trùng cùng một khung giờ.");
     }
 }
 
@@ -362,12 +411,21 @@ QList<HolidayEntry> AppointmentController::loadHolidays(const std::string &confi
 
 bool AppointmentController::saveHolidays(const std::string &configPath, const QList<HolidayEntry> &list) {
     s_holidayCache[configPath] = list;
-    std::ofstream file(configPath);
+    std::string tempPath = configPath + ".tmp";
+    std::ofstream file(tempPath);
     if (!file.is_open()) return false;
-    for (const auto &item : list) {
-        file << item.date.toUtf8().toStdString() << " - " << item.note.toUtf8().toStdString() << "\n";
+    try {
+        for (const auto &item : list) {
+            file << item.date.toUtf8().toStdString() << " - " << item.note.toUtf8().toStdString() << "\n";
+        }
+        file.close();
+        libPBL2::safeAtomicCommit(tempPath, configPath);
+        return true;
+    } catch (...) {
+        file.close();
+        std::remove(tempPath.c_str());
+        return false;
     }
-    return true;
 }
 
 QList<Appointment*> AppointmentController::getAffectedAppointmentsForHoliday(
@@ -444,6 +502,22 @@ int AppointmentController::rescheduleAppointmentsLinear(
         Date oldD = oldAppt->getDateGet();
         QDate oldQDate(oldD.getYear(), oldD.getMonth(), oldD.getDay());
 
+        // Lấy thông tin bệnh nhân và chuyên khoa từ phiếu SymptomPatient cũ trước để kiểm tra trùng giờ khám
+        std::string oldSpId = oldAppt->getSymptomPatientId();
+        std::string patientId = "";
+        std::string spSpec = "";
+        if (symptomPatients && symptomPatients->getHeader()) {
+            auto *spn = symptomPatients->getHeader()->next;
+            while (spn && spn->next) {
+                if (spn->info.getSP_id() == oldSpId) {
+                    patientId = spn->info.getP_id();
+                    spSpec = spn->info.getSp_id();
+                    break;
+                }
+                spn = spn->next;
+            }
+        }
+
         // Bắt đầu tìm kiếm từ ngày tiếp theo (> ngày bị khóa)
         QDate curDate = oldQDate.addDays(1);
         bool foundSlot = false;
@@ -465,8 +539,10 @@ int AppointmentController::rescheduleAppointmentsLinear(
                 Date candidateTime(curDate.day(), curDate.month(), curDate.year(),
                                    slotTime.hour(), slotTime.minute());
 
-                // Nếu ca này của bác sĩ chưa bị đặt: chèn vào!
-                if (!isSlotBooked(appointments, docId, candidateTime)) {
+                // Nếu ca này của bác sĩ chưa bị đặt VÀ bệnh nhân chưa có lịch khám vào giờ này: chèn vào!
+                bool docFree = !isSlotBooked(appointments, docId, candidateTime);
+                bool patientFree = patientId.empty() || !isPatientSlotBooked(appointments, symptomPatients, patientId, candidateTime, oldAppt->getId());
+                if (docFree && patientFree) {
                     targetCandidateDate = candidateTime;
                     foundSlot = true;
                     break;
@@ -482,23 +558,7 @@ int AppointmentController::rescheduleAppointmentsLinear(
             // 1. Đổi trạng thái lịch cũ thành -2 (Đã dời lịch)
             oldAppt->setState(-2);
 
-            // 2. Tìm thông tin bệnh nhân và chuyên khoa từ phiếu SymptomPatient cũ
-            std::string oldSpId = oldAppt->getSymptomPatientId();
-            std::string patientId = "";
-            std::string spSpec = "";
-            if (symptomPatients && symptomPatients->getHeader()) {
-                auto *spn = symptomPatients->getHeader()->next;
-                while (spn && spn->next) {
-                    if (spn->info.getSP_id() == oldSpId) {
-                        patientId = spn->info.getP_id();
-                        spSpec = spn->info.getSp_id();
-                        break;
-                    }
-                    spn = spn->next;
-                }
-            }
-
-            // 3. Tạo phiếu SymptomPatient mới
+            // 2. Tạo phiếu SymptomPatient mới
             std::string newSpId = SymptomPatient::generateNextId(symptomPatients);
             if (symptomPatients) {
                 symptomPatients->insert(SymptomPatient(newSpId, patientId, spSpec, Date::now()));

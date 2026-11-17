@@ -35,11 +35,6 @@ class Date {
         static Date loadFromString(const std::string &str);
         static Date now();
 
-        Date operator ++ (int);
-        Date operator -- (int);
-        Date operator ++ ();
-        Date operator -- ();
-        Date operator + (const int &value);
         Date operator - (const int &value);
         int posofdayinmonth(int = 0) const;
         bool isLeapYear(int = 0) const;

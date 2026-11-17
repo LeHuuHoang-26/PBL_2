@@ -307,7 +307,7 @@ void AccountView::refresh(bool preserveScroll) {
             }
             if (!UIHelper::confirmDelete(this, "Xác nhận xóa tài khoản",
                 QStringLiteral("Bạn có chắc chắn muốn xóa tài khoản \"%1\" khỏi hệ thống?\nTài khoản sau khi xóa sẽ bị xóa khỏi danh sách.").arg(name),
-                "Xóa tài khoản", "Không xóa")) {
+                "Xóa tài khoản", "Hủy bỏ")) {
                 return;
             }
             auto *n = managers->getHeader()->next;

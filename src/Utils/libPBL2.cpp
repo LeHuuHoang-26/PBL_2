@@ -389,7 +389,7 @@ inline void sortAppointments(LinkList<Appointment> &list, AppointmentSortBy crit
                 cmp = compareNatural(a.getDoctorId(), b.getDoctorId());
                 break;
         }
-        if (cmp == 0) cmp = compareDates(a.getDateGet(), b.getDateGet());
+        if (cmp == 0 && criteria != AppointmentSortBy::Date) cmp = compareDates(a.getDateGet(), b.getDateGet());
         if (cmp == 0) cmp = compareNatural(a.getId(), b.getId());
         return ascending ? (cmp < 0) : (cmp > 0);
     });

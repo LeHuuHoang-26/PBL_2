@@ -58,6 +58,7 @@ public:
     ~MainWindow() override;
 
     bool initApp();
+    bool isInitialized() const { return appInitialized; }
     void showLogin();
     void handleLogin();
     void handleLogout();
@@ -94,10 +95,9 @@ public:
     Date getDateSetForAppointment(const Appointment &a) const;
     bool isHoliday(const QDate &date) const;
     QString holidayNote(const QDate &date) const;
-    void updatePatientSymptomStatus(const std::string &patientId);
     std::string nextAppointmentId() const;
 
-    bool showBookingDialog(const QDate &defaultDate = QDate::currentDate());
+    bool showBookingDialog(const QDate &defaultDate = QDate::currentDate(), const std::string &preselectedPatientId = "");
     void editAppointmentDialog(const std::string &id);
 
     // Giao diện và Phong cách
@@ -135,6 +135,7 @@ private:
 
     QLabel *sidebarAvatarLabel = nullptr;
     QLabel *sidebarNameLabel = nullptr;
+    bool appInitialized = false;
 
     void updateNavigation();
     void setupShell();

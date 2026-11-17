@@ -348,7 +348,7 @@ void DoctorView::refresh(bool preserveScroll) {
 
             if (!UIHelper::confirmDelete(this, "Xác nhận xóa bác sĩ",
                 QStringLiteral("Bạn có chắc chắn muốn xóa bác sĩ \"%1\" khỏi hệ thống?\nThông tin bác sĩ sau khi xóa sẽ được loại bỏ khỏi danh sách.").arg(name),
-                "Xóa bác sĩ", "Không xóa")) {
+                "Xóa bác sĩ", "Hủy bỏ")) {
                 return;
             }
 
@@ -893,8 +893,8 @@ void DoctorView::editDoctorDialog(const std::string &id) {
     // --- LOGIC QUẢN LÝ DỮ LIỆU LỊCH SỬ KHÁM CỦA BÁC SĨ (SEARCH, SORT, PHÂN TRANG 20 CA/TRANG) ---
     const int PAGE_SIZE = 20; // Giới hạn 20 ca khám mỗi trang
     struct HistViewState {
-        int sortCol = 0;       // Mặc định sắp xếp theo ngày giờ khám
-        bool sortAsc = false;  // Mới nhất lên đầu
+        int sortCol = -1;      // Mặc định (-1): sắp xếp theo Mã lịch khám (ID giảm dần)
+        bool sortAsc = false;  // Giảm dần (ID lớn nhất lên đầu: A_186 -> A_185 -> ...)
         int currentPage = 0;   // Trang hiện tại (0-based)
     };
     auto viewState = std::make_shared<HistViewState>();
@@ -925,6 +925,7 @@ void DoctorView::editDoctorDialog(const std::string &id) {
         QList<Appointment*> filtered;
         for (auto *a : allAppts) {
             if (!q.isEmpty()) {
+                QString aid = UIHelper::qs(a->getId()).toLower();
                 Patient *p = mainWindow->findPatientForAppointment(*a);
                 QString patName = p ? UIHelper::qs(p->getfullName()) : "";
                 QString patPhone = p ? UIHelper::qs(p->getPhone()) : "";
@@ -932,7 +933,7 @@ void DoctorView::editDoctorDialog(const std::string &id) {
                 Date ad = a->getDateGet();
                 QString dateStr = QString::asprintf("%02d/%02d/%04d %02d:%02d", ad.getDay(), ad.getMonth(), ad.getYear(), ad.getHour(), ad.getMinute());
 
-                QString fullSearch = (patName + " " + patPhone + " " + sym + " " + dateStr).toLower();
+                QString fullSearch = (aid + " " + patName + " " + patPhone + " " + sym + " " + dateStr).toLower();
                 if (!fullSearch.contains(q)) {
                     continue;
                 }
@@ -972,7 +973,8 @@ void DoctorView::editDoctorDialog(const std::string &id) {
                     cmp = (a->getState() < b->getState()) ? -1 : ((a->getState() > b->getState()) ? 1 : 0);
                     break;
                 default:
-                    cmp = libPBL2::compareDates(a->getDateGet(), b->getDateGet());
+                    // Mặc định (-1) sắp xếp theo Mã lịch khám (ID giảm dần)
+                    cmp = libPBL2::compareNatural(a->getId(), b->getId());
                     break;
             }
             if (cmp == 0) cmp = libPBL2::compareNatural(a->getId(), b->getId());

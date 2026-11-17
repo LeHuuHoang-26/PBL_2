@@ -774,6 +774,7 @@ private:
     QDate initialDate;
     QDate selectedDate;
     std::string currentDoctorId;
+    std::string currentPatientId;
     std::string currentExcludeApptId;
     QString initialSlot;
     QString selectedSlot;
@@ -790,8 +791,16 @@ public:
         onDateTimeSelected = cb;
     }
 
-    void configure(const std::string &doctorId, const QDate &date = QDate(), const std::string &excludeApptId = "", const QString &initSlot = "", const QString &curSelect = "") {
+    void setPatientId(const std::string &patientId) {
+        if (currentPatientId != patientId) {
+            currentPatientId = patientId;
+            refreshSlots();
+        }
+    }
+
+    void configure(const std::string &doctorId, const QDate &date = QDate(), const std::string &excludeApptId = "", const QString &initSlot = "", const QString &curSelect = "", const std::string &patientId = "") {
         currentDoctorId = doctorId;
+        currentPatientId = patientId;
         initialDate = date;
         selectedDate = date;
         currentExcludeApptId = excludeApptId;
@@ -817,6 +826,7 @@ public:
         selectedSlot.clear();
         initialSlot.clear();
         currentDoctorId.clear();
+        currentPatientId.clear();
         currentExcludeApptId.clear();
         if (calendar) {
             calendar->blockSignals(true);
@@ -1061,8 +1071,11 @@ private:
         bool isPast = (slotDT <= nowDT);
 
         Date checkDate = Date::loadFromString(UIHelper::ss(slotDT.toString("yyyy-MM-dd HH:mm")));
-        bool isBooked = (!currentDoctorId.empty() && mainWindow &&
-                         AppointmentController::isSlotBooked(mainWindow->getAppointments(), currentDoctorId, checkDate, currentExcludeApptId));
+        bool isDoctorBooked = (!currentDoctorId.empty() && mainWindow &&
+                               AppointmentController::isSlotBooked(mainWindow->getAppointments(), currentDoctorId, checkDate, currentExcludeApptId));
+        bool isPatientBooked = (!currentPatientId.empty() && mainWindow &&
+                                AppointmentController::isPatientSlotBooked(mainWindow->getAppointments(), mainWindow->getSymptomPatients(), currentPatientId, checkDate, currentExcludeApptId));
+        bool isBooked = isDoctorBooked || isPatientBooked;
 
         bool isCurrentSlot = (!initialSlot.isEmpty() && initialSlot == slotStr && initialDate.isValid() && selectedDate == initialDate);
         bool isSelected = (selectedSlot == slotStr);
@@ -1085,7 +1098,13 @@ private:
             btn->setEnabled(false);
             btn->setCursor(Qt::ArrowCursor);
             btn->setStyleSheet("QPushButton { background-color: #f1f5f9; border: 1.5px solid #cbd5e1; color: #94a3b8; font-weight: 600; font-size: 11.5px; border-radius: 6px; }");
-            btn->setToolTip(isPast ? "Khung giờ này đã trôi qua" : "Bác sĩ đã có lịch hẹn khác vào khung giờ này");
+            if (isPast) {
+                btn->setToolTip("Khung giờ này đã trôi qua");
+            } else if (isDoctorBooked) {
+                btn->setToolTip("Bác sĩ đã có lịch hẹn khác vào khung giờ này");
+            } else {
+                btn->setToolTip("Bệnh nhân đã có một lịch khám khác vào khung giờ này");
+            }
         } else {
             btn->setEnabled(true);
             btn->setCursor(Qt::PointingHandCursor);
@@ -1110,6 +1129,7 @@ private:
     QDate initialDate;
     QDate selectedDate;
     std::string currentDoctorId;
+    std::string currentPatientId;
     std::string currentExcludeApptId;
     QString initialSlot;
     QString selectedSlot;
@@ -1126,8 +1146,16 @@ public:
         onDateTimeSelected = cb;
     }
 
-    void configure(const std::string &doctorId, const QDate &date = QDate(), const std::string &excludeApptId = "", const QString &initSlot = "", const QString &curSelect = "") {
+    void setPatientId(const std::string &patientId) {
+        if (currentPatientId != patientId) {
+            currentPatientId = patientId;
+            refreshSlots();
+        }
+    }
+
+    void configure(const std::string &doctorId, const QDate &date = QDate(), const std::string &excludeApptId = "", const QString &initSlot = "", const QString &curSelect = "", const std::string &patientId = "") {
         currentDoctorId = doctorId;
+        currentPatientId = patientId;
         initialDate = date;
         selectedDate = date;
         currentExcludeApptId = excludeApptId;
@@ -1336,8 +1364,11 @@ private:
         bool isPast = (slotDT <= nowDT);
 
         Date checkDate = Date::loadFromString(UIHelper::ss(slotDT.toString("yyyy-MM-dd HH:mm")));
-        bool isBooked = (!currentDoctorId.empty() && mainWindow &&
-                         AppointmentController::isSlotBooked(mainWindow->getAppointments(), currentDoctorId, checkDate, currentExcludeApptId));
+        bool isDoctorBooked = (!currentDoctorId.empty() && mainWindow &&
+                               AppointmentController::isSlotBooked(mainWindow->getAppointments(), currentDoctorId, checkDate, currentExcludeApptId));
+        bool isPatientBooked = (!currentPatientId.empty() && mainWindow &&
+                                AppointmentController::isPatientSlotBooked(mainWindow->getAppointments(), mainWindow->getSymptomPatients(), currentPatientId, checkDate, currentExcludeApptId));
+        bool isBooked = isDoctorBooked || isPatientBooked;
 
         bool isCurrentSlot = (!initialSlot.isEmpty() && initialSlot == slotStr && initialDate.isValid() && selectedDate == initialDate);
         bool isSelected = (selectedSlot == slotStr);
@@ -1360,7 +1391,13 @@ private:
             btn->setEnabled(false);
             btn->setCursor(Qt::ArrowCursor);
             btn->setStyleSheet("QPushButton { background-color: #f1f5f9; border: 1.5px solid #cbd5e1; color: #94a3b8; font-weight: 600; font-size: 11px; border-radius: 6px; }");
-            btn->setToolTip(isPast ? "Khung giờ này đã trôi qua" : "Bác sĩ đã có lịch hẹn khác vào khung giờ này");
+            if (isPast) {
+                btn->setToolTip("Khung giờ này đã trôi qua");
+            } else if (isDoctorBooked) {
+                btn->setToolTip("Bác sĩ đã có lịch hẹn khác vào khung giờ này");
+            } else {
+                btn->setToolTip("Bệnh nhân đã có một lịch khám khác vào khung giờ này");
+            }
         } else {
             btn->setEnabled(true);
             btn->setCursor(Qt::PointingHandCursor);
@@ -1375,7 +1412,7 @@ private:
 
 } // namespace
 
-bool AppointmentView::showBookingDialog(const QDate &defaultDate) {
+bool AppointmentView::showBookingDialog(const QDate &defaultDate, const std::string &preselectedPatientId) {
     if (!mainWindow) return false;
 
     QDate targetedDate = (defaultDate.isValid() && defaultDate >= QDate::currentDate() && !mainWindow->isHoliday(defaultDate)) ? defaultDate : QDate();
@@ -1398,10 +1435,19 @@ bool AppointmentView::showBookingDialog(const QDate &defaultDate) {
             border: 1.5px solid #0d9488;
             background: #ffffff;
         }
+        QComboBox:disabled {
+            background-color: #f1f5f9;
+            color: #475569;
+            border: 1.5px solid #e2e8f0;
+        }
         QComboBox::drop-down { border: none; width: 28px; }
+        QComboBox::drop-down:disabled { width: 0px; border: none; }
         QComboBox::down-arrow {
             image: url(:/assets/textures/arrow_down_dark.png);
             width: 12px; height: 12px; margin-right: 8px;
+        }
+        QComboBox::down-arrow:disabled {
+            image: none;
         }
         QComboBox QAbstractItemView {
             background-color: #ffffff;
@@ -1503,6 +1549,20 @@ bool AppointmentView::showBookingDialog(const QDate &defaultDate) {
             p = p->next;
         }
     }
+    if (!preselectedPatientId.empty()) {
+        int idx = patient->findData(UIHelper::qs(preselectedPatientId));
+        if (idx != -1) {
+            patient->setCurrentIndex(idx);
+            patient->setEnabled(false);
+        }
+        sidePanel->setPatientId(preselectedPatientId);
+    }
+
+    connect(patient, qOverload<int>(&QComboBox::currentIndexChanged), &dialog, [patient, sidePanel]() {
+        std::string pId = UIHelper::ss(patient->currentData().toString());
+        sidePanel->setPatientId(pId);
+    });
+
     form->addRow(makeLabel("Bệnh nhân:"), patient);
 
     // 2. Symptoms: 1 to 5 dynamic dropdowns
@@ -1588,7 +1648,7 @@ bool AppointmentView::showBookingDialog(const QDate &defaultDate) {
     leftLayout->addWidget(formWidget);
 
     // Bấm vào dateBtn hoặc icon lịch: Mở/đóng Side panel mở rộng 50%
-    connect(dateBtn, &QPushButton::clicked, &dialog, [dateBtn, sidePanel, doctor, &selectedDate, &dialog]() {
+    connect(dateBtn, &QPushButton::clicked, &dialog, [dateBtn, sidePanel, doctor, patient, &selectedDate, &dialog]() {
         if (doctor->currentData().toString().isEmpty()) {
             UIHelper::showWarning(&dialog, "Thiếu thông tin", "Vui lòng chọn bác sĩ phụ trách trước khi chọn lịch khám.");
             return;
@@ -1600,7 +1660,8 @@ bool AppointmentView::showBookingDialog(const QDate &defaultDate) {
             dialog.adjustSize();
         } else {
             std::string dId = UIHelper::ss(doctor->currentData().toString());
-            sidePanel->configure(dId, selectedDate);
+            std::string pId = UIHelper::ss(patient->currentData().toString());
+            sidePanel->configure(dId, selectedDate, "", "", "", pId);
             sidePanel->setVisible(true);
             dialog.setFixedWidth(856);
             dialog.setMinimumHeight(630);
@@ -1912,6 +1973,8 @@ bool AppointmentView::showBookingDialog(const QDate &defaultDate) {
         try {
             AppointmentController::validateBooking(
                 mainWindow->getAppointments(),
+                mainWindow->getSymptomPatients(),
+                pId,
                 dId,
                 bookingDT,
                 "",
@@ -1947,7 +2010,6 @@ bool AppointmentView::showBookingDialog(const QDate &defaultDate) {
             appointments->insert(Appointment(AppointmentController::generateNextId(appointments), nextSpId, dId, targetTime, 0));
         }
 
-        mainWindow->updatePatientSymptomStatus(pId);
         try {
             mainWindow->saveAll(SaveScope::Appointment, SaveAction::Normal);
             UIHelper::showSuccess(&dialog, "Thành công", "Lịch khám đã được ghi nhận và lưu thành công.");
@@ -2016,9 +2078,15 @@ public:
         }
     }
 
+    ~StepperComboBox() override {
+        delete comboStyle;
+        comboStyle = nullptr;
+    }
+
     void showPopup() override {
         if (stepperBox && !comboStyle) {
             comboStyle = new StepperComboStyle(stepperBox, style());
+            comboStyle->setParent(this);
             setStyle(comboStyle);
         } else if (comboStyle) {
             comboStyle->stepperBox = stepperBox;
@@ -2159,10 +2227,8 @@ public:
     Appointment *appointment = nullptr;
     AppointmentView *view = nullptr;
     std::function<void()> onClosed = nullptr;
-    AppointmentRowClickFilter(Appointment *a, AppointmentView *v, std::function<void()> callback, QObject *parent = nullptr)
+    AppointmentRowClickFilter(Appointment *a, AppointmentView *v, std::function<void()> callback = nullptr, QObject *parent = nullptr)
         : QObject(parent), appointment(a), view(v), onClosed(std::move(callback)) {}
-    AppointmentRowClickFilter(Appointment *a, AppointmentView *v, QObject *parent = nullptr)
-        : QObject(parent), appointment(a), view(v), onClosed(nullptr) {}
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override {
         if (event->type() == QEvent::MouseButtonDblClick) {
@@ -2366,7 +2432,7 @@ QWidget *AppointmentView::createDashboardWidget(QWidget *parent) {
         bool sortAsc = true;
         enum { PAGE_SIZE = 8 };
     };
-    auto *state = new DashState;
+    auto state = std::make_shared<DashState>();
 
     auto renderRowsPtr = std::make_shared<std::function<void(bool)>>();
     auto renderRows = [renderRowsPtr](bool preserveScroll = true) { if (*renderRowsPtr) (*renderRowsPtr)(preserveScroll); };
@@ -2738,6 +2804,7 @@ QWidget *AppointmentView::createBookingWidget(QWidget *parent) {
     auto *monthCombo = new StepperComboBox(monthGroup);
     monthCombo->stepperBox = monthGroup;
     monthCombo->comboStyle = new StepperComboStyle(monthGroup, monthCombo->style());
+    monthCombo->comboStyle->setParent(monthCombo);
     monthCombo->setStyle(monthCombo->comboStyle);
     monthCombo->setFixedWidth(92);
     monthCombo->setMaxVisibleItems(12);
@@ -3014,7 +3081,7 @@ QWidget *AppointmentView::createBookingWidget(QWidget *parent) {
         bool sortAsc = true;
         enum { PAGE_SIZE = 8 };
     };
-    auto *state = new BookingPageState;
+    auto state = std::make_shared<BookingPageState>();
     state->selectedDate = QDate::currentDate();
 
     auto reloadDayViewPtr = std::make_shared<std::function<void(bool)>>();
@@ -3635,8 +3702,7 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
     pagination->addWidget(nextBtn);
     layout->addLayout(pagination);
 
-    auto computeApptStatus = [](const Appointment &a, Doctor *d = nullptr) -> QString {
-        (void)d;
+    auto computeApptStatus = [](const Appointment &a) -> QString {
         return getAppointmentStatusText(a);
     };
 
@@ -3673,7 +3739,7 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
 
                 bool matchesDoctor = doctor->currentData().toString().isEmpty() || UIHelper::qs(a.getDoctorId()) == doctor->currentData().toString();
                 bool matchesDate = allDates->isChecked() || (ad.getYear() == date->date().year() && ad.getMonth() == date->date().month() && ad.getDay() == date->date().day());
-                QString sText = computeApptStatus(a, d);
+                QString sText = computeApptStatus(a);
                 bool matchesStatus = (status->currentIndex() == 0) || (status->currentText() == sText);
 
                 bool matchesSearch = true;
@@ -3736,10 +3802,8 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
                     break;
                 }
                 case 4: { // TRẠNG THÁI
-                    Doctor *da = mainWindow ? mainWindow->findDoctor(a->getDoctorId()) : nullptr;
-                    Doctor *db = mainWindow ? mainWindow->findDoctor(b->getDoctorId()) : nullptr;
-                    QString sa = computeApptStatus(*a, da);
-                    QString sb = computeApptStatus(*b, db);
+                    QString sa = computeApptStatus(*a);
+                    QString sb = computeApptStatus(*b);
                     cmp = QString::compare(sa, sb, Qt::CaseInsensitive);
                     break;
                 }
@@ -3778,7 +3842,7 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
             Doctor *d = mainWindow->findDoctor(a.getDoctorId());
             Patient *p = mainWindow->findPatientForAppointment(a);
             Date ad = a.getDateGet();
-            QString sText = computeApptStatus(a, d);
+            QString sText = computeApptStatus(a);
 
             int r = t->rowCount();
             t->insertRow(r);
@@ -3846,9 +3910,9 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
                 QString patientName = p ? UIHelper::qs(p->getfullName()) : "bệnh nhân";
                 QString dateStr = QString::asprintf("%02d:%02d · %02d/%02d/%04d", ad.getHour(), ad.getMinute(), ad.getDay(), ad.getMonth(), ad.getYear());
 
-                QString confirmMsg = QStringLiteral("Bạn có chắc chắn muốn hủy lịch khám lúc %1 của bệnh nhân \"%2\"?\nLịch hẹn sau khi hủy sẽ không còn hiển thị trong danh sách chờ.")
+                QString confirmMsg = QStringLiteral("Bạn có chắc chắn muốn xóa lịch khám lúc %1 của bệnh nhân \"%2\"?\nLịch hẹn sau khi xóa sẽ không còn hiển thị trong danh sách chờ.")
                     .arg(dateStr, patientName);
-                if (!UIHelper::confirmCancel(mainWindow, "Hủy lịch khám", confirmMsg, "Hủy lịch", "Không hủy")) {
+                if (!UIHelper::confirmDelete(mainWindow, "Xác nhận xóa lịch khám", confirmMsg, "Xóa lịch khám", "Hủy bỏ")) {
                     return;
                 }
 
@@ -4277,10 +4341,6 @@ void AppointmentView::showAppointmentDetailDialog(Appointment *a) {
 
         QObject::connect(inviteBtn, &QPushButton::clicked, &dialog, [this, &dialog, a] {
             a->setState(1);
-            std::string patientId = mainWindow->getPatientIdForAppointment(*a);
-            if (!patientId.empty()) {
-                mainWindow->updatePatientSymptomStatus(patientId);
-            }
             try {
                 mainWindow->saveAll(SaveScope::Appointment, SaveAction::Normal);
                 UIHelper::showSuccess(&dialog, "Thành công", "Đã xác nhận bệnh nhân vào phòng và hoàn tất ca khám.");
@@ -4508,7 +4568,9 @@ void AppointmentView::showAppointmentDetailDialog(Appointment *a) {
 
                                 Date checkDate(slotDT.date().day(), slotDT.date().month(), slotDT.date().year(), slotDT.time().hour(), slotDT.time().minute());
                                 bool booked = AppointmentController::isSlotBooked(mainWindow->getAppointments(), cand.doc->getID(), checkDate, "");
-                                if (!booked) {
+                                bool patientBooked = (!patientId.empty() && mainWindow &&
+                                                      AppointmentController::isPatientSlotBooked(mainWindow->getAppointments(), mainWindow->getSymptomPatients(), patientId, checkDate, a->getId()));
+                                if (!booked && !patientBooked) {
                                     cand.freeSlot = checkDate;
                                     cand.freeSlotDT = slotDT;
                                     cand.freeSlotText = slotDT.toString("dd/MM/yyyy HH:mm");
@@ -4780,19 +4842,19 @@ void AppointmentView::showAppointmentDetailDialog(Appointment *a) {
             rLay->addWidget(bottomPanel);
 
             std::string initDocId = UIHelper::ss(docCombo->currentData().toString());
-            bottomPanel->configure(initDocId, selD, a->getId(), selSlot, selSlot);
+            bottomPanel->configure(initDocId, selD, a->getId(), selSlot, selSlot, patientId);
 
-            QObject::connect(dateBtn, &QPushButton::clicked, &rDlg, [&rDlg, bottomPanel, docCombo, a, &selD, &selSlot] {
+            QObject::connect(dateBtn, &QPushButton::clicked, &rDlg, [&rDlg, bottomPanel, docCombo, a, patientId, &selD, &selSlot] {
                 bool willShow = !bottomPanel->isVisible();
                 if (willShow) {
                     std::string curDocId = UIHelper::ss(docCombo->currentData().toString());
-                    bottomPanel->configure(curDocId, selD, a->getId(), selSlot, selSlot);
+                    bottomPanel->configure(curDocId, selD, a->getId(), selSlot, selSlot, patientId);
                 }
                 bottomPanel->setVisible(willShow);
                 rDlg.adjustSize();
             });
 
-            QObject::connect(docCombo, qOverload<int>(&QComboBox::currentIndexChanged), &rDlg, [docCombo, bottomPanel, a, dateBtn, &selD, &selSlot] {
+            QObject::connect(docCombo, qOverload<int>(&QComboBox::currentIndexChanged), &rDlg, [docCombo, bottomPanel, a, patientId, dateBtn, &selD, &selSlot] {
                 selSlot = "";
                 if (dateBtn) {
                     if (!selD.isValid()) {
@@ -4803,7 +4865,7 @@ void AppointmentView::showAppointmentDetailDialog(Appointment *a) {
                 }
                 std::string curDocId = UIHelper::ss(docCombo->currentData().toString());
                 if (bottomPanel) {
-                    bottomPanel->configure(curDocId, selD, a->getId(), "", "");
+                    bottomPanel->configure(curDocId, selD, a->getId(), "", "", patientId);
                 }
             });
 
@@ -4869,6 +4931,8 @@ void AppointmentView::showAppointmentDetailDialog(Appointment *a) {
                 try {
                     AppointmentController::validateBooking(
                         mainWindow->getAppointments(),
+                        mainWindow->getSymptomPatients(),
+                        patientId,
                         newDocId,
                         newDT,
                         a->getId(),
@@ -5498,7 +5562,7 @@ void AppointmentView::showHolidayManagementDialog(QWidget *parent) {
                     return;
                 }
                 if (UIHelper::confirmDelete(&dialog, "Xác nhận xóa ngày nghỉ",
-                    QStringLiteral("Bạn có chắc chắn muốn xóa ngày nghỉ '%1' khỏi lịch phòng khám?").arg(item.date), "Xóa", "Không xóa")) {
+                    QStringLiteral("Bạn có chắc chắn muốn xóa ngày nghỉ '%1' khỏi lịch phòng khám?").arg(item.date), "Xóa ngày nghỉ", "Hủy bỏ")) {
                     auto curList = AppointmentController::loadHolidays("Config/Lichnghile.txt");
                     if (i < curList.size()) {
                         curList.removeAt(i);

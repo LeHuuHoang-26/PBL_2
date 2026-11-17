@@ -41,8 +41,17 @@ public:
     static bool isHoliday(const QDate &date, const std::string &configPath);
     static bool isHolidayInList(const QDate &date, const QList<HolidayEntry> &list);
     static bool isSlotBooked(const LinkList<Appointment> *appointments, const std::string &doctorId, const Date &targetTime, const std::string &excludeApptId = "");
+    static bool isPatientSlotBooked(
+        const LinkList<Appointment> *appointments,
+        const LinkList<SymptomPatient> *symptomPatients,
+        const std::string &patientId,
+        const Date &targetTime,
+        const std::string &excludeApptId = ""
+    );
     static void validateBooking(
         const LinkList<Appointment> *appointments,
+        const LinkList<SymptomPatient> *symptomPatients,
+        const std::string &patientId,
         const std::string &doctorId,
         const QDateTime &targetDateTime,
         const std::string &excludeApptId = "",

@@ -979,7 +979,7 @@ void PatientView::editPatientDialog(const std::string &id) {
     filterBar->addWidget(quickBookBtn);
     rightCardLayout->addLayout(filterBar);
 
-    // Bảng danh sách lịch sử khám (5 cột, không có cột thao tác)
+    // Bảng danh sách lịch sử khám (5 cột: Ngày giờ khám, Bác sĩ phụ trách, Phòng, Triệu chứng, Trạng thái)
     auto *histTable = new QTableWidget;
     histTable->setColumnCount(5);
     histTable->setHorizontalHeaderLabels({"NGÀY GIỜ KHÁM", "BÁC SĨ PHỤ TRÁCH", "PHÒNG", "TRIỆU CHỨNG", "TRẠNG THÁI"});
@@ -1135,8 +1135,8 @@ void PatientView::editPatientDialog(const std::string &id) {
     // --- LOGIC QUẢN LÝ DỮ LIỆU LỊCH SỬ KHÁM (SEARCH, SORT, PHÂN TRANG 20 CA/TRANG) ---
     const int PAGE_SIZE = 20; // Giới hạn 20 ca khám mỗi trang
     struct HistViewState {
-        int sortCol = 0;       // Mặc định sắp xếp theo ngày giờ khám
-        bool sortAsc = false;  // Mới nhất lên đầu
+        int sortCol = -1;      // Mặc định (-1): sắp xếp theo Mã lịch khám (ID giảm dần)
+        bool sortAsc = false;  // Giảm dần (ID lớn nhất lên đầu: A_186 -> A_185 -> ...)
         int currentPage = 0;   // Trang hiện tại (0-based)
     };
     auto viewState = std::make_shared<HistViewState>();
@@ -1168,6 +1168,7 @@ void PatientView::editPatientDialog(const std::string &id) {
         QList<Appointment*> filtered;
         for (auto *a : allAppts) {
             if (!q.isEmpty()) {
+                QString aid = UIHelper::qs(a->getId()).toLower();
                 Doctor *d = mainWindow->findDoctor(a->getDoctorId());
                 QString docName = d ? UIHelper::qs(d->getfullName()) : "";
                 QString spec = d ? mainWindow->specialty(d->getSpId()) : "";
@@ -1176,7 +1177,7 @@ void PatientView::editPatientDialog(const std::string &id) {
                 Date ad = a->getDateGet();
                 QString dateStr = QString::asprintf("%02d/%02d/%04d %02d:%02d", ad.getDay(), ad.getMonth(), ad.getYear(), ad.getHour(), ad.getMinute());
 
-                QString fullSearch = (docName + " " + spec + " " + room + " " + sym + " " + dateStr).toLower();
+                QString fullSearch = (aid + " " + docName + " " + spec + " " + room + " " + sym + " " + dateStr).toLower();
                 if (!fullSearch.contains(q)) {
                     continue;
                 }
@@ -1222,7 +1223,7 @@ void PatientView::editPatientDialog(const std::string &id) {
                     cmp = (a->getState() < b->getState()) ? -1 : ((a->getState() > b->getState()) ? 1 : 0);
                     break;
                 default:
-                    cmp = libPBL2::compareDates(a->getDateGet(), b->getDateGet());
+                    cmp = libPBL2::compareNatural(a->getId(), b->getId());
                     break;
             }
             if (cmp == 0) cmp = libPBL2::compareNatural(a->getId(), b->getId());
@@ -1362,9 +1363,9 @@ void PatientView::editPatientDialog(const std::string &id) {
     });
 
     // Nút "＋ Đặt lịch khám mới"
-    connect(quickBookBtn, &QPushButton::clicked, &dialog, [this, reloadHistory]() {
-        if (mainWindow) {
-            mainWindow->showBookingDialog(QDate::currentDate());
+    connect(quickBookBtn, &QPushButton::clicked, &dialog, [this, reloadHistory, patient]() {
+        if (mainWindow && patient) {
+            mainWindow->showBookingDialog(QDate::currentDate(), patient->getID());
             reloadHistory();
         }
     });

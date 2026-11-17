@@ -44,130 +44,30 @@ bool Date::isLeapYear(int yearVar) const {
     return 0;
 }
 
-Date Date::operator ++ (int) {
-    Date tmp = *this;
-    int dayinmonth = this->posofdayinmonth();
-    day++;
-    if (day > dayinmonth) {
-        day = 1;
-        month++;
-        if (month > 12) {
-            month = 1;
-            year++;
-        }
-    }
-    return tmp;
-}
-
-Date Date::operator -- (int) {
-    Date tmp = *this;
-    if (day == 1 && month == 1 && year == 1) {
-        return tmp;
-    }
-    day--;
-    if (day <= 0) {
-        month--;
-        if (month <= 0) {
-            year--;
-            month = 12;
-        }
-        int dayinmonth = this->posofdayinmonth();
-        day = dayinmonth;
-    }
-    return tmp;
-}
-
-Date Date::operator ++ () {
-    int dayinmonth = this->posofdayinmonth();
-    day++;
-    if (day > dayinmonth) {
-        day = 1;
-        month++;
-        if (month > 12) {
-            month = 1;
-            year++;
-        }
-    }
-    return *this;
-}
-
-Date Date::operator -- () {
-    if (day == 1 && month == 1 && year == 1) {
-        return *this;
-    }
-    day--;
-    if (day <= 0) {
-        month--;
-        if (month <= 0) {
-            year--;
-            month = 12;
-        }
-        int dayinmonth = this->posofdayinmonth();
-        day = dayinmonth;
-    }
-    return *this;
-}
-
-Date Date::operator + (const int &value) {
-    Date tmp = *this;
-    int valueVar = value + tmp.day - 1;
-    tmp.day = 1;
-
-    while (tmp.month > 1) {
-        valueVar += tmp.posofdayinmonth(--tmp.month);
-    }
-
-    int tmpVar = tmp.isLeapYear() ? 366 : 365;
-    while (valueVar >= tmpVar) {
-        valueVar -= tmpVar;
-        tmp.year++;
-        tmpVar = tmp.isLeapYear() ? 366 : 365;
-    }
-    tmpVar = tmp.posofdayinmonth();
-    while (valueVar >= tmpVar) {
-        valueVar -= tmpVar;
-        if (++tmp.month > 12) {
-            tmp.month = 1;
-            tmp.year++;
-        }
-        tmpVar = tmp.posofdayinmonth();
-    }
-    tmp.day += valueVar;
-    return tmp;
-}
-
 Date Date::operator - (const int &value) {
+    if (value <= 0) return *this;
     Date tmp = *this;
-
-    int tmpVar = tmp.posofdayinmonth();
-    int valueVar = value + (tmpVar - tmp.day);
-    tmp.day = tmpVar;
-
-    while (tmp.month < 12) {
-        valueVar += tmp.posofdayinmonth(++tmp.month);
-    }
-
-    tmpVar = tmp.isLeapYear() ? 366 : 365;
-    while (valueVar >= tmpVar) {
-        if (tmp.year == 1) {
-            tmp.day = 1;
-            tmp.year = 1;
-            return tmp;
+    int remaining = value;
+    while (remaining > 0) {
+        if (tmp.day > remaining) {
+            tmp.day -= remaining;
+            remaining = 0;
+        } else {
+            remaining -= tmp.day;
+            tmp.month--;
+            if (tmp.month < 1) {
+                tmp.month = 12;
+                tmp.year--;
+                if (tmp.year < 1) {
+                    tmp.year = 1;
+                    tmp.month = 1;
+                    tmp.day = 1;
+                    return tmp;
+                }
+            }
+            tmp.day = tmp.posofdayinmonth(tmp.month);
         }
-        tmp.year--;
-        valueVar -= tmpVar;
-        tmpVar = tmp.isLeapYear() ? 366 : 365;
     }
-
-    tmpVar = tmp.posofdayinmonth();
-    while (valueVar >= tmpVar) {
-        tmp.month--;
-        valueVar -= tmpVar;
-        tmpVar = tmp.posofdayinmonth();
-        tmp.day = tmpVar;
-    }
-
-    tmp.day -= valueVar;
     return tmp;
 }
 

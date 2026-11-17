@@ -34,7 +34,7 @@ bool Patient::isDefault() const {
 
 string Patient::getCCCD() const { return this->CCCD; }
 int Patient::getState() const { return this->state; }
-void Patient::setCCCD(string CCCD) { this->CCCD = CCCD; }
+void Patient::setCCCD(const string &CCCD) { this->CCCD = CCCD; }
 void Patient::setState(int state) { this->state = state; }
 
 string Patient::toString() const {

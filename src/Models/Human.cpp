@@ -11,8 +11,8 @@ string Human::getPhone() const {return this->phone;}
 bool Human::getGender() const {return this->gender;}
 int Human::getAge() const {return this->age;}
 
-void Human::setID(string id) {this->id = id;}
-void Human::setfullName(string fullName) {this->fullName = fullName;}
-void Human::setPhone(string phone) {this->phone = phone;}
+void Human::setID(const string &id) {this->id = id;}
+void Human::setfullName(const string &fullName) {this->fullName = fullName;}
+void Human::setPhone(const string &phone) {this->phone = phone;}
 void Human::setGender(bool gender) {this->gender = gender;}
 void Human::setAge(int age) {this->age = age;}

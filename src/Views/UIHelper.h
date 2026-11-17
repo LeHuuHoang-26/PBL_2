@@ -51,8 +51,6 @@ public:
     static bool isValidPhone(const QString &phone);
     static bool isValidCccd(const QString &cccd);
 
-    static bool confirmCancel(QWidget *parent, const QString &title, const QString &message,
-                             const QString &confirmText = "Hủy lịch hẹn", const QString &cancelText = "Không hủy");
     static bool confirmDelete(QWidget *parent, const QString &title, const QString &message,
                              const QString &confirmText = "Xóa", const QString &cancelText = "Không xóa");
     static bool confirmWarning(QWidget *parent, const QString &title, const QString &message,

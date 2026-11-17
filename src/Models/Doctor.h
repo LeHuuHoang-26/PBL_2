@@ -27,9 +27,9 @@ public:
     double getFee() const;
     double getRating() const;
 
-    void setSpId(std::string _spId);
+    void setSpId(const std::string &_spId);
     void setState(int _state);
-    void setRoomId(std::string _roomId);
+    void setRoomId(const std::string &_roomId);
     void setFee(double _fee);
     void setRating(double _rating);
 

@@ -14,9 +14,6 @@
 class PatientController {
 public:
     static Patient *findById(LinkList<Patient> *patients, const std::string &id);
-    static void updateSymptomStatus(const std::string &patientId,
-                                    LinkList<SymptomPatient> *spList,
-                                    const LinkList<Appointment> *aList);
 };
 
 #endif // PATIENTCONTROLLER_H

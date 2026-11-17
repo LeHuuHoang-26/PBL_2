@@ -24,7 +24,7 @@ public:
     QWidget *createBookingWidget(QWidget *parent = nullptr);
     QWidget *createAppointmentListWidget(QWidget *parent = nullptr);
 
-    bool showBookingDialog(const QDate &defaultDate = QDate::currentDate());
+    bool showBookingDialog(const QDate &defaultDate = QDate::currentDate(), const std::string &preselectedPatientId = "");
     void showHolidayManagementDialog(QWidget *parent = nullptr);
     void showAppointmentDetailDialog(Appointment *appointment);
     void editAppointmentDialog(const std::string &id);

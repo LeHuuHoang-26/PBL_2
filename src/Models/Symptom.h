@@ -26,9 +26,9 @@ class Symptom {
         std::string getSp_id() const;
         int getSScore() const;
 
-        void setS_id(std::string id);
-        void setSName(std::string name);
-        void setSp_id(std::string spId);
+        void setS_id(const std::string &id);
+        void setSName(const std::string &name);
+        void setSp_id(const std::string &spId);
         void setSScore(int score);
 
         std::string toString() const;

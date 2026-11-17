@@ -15,10 +15,9 @@ public:
 private:
     Node *header;
     Node *footer;
-
-public:
     int count;
 
+public:
     LinkList();
     LinkList(const LinkList &L);
     LinkList &operator=(const LinkList &) = delete;

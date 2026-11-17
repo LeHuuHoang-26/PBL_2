@@ -33,9 +33,9 @@ string Symptom::getSName() const { return sName; }
 string Symptom::getSp_id() const { return Sp_id; }
 int Symptom::getSScore() const { return sScore; }
 
-void Symptom::setS_id(string id) { S_id = id; }
-void Symptom::setSName(string name) { sName = name; }
-void Symptom::setSp_id(string spId) { Sp_id = spId; }
+void Symptom::setS_id(const string &id) { S_id = id; }
+void Symptom::setSName(const string &name) { sName = name; }
+void Symptom::setSp_id(const string &spId) { Sp_id = spId; }
 void Symptom::setSScore(int score) { sScore = score; }
 
 string Symptom::toString() const {
