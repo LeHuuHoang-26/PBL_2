@@ -4,8 +4,6 @@
 #include <string>
 #include <cstdio>
 #include "../DataStructures/LinkList.h"
-#include "../Models/Permission.h"
-#include "../Models/PermissionManager.h"
 #include "Date.h"
 #include "AppExceptions.h"
 
@@ -13,66 +11,10 @@ class Patient;
 class Doctor;
 class Appointment;
 class Manager;
+class PermissionManager;
 
 namespace libPBL2 {
 
-    // String utilities
-    inline void trim(std::string &str);
-    inline size_t utf8Length(const std::string &str);
-    inline std::string padRightUtf8(const std::string &str, size_t targetWidth);
-
-    // Safe Data Parsing Utilities (ném DataFormatException có nguồn gốc rõ ràng)
-    inline int safeParseInt(const std::string &str, const std::string &fieldName, int defaultVal = 0, bool required = false);
-    inline double safeParseDouble(const std::string &str, const std::string &fieldName, double defaultVal = 0.0, bool required = false);
-
-    // Safe Atomic File Commit (ghi file tạm rồi đổi tên đè, chống mất dữ liệu khi mất điện/lỗi ổ đĩa)
-    inline void safeAtomicCommit(const std::string &tempPath, const std::string &finalPath);
-
-    // -------------------------------------------------------------
-    // Generic QuickSort Algorithm (Khai báo template)
-    // -------------------------------------------------------------
-
-    template <typename T>
-    void swapVal(T &a, T &b);
-
-    // Partition logic for doubly linked list
-    template <typename T, typename Compare>
-    typename LinkList<T>::Node* partitionNodes(typename LinkList<T>::Node *left,
-                                                typename LinkList<T>::Node *right,
-                                                Compare comp);
-
-    // Recursive node quicksort
-    template <typename T, typename Compare>
-    void qsortNodes(typename LinkList<T>::Node *left, typename LinkList<T>::Node *right, Compare comp);
-
-    // QuickSort on LinkList<T>
-    template <typename T, typename Compare>
-    void qsort(LinkList<T> &list, Compare comp);
-
-    template <typename T, typename Compare>
-    void qsort(LinkList<T> *list, Compare comp);
-
-    // QuickSort on C-arrays
-    template <typename T, typename Compare>
-    void qsort(T *arr, int low, int high, Compare comp);
-
-    // QuickSort on random-access indexable containers (QList, std::vector, etc.)
-    template <typename Container, typename Compare>
-    void qsortRandomAccess(Container &c, int low, int high, Compare comp);
-
-    template <typename Container, typename Compare>
-    void qsort(Container &c, Compare comp);
-
-    // Comparison helpers
-    inline int compareNatural(const std::string &a, const std::string &b);
-    inline std::string extractLastName(const std::string &fullName);
-    inline int compareVietnameseNames(const std::string &name1, const std::string &name2);
-    inline int compareDates(const Date &da, const Date &db);
-    inline int extractRoomNumber(const std::string &roomStr);
-
-    // -------------------------------------------------------------
-    // Patient Sorting
-    // -------------------------------------------------------------
     enum class PatientSortBy {
         ID,
         Name,
@@ -81,12 +23,7 @@ namespace libPBL2 {
         Phone,
         Gender
     };
-    inline void sortPatients(LinkList<Patient> &list, PatientSortBy criteria = PatientSortBy::Name, bool ascending = true);
-    inline void sortPatients(LinkList<Patient> *list, PatientSortBy criteria = PatientSortBy::Name, bool ascending = true);
 
-    // -------------------------------------------------------------
-    // Doctor Sorting
-    // -------------------------------------------------------------
     enum class DoctorSortBy {
         ID,
         Name,
@@ -96,24 +33,11 @@ namespace libPBL2 {
         Room,
         State
     };
-    inline void sortDoctors(LinkList<Doctor> &list, DoctorSortBy criteria = DoctorSortBy::Name, bool ascending = true);
-    inline void sortDoctors(LinkList<Doctor> *list, DoctorSortBy criteria = DoctorSortBy::Name, bool ascending = true);
 
-    // -------------------------------------------------------------
-    // Appointment Sorting
-    // -------------------------------------------------------------
     enum class AppointmentSortBy {
-        Date,
-        ID,
-        State,
-        DoctorID
+        ID
     };
-    inline void sortAppointments(LinkList<Appointment> &list, AppointmentSortBy criteria = AppointmentSortBy::Date, bool ascending = true);
-    inline void sortAppointments(LinkList<Appointment> *list, AppointmentSortBy criteria = AppointmentSortBy::Date, bool ascending = true);
 
-    // -------------------------------------------------------------
-    // Account (Manager) Sorting
-    // -------------------------------------------------------------
     enum class AccountSortBy {
         ID,
         Username,
@@ -121,11 +45,65 @@ namespace libPBL2 {
         Role,
         State
     };
-    inline void sortManagers(LinkList<Manager> &list, AccountSortBy criteria = AccountSortBy::ID, bool ascending = true);
-    inline void sortManagers(LinkList<Manager> *list, AccountSortBy criteria = AccountSortBy::ID, bool ascending = true);
 
-} // namespace libPBL2
+    inline void trim(std::string &str);
+    inline size_t utf8Length(const std::string &str);
+    inline std::string padRightUtf8(const std::string &str, size_t targetWidth);
+
+    inline int safeParseInt(const std::string &str, const std::string &fieldName, int defaultVal = 0);
+    inline double safeParseDouble(const std::string &str, const std::string &fieldName, double defaultVal = 0.0);
+
+    inline void safeAtomicCommit(const std::string &tempPath, const std::string &finalPath);
+
+    template <typename T, typename IdGetter>
+    std::string generateNextId(const LinkList<T> *list, const std::string &prefix, IdGetter getId, const std::string &altPrefix = "");
+
+    inline int compareNatural(const std::string &a, const std::string &b);
+    inline std::string extractLastName(const std::string &fullName);
+    inline int compareVietnameseNames(const std::string &name1, const std::string &name2);
+    inline int compareDates(const Date &da, const Date &db);
+    inline int extractRoomNumber(const std::string &roomStr);
+
+    template <typename T>
+    void swapVal(T &a, T &b);
+
+    template <typename T, typename Compare>
+    typename LinkList<T>::Node* partitionNodes(typename LinkList<T>::Node *left,
+                                                typename LinkList<T>::Node *right,
+                                                Compare comp);
+
+    template <typename T, typename Compare>
+    void qsortNodes(typename LinkList<T>::Node *left, typename LinkList<T>::Node *right, Compare comp);
+
+    template <typename T, typename Compare>
+    void qsort(LinkList<T> &list, Compare comp);
+
+    template <typename T, typename Compare>
+    void qsort(LinkList<T> *list, Compare comp);
+
+    template <typename T, typename Compare>
+    void qsort(T *arr, int low, int high, Compare comp);
+
+    template <typename Container, typename Compare>
+    void qsortRandomAccess(Container &c, int low, int high, Compare comp);
+
+    template <typename Container, typename Compare>
+    void qsort(Container &c, Compare comp);
+
+    inline void sortPatients(LinkList<Patient> &list, PatientSortBy criteria = PatientSortBy::Name, bool ascending = true);
+    inline void sortPatients(LinkList<Patient> *list, PatientSortBy criteria = PatientSortBy::Name, bool ascending = true);
+
+    inline void sortDoctors(LinkList<Doctor> &list, DoctorSortBy criteria = DoctorSortBy::Name, bool ascending = true);
+    inline void sortDoctors(LinkList<Doctor> *list, DoctorSortBy criteria = DoctorSortBy::Name, bool ascending = true);
+
+    inline void sortAppointments(LinkList<Appointment> &list, AppointmentSortBy criteria = AppointmentSortBy::ID, bool ascending = true);
+    inline void sortAppointments(LinkList<Appointment> *list, AppointmentSortBy criteria = AppointmentSortBy::ID, bool ascending = true);
+
+    inline void sortManagers(LinkList<Manager> &list, AccountSortBy criteria = AccountSortBy::ID, bool ascending = true, const LinkList<PermissionManager> *permissionRecords = nullptr);
+    inline void sortManagers(LinkList<Manager> *list, AccountSortBy criteria = AccountSortBy::ID, bool ascending = true, const LinkList<PermissionManager> *permissionRecords = nullptr);
+
+}
 
 #include "libPBL2.cpp"
 
-#endif // LIBPBL2_H
+#endif

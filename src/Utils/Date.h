@@ -4,40 +4,42 @@
 #include <string>
 
 class Date {
-    private:
-        int day;
-        int month;
-        int year;
-        int hour;
-        int minute;
+private:
+    int day;
+    int month;
+    int year;
+    int hour;
+    int minute;
 
-    public:
-        Date(int day = 0, int month = 0, int year = 0, int hour = 0, int minute = 0);
-        Date(const Date &D);
-        Date &operator=(const Date &D) = default;
-        ~Date();
+public:
+    Date(int day = 0, int month = 0, int year = 0, int hour = 0, int minute = 0);
+    Date(const Date &D);
+    Date &operator=(const Date &D) = default;
+    Date(Date &&D) noexcept = default;
+    Date &operator=(Date &&D) noexcept = default;
+    ~Date();
 
-        int getDay() const;
-        int getMonth() const;
-        int getYear() const;
-        int getHour() const;
-        int getMinute() const;
+    int getDay() const;
+    int getMonth() const;
+    int getYear() const;
+    int getHour() const;
+    int getMinute() const;
 
-        void setDay(int d);
-        void setMonth(int m);
-        void setYear(int y);
-        void setHour(int h);
-        void setMinute(int min);
+    void setDay(int d);
+    void setMonth(int m);
+    void setYear(int y);
+    void setHour(int h);
+    void setMinute(int min);
 
-        bool isDefault() const;
+    bool isDefault() const;
 
-        std::string toString() const;
-        static Date loadFromString(const std::string &str);
-        static Date now();
+    bool isLeapYear(int y = 0) const;
+    int posofdayinmonth(int m = 0) const;
+    Date operator-(const int &value);
 
-        Date operator - (const int &value);
-        int posofdayinmonth(int = 0) const;
-        bool isLeapYear(int = 0) const;
+    std::string toString() const;
+    static Date loadFromString(const std::string &str);
+    static Date now();
 };
 
 #endif

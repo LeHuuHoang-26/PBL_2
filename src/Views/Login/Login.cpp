@@ -1,5 +1,4 @@
 #include "Login.h"
-#include "libPBL2.h"
 #include "UIHelper.h"
 
 #include <QVBoxLayout>
@@ -12,9 +11,7 @@
 #include <QPainterPath>
 #include <QGraphicsDropShadowEffect>
 #include <QFile>
-#include <QCursor>
 #include <QResizeEvent>
-#include <QtMath>
 
 static QIcon createUserIcon() {
     int size = 56;
@@ -22,17 +19,14 @@ static QIcon createUserIcon() {
     pix.fill(Qt::transparent);
     QPainter p(&pix);
     p.setRenderHint(QPainter::Antialiasing);
-    p.scale(2.0, 2.0); // 28x28 logical canvas
+    p.scale(2.0, 2.0);
 
-    // Màu icon Teal thương hiệu An Tâm
     QColor iconColor("#0D9488");
     p.setPen(Qt::NoPen);
     p.setBrush(iconColor);
 
-    // Đầu hình tròn (đường kính 10px, to rõ ràng)
     p.drawEllipse(QPointF(14.0, 8.5), 5.0, 5.0);
 
-    // Thân vai hình vòm nở rộng cân bằng (rộng 19px)
     QPainterPath body;
     body.moveTo(4.5, 23.5);
     body.quadTo(4.5, 16.5, 10.0, 15.5);
@@ -51,11 +45,10 @@ static QIcon createLockIcon() {
     pix.fill(Qt::transparent);
     QPainter p(&pix);
     p.setRenderHint(QPainter::Antialiasing);
-    p.scale(2.0, 2.0); // 28x28 logical canvas
+    p.scale(2.0, 2.0);
 
     QColor iconColor("#0D9488");
 
-    // Càng khóa (Shackle) to hơn, nét dày 2.4px
     QPen shacklePen(iconColor, 2.4);
     shacklePen.setCapStyle(Qt::RoundCap);
     p.setPen(shacklePen);
@@ -67,12 +60,10 @@ static QIcon createLockIcon() {
     shackle.lineTo(19.0, 12.0);
     p.drawPath(shackle);
 
-    // Thân ổ khóa hình chữ nhật bo góc cân đối (19px rộng x 12.0px cao)
     p.setPen(Qt::NoPen);
     p.setBrush(iconColor);
     p.drawRoundedRect(QRectF(4.5, 11.5, 19.0, 12.0), 3.0, 3.0);
 
-    // Lỗ khóa màu trắng tinh tế
     p.setBrush(QColor("#FFFFFF"));
     p.drawEllipse(QPointF(14.0, 15.8), 1.6, 1.6);
     p.drawRect(QRectF(13.2, 15.8, 1.6, 3.0));
@@ -106,13 +97,236 @@ Login::Login(QWidget *parent)
     setupConnections();
 }
 
+QString Login::getUsername() const {
+    return m_txtUsername->text();
+}
+
+QString Login::getPassword() const {
+    return m_txtPassword->text();
+}
+
+void Login::clearInputs() {
+    m_txtUsername->clear();
+    m_txtPassword->clear();
+    m_isPasswordVisible = false;
+    m_txtPassword->setEchoMode(QLineEdit::Password);
+    if (m_actionTogglePassword) {
+        m_actionTogglePassword->setIcon(UIHelper::createEyeIcon(false));
+    }
+    m_txtUsername->setFocus();
+}
+
+void Login::showErrorMessage(const QString &message) {
+    m_lblMessage->setText(message);
+    m_lblMessage->setStyleSheet("background-color: #FEF2F2; border: 1px solid #FECACA; border-radius: 10px; color: #DC2626; font-size: 12.5px; font-weight: 600; padding: 8px 14px;");
+    m_lblMessage->show();
+}
+
+void Login::clearMessage() {
+    m_lblMessage->clear();
+    m_lblMessage->hide();
+}
+
+void Login::paintEvent(QPaintEvent *event) {
+    Q_UNUSED(event);
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    int w = width();
+    int h = height();
+
+    QLinearGradient bgGrad(0, 0, w, h);
+    bgGrad.setColorAt(0.0, QColor("#0F2A3A"));
+    bgGrad.setColorAt(0.5, QColor("#0A1F2C"));
+    bgGrad.setColorAt(1.0, QColor("#06131C"));
+    painter.fillRect(rect(), bgGrad);
+
+    QRadialGradient centerGlow(w * 0.5, h * 0.5, qMax(w, h) * 0.52);
+    centerGlow.setColorAt(0.0, QColor(13, 148, 136, 55));
+    centerGlow.setColorAt(0.65, QColor(15, 118, 110, 20));
+    centerGlow.setColorAt(1.0, QColor(0, 0, 0, 0));
+    painter.fillRect(rect(), centerGlow);
+
+    QRadialGradient cyanGlow(w * 0.15, h * 0.22, w * 0.38);
+    cyanGlow.setColorAt(0.0, QColor(20, 184, 166, 45));
+    cyanGlow.setColorAt(1.0, QColor(0, 0, 0, 0));
+    painter.fillRect(rect(), cyanGlow);
+
+    QRadialGradient emeraldGlow(w * 0.85, h * 0.78, w * 0.38);
+    emeraldGlow.setColorAt(0.0, QColor(16, 185, 129, 40));
+    emeraldGlow.setColorAt(1.0, QColor(0, 0, 0, 0));
+    painter.fillRect(rect(), emeraldGlow);
+
+    auto drawECGWave = [&](qreal startX, qreal endX, qreal midY, qreal amp, const QColor &color) {
+        if (endX <= startX + 60) return;
+        QPainterPath path;
+        qreal totalLen = endX - startX;
+        path.moveTo(startX, midY);
+
+        path.lineTo(startX + totalLen * 0.15, midY);
+        path.lineTo(startX + totalLen * 0.20, midY - amp * 0.25);
+        path.lineTo(startX + totalLen * 0.24, midY);
+        path.lineTo(startX + totalLen * 0.28, midY + amp * 0.20);
+        path.lineTo(startX + totalLen * 0.33, midY - amp);
+        path.lineTo(startX + totalLen * 0.38, midY + amp * 0.50);
+        path.lineTo(startX + totalLen * 0.43, midY);
+        path.lineTo(startX + totalLen * 0.48, midY - amp * 0.35);
+        path.lineTo(startX + totalLen * 0.54, midY);
+
+        path.lineTo(startX + totalLen * 0.62, midY);
+        path.lineTo(startX + totalLen * 0.66, midY - amp * 0.20);
+        path.lineTo(startX + totalLen * 0.70, midY);
+        path.lineTo(startX + totalLen * 0.73, midY + amp * 0.18);
+        path.lineTo(startX + totalLen * 0.77, midY - amp * 0.90);
+        path.lineTo(startX + totalLen * 0.81, midY + amp * 0.45);
+        path.lineTo(startX + totalLen * 0.85, midY);
+        path.lineTo(startX + totalLen * 0.89, midY - amp * 0.30);
+        path.lineTo(endX, midY);
+
+        QLinearGradient fadeGrad(startX, midY, endX, midY);
+        QColor c0 = color; c0.setAlpha(0);
+        QColor c1 = color;
+        QColor c2 = color; c2.setAlpha(0);
+        fadeGrad.setColorAt(0.0, c0);
+        fadeGrad.setColorAt(0.5, c1);
+        fadeGrad.setColorAt(1.0, c2);
+
+        QPen pen(fadeGrad, 2.0);
+        painter.setPen(pen);
+        painter.setBrush(Qt::NoBrush);
+        painter.drawPath(path);
+
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(45, 212, 191, 230));
+        painter.drawEllipse(QPointF(startX + totalLen * 0.33, midY - amp), 3.0, 3.0);
+    };
+
+    qreal cardLeft = (m_cardWidget) ? m_cardWidget->x() : (w * 0.5 - 520);
+    qreal cardRight = (m_cardWidget) ? (m_cardWidget->x() + m_cardWidget->width()) : (w * 0.5 + 520);
+
+    if (cardLeft > 130) {
+        drawECGWave(20, cardLeft - 20, h * 0.38, 28, QColor(20, 184, 166, 140));
+        drawECGWave(35, cardLeft - 35, h * 0.65, 22, QColor(13, 148, 136, 110));
+    }
+    if (w - cardRight > 130) {
+        drawECGWave(cardRight + 20, w - 20, h * 0.42, 28, QColor(20, 184, 166, 140));
+        drawECGWave(cardRight + 35, w - 35, h * 0.68, 22, QColor(13, 148, 136, 110));
+    }
+
+    auto drawMedicalCross = [&](qreal cx, qreal cy, qreal size, const QColor &color, qreal angle) {
+        painter.save();
+        painter.translate(cx, cy);
+        if (angle != 0.0) painter.rotate(angle);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(color);
+        qreal armW = size * 0.34;
+        qreal halfArm = armW / 2.0;
+        qreal halfSize = size / 2.0;
+        painter.drawRoundedRect(QRectF(-halfArm, -halfSize, armW, size), armW * 0.35, armW * 0.35);
+        painter.drawRoundedRect(QRectF(-halfSize, -halfArm, size, armW), armW * 0.35, armW * 0.35);
+        painter.restore();
+    };
+
+    drawMedicalCross(w * 0.07, h * 0.18, 38, QColor(20, 184, 166, 70), 0);
+    drawMedicalCross(w * 0.12, h * 0.82, 28, QColor(255, 255, 255, 55), 15);
+    drawMedicalCross(w * 0.05, h * 0.52, 24, QColor(13, 148, 136, 65), -10);
+
+    drawMedicalCross(w * 0.93, h * 0.22, 36, QColor(20, 184, 166, 70), -5);
+    drawMedicalCross(w * 0.88, h * 0.76, 30, QColor(255, 255, 255, 55), 12);
+    drawMedicalCross(w * 0.95, h * 0.88, 24, QColor(13, 148, 136, 65), 0);
+
+    drawMedicalCross(w * 0.28, h * 0.06, 20, QColor(255, 255, 255, 45), 0);
+    drawMedicalCross(w * 0.72, h * 0.94, 22, QColor(20, 184, 166, 60), 0);
+    drawMedicalCross(w * 0.50, h * 0.05, 18, QColor(20, 184, 166, 45), 0);
+
+    auto drawCapsulePill = [&](qreal cx, qreal cy, qreal len, qreal thick, qreal angle, const QColor &c1, const QColor &c2) {
+        painter.save();
+        painter.translate(cx, cy);
+        painter.rotate(angle);
+        painter.setPen(Qt::NoPen);
+
+        painter.setBrush(c1);
+        QPainterPath leftP;
+        leftP.moveTo(0, -thick / 2.0);
+        leftP.lineTo(-len / 2.0 + thick / 2.0, -thick / 2.0);
+        leftP.arcTo(-len / 2.0, -thick / 2.0, thick, thick, 90, 180);
+        leftP.lineTo(0, thick / 2.0);
+        leftP.closeSubpath();
+        painter.drawPath(leftP);
+
+        painter.setBrush(c2);
+        QPainterPath rightP;
+        rightP.moveTo(0, -thick / 2.0);
+        rightP.lineTo(len / 2.0 - thick / 2.0, -thick / 2.0);
+        rightP.arcTo(len / 2.0 - thick, -thick / 2.0, thick, thick, 90, -180);
+        rightP.lineTo(0, thick / 2.0);
+        rightP.closeSubpath();
+        painter.drawPath(rightP);
+
+        painter.restore();
+    };
+
+    drawCapsulePill(w * 0.09, h * 0.32, 34, 15, -35, QColor(255, 255, 255, 55), QColor(20, 184, 166, 75));
+    drawCapsulePill(w * 0.91, h * 0.60, 32, 14, 40, QColor(13, 148, 136, 70), QColor(255, 255, 255, 50));
+
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(255, 255, 255, 45));
+    for (int r = 0; r < 6; ++r) {
+        for (int c = 0; c < 6; ++c) {
+            painter.drawEllipse(QPointF(w * 0.035 + c * 16, h * 0.065 + r * 16), 1.8, 1.8);
+        }
+    }
+    for (int r = 0; r < 5; ++r) {
+        for (int c = 0; c < 8; ++c) {
+            painter.drawEllipse(QPointF(w * 0.88 + c * 15, h * 0.85 + r * 15), 1.8, 1.8);
+        }
+    }
+
+    QPen ringPen(QColor(255, 255, 255, 30), 1.5);
+    painter.setPen(ringPen);
+    painter.setBrush(Qt::NoBrush);
+    painter.drawEllipse(QPointF(w * 0.09, h * 0.88), 75, 75);
+    painter.drawEllipse(QPointF(w * 0.09, h * 0.88), 45, 45);
+
+    painter.drawEllipse(QPointF(w * 0.92, h * 0.14), 60, 60);
+    painter.drawEllipse(QPointF(w * 0.92, h * 0.14), 35, 35);
+
+    QPen dashRing(QColor(20, 184, 166, 60), 1.2, Qt::DashLine);
+    painter.setPen(dashRing);
+    painter.drawEllipse(QPointF(w * 0.18, h * 0.15), 34, 34);
+    painter.drawEllipse(QPointF(w * 0.82, h * 0.88), 44, 44);
+
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(45, 212, 191, 200));
+    painter.drawEllipse(QPointF(w * 0.22, h * 0.28), 3.5, 3.5);
+    painter.drawEllipse(QPointF(w * 0.78, h * 0.72), 3.5, 3.5);
+    painter.setBrush(QColor(255, 255, 255, 220));
+    painter.drawEllipse(QPointF(w * 0.15, h * 0.48), 2.5, 2.5);
+    painter.drawEllipse(QPointF(w * 0.85, h * 0.52), 2.5, 2.5);
+}
+
+void Login::resizeEvent(QResizeEvent *event) {
+    QWidget::resizeEvent(event);
+    if (!m_cardWidget) return;
+
+    int targetW = qBound(980, static_cast<int>(width() * 0.65), 1140);
+    int targetH = qBound(580, static_cast<int>(height() * 0.72), 640);
+    m_cardWidget->setFixedSize(targetW, targetH);
+
+    updateIllustrationScale();
+}
+
+void Login::onTogglePasswordVisibility() {
+    m_isPasswordVisible = !m_isPasswordVisible;
+    m_txtPassword->setEchoMode(m_isPasswordVisible ? QLineEdit::Normal : QLineEdit::Password);
+    m_actionTogglePassword->setIcon(UIHelper::createEyeIcon(m_isPasswordVisible));
+}
+
 void Login::setupUI() {
-    // 1. Layout tổng thể căn giữa Card
     QVBoxLayout *rootLayout = new QVBoxLayout(this);
     rootLayout->setContentsMargins(30, 20, 30, 20);
     rootLayout->setAlignment(Qt::AlignCenter);
 
-    // 2. White Card Widget
     m_cardWidget = new QWidget(this);
     m_cardWidget->setObjectName("cardWidget");
     m_cardWidget->setFixedSize(1040, 610);
@@ -123,7 +337,6 @@ void Login::setupUI() {
         "}"
     );
 
-    // Hiệu ứng bóng đổ mềm mại, sâu sắc
     QGraphicsDropShadowEffect *shadow = new QGraphicsDropShadowEffect(m_cardWidget);
     shadow->setBlurRadius(55);
     shadow->setOffset(0, 18);
@@ -134,9 +347,6 @@ void Login::setupUI() {
     cardLayout->setContentsMargins(48, 30, 48, 24);
     cardLayout->setSpacing(0);
 
-    // ==========================================
-    // A. HEADER TRONG CARD (Logo & Thương hiệu An Tâm Clinic)
-    // ==========================================
     QHBoxLayout *headerLayout = new QHBoxLayout();
     headerLayout->setContentsMargins(0, 0, 0, 0);
     headerLayout->setSpacing(12);
@@ -153,7 +363,6 @@ void Login::setupUI() {
     headerLayout->addWidget(lblIcon);
 
     QLabel *lblLogo = new QLabel(m_cardWidget);
-    lblLogo->setObjectName("lblLogo");
     lblLogo->setText("<div style='line-height: 115%;'>"
                      "<span style='color:#0F172A; font-weight:900; font-size:22px; letter-spacing:0.3px;'>AN TÂM </span>"
                      "<span style='color:#0D9488; font-weight:800; font-size:18px; letter-spacing:0.5px;'>MNG</span><br>"
@@ -165,14 +374,10 @@ void Login::setupUI() {
     cardLayout->addLayout(headerLayout);
     cardLayout->addSpacing(30);
 
-    // ==========================================
-    // B. BODY: 2 CỘT (Form bên trái, Illustration bên phải)
-    // ==========================================
     QHBoxLayout *bodyLayout = new QHBoxLayout();
     bodyLayout->setContentsMargins(0, 0, 0, 0);
     bodyLayout->setSpacing(40);
 
-    // --- CỘT TRÁI: FORM ĐĂNG NHẬP NÂNG CẤP ĐẸP MẮT ---
     QVBoxLayout *leftCol = new QVBoxLayout();
     leftCol->setContentsMargins(0, 0, 10, 0);
     leftCol->setSpacing(0);
@@ -183,14 +388,12 @@ void Login::setupUI() {
     formLayout->setContentsMargins(0, 0, 0, 0);
     formLayout->setSpacing(0);
 
-    // Tiêu đề Sign in to account (Font chủ đề Be Vietnam Pro hiện đại, ăn khớp nút Sign in)
     QLabel *lblTitle = new QLabel("Sign in to account", formContainer);
     QFont titleFont("Be Vietnam Pro", 22, QFont::Bold);
     titleFont.setStyleStrategy(QFont::PreferAntialias);
     lblTitle->setFont(titleFont);
     lblTitle->setStyleSheet("font-family: 'Be Vietnam Pro', 'Segoe UI', sans-serif; color: #0F172A; font-size: 28px; font-weight: 700; letter-spacing: -0.4px;");
 
-    // Thanh gạch chỉ báo gradient hiện đại dưới tiêu đề
     QWidget *titleAccent = new QWidget(formContainer);
     titleAccent->setFixedSize(52, 4);
     titleAccent->setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0D9488, stop:1 #14B8A6); border-radius: 2px;");
@@ -200,7 +403,6 @@ void Login::setupUI() {
     formLayout->addWidget(titleAccent);
     formLayout->addSpacing(32);
 
-    // Style cao cấp cho các ô input (Viền mượt, focus glow, phông chữ chuẩn)
     QString inputStyle =
         "QLineEdit {"
         "   background-color: #F8FAFC;"
@@ -218,13 +420,14 @@ void Login::setupUI() {
         "QLineEdit:focus {"
         "   background-color: #FFFFFF;"
         "   border: 2px solid #0D9488;"
-        "}"
-        "QLineEdit::placeholder {"
-        "   color: #94A3B8;"
-        "   font-size: 13.5px;"
         "}";
 
-    // Nhãn & Input Username
+    auto applyPlaceholderColor = [](QLineEdit *edit) {
+        QPalette pal = edit->palette();
+        pal.setColor(QPalette::PlaceholderText, QColor("#94A3B8"));
+        edit->setPalette(pal);
+    };
+
     QLabel *lblUser = new QLabel("Username", formContainer);
     lblUser->setStyleSheet("color: #334155; font-size: 13.5px; font-weight: 700; margin-bottom: 6px;");
     formLayout->addWidget(lblUser);
@@ -232,12 +435,12 @@ void Login::setupUI() {
     m_txtUsername = new QLineEdit(formContainer);
     m_txtUsername->setPlaceholderText("Nhập Username");
     m_txtUsername->setStyleSheet(inputStyle);
+    applyPlaceholderColor(m_txtUsername);
     m_txtUsername->addAction(createUserIcon(), QLineEdit::LeadingPosition);
     formLayout->addWidget(m_txtUsername);
 
     formLayout->addSpacing(18);
 
-    // Nhãn & Input Password
     QLabel *lblPass = new QLabel("Password", formContainer);
     lblPass->setStyleSheet("color: #334155; font-size: 13.5px; font-weight: 700; margin-bottom: 6px;");
     formLayout->addWidget(lblPass);
@@ -246,13 +449,13 @@ void Login::setupUI() {
     m_txtPassword->setPlaceholderText("Nhập mật khẩu");
     m_txtPassword->setEchoMode(QLineEdit::Password);
     m_txtPassword->setStyleSheet(inputStyle);
+    applyPlaceholderColor(m_txtPassword);
     m_txtPassword->addAction(createLockIcon(), QLineEdit::LeadingPosition);
     m_actionTogglePassword = m_txtPassword->addAction(UIHelper::createEyeIcon(false), QLineEdit::TrailingPosition);
     formLayout->addWidget(m_txtPassword);
 
     formLayout->addSpacing(12);
 
-    // Thông báo lỗi / thành công dạng Card Alert
     m_lblMessage = new QLabel(formContainer);
     m_lblMessage->setWordWrap(true);
     m_lblMessage->hide();
@@ -260,7 +463,6 @@ void Login::setupUI() {
 
     formLayout->addSpacing(22);
 
-    // Nút Sign in tone xanh Teal đồng bộ với ứng dụng
     m_btnLogin = new QPushButton("Sign in", formContainer);
     m_btnLogin->setObjectName("btnLogin");
     m_btnLogin->setCursor(Qt::PointingHandCursor);
@@ -299,7 +501,6 @@ void Login::setupUI() {
 
     bodyLayout->addLayout(leftCol, 5);
 
-    // --- CỘT PHẢI: MINH HỌA Y TẾ ĐẶT LỊCH ĐỘ NÉT CAO (HiDPI RETINA) ---
     QVBoxLayout *rightCol = new QVBoxLayout();
     rightCol->setContentsMargins(0, 0, 0, 0);
     rightCol->setAlignment(Qt::AlignCenter);
@@ -314,9 +515,6 @@ void Login::setupUI() {
     cardLayout->addLayout(bodyLayout);
     cardLayout->addSpacing(15);
 
-    // ==========================================
-    // C. FOOTER TRONG CARD
-    // ==========================================
     QHBoxLayout *footerLayout = new QHBoxLayout();
     footerLayout->setContentsMargins(0, 10, 0, 0);
 
@@ -331,15 +529,15 @@ void Login::setupUI() {
 
     QLabel *dot1 = new QLabel(m_cardWidget);
     dot1->setFixedSize(8, 8);
-    dot1->setStyleSheet("background-color: #10B981; border-radius: 4px;"); // Xanh lá online
+    dot1->setStyleSheet("background-color: #10B981; border-radius: 4px;");
 
     QLabel *dot2 = new QLabel(m_cardWidget);
     dot2->setFixedSize(8, 8);
-    dot2->setStyleSheet("background-color: #0D9488; border-radius: 4px;"); // Xanh Teal
+    dot2->setStyleSheet("background-color: #0D9488; border-radius: 4px;");
 
     QLabel *dot3 = new QLabel(m_cardWidget);
     dot3->setFixedSize(8, 8);
-    dot3->setStyleSheet("background-color: #14B8A6; border-radius: 4px;"); // Xanh Teal sáng
+    dot3->setStyleSheet("background-color: #14B8A6; border-radius: 4px;");
 
     dotsLayout->addWidget(dot1);
     dotsLayout->addWidget(dot2);
@@ -356,24 +554,20 @@ void Login::setupUI() {
     rootLayout->addWidget(m_cardWidget);
 }
 
-void Login::resizeEvent(QResizeEvent *event) {
-    QWidget::resizeEvent(event);
-    if (!m_cardWidget) return;
-
-    // Kích thước card cân đối khi phóng to
-    int targetW = qBound(980, static_cast<int>(width() * 0.65), 1140);
-    int targetH = qBound(580, static_cast<int>(height() * 0.72), 640);
-    m_cardWidget->setFixedSize(targetW, targetH);
-
-    updateIllustrationScale();
+void Login::setupConnections() {
+    connect(m_btnLogin, &QPushButton::clicked, this, &Login::loginClicked);
+    connect(m_txtUsername, &QLineEdit::returnPressed, this, &Login::loginClicked);
+    connect(m_txtPassword, &QLineEdit::returnPressed, this, &Login::loginClicked);
+    connect(m_actionTogglePassword, &QAction::triggered, this, &Login::onTogglePasswordVisibility);
 }
 
 void Login::updateIllustrationScale() {
     if (!m_lblIllustration || !m_cardWidget) return;
-    QPixmap illPix = loadAssetPixmap(":/assets/textures/login_illustration.png", "assets/textures/login_illustration.png");
-    if (illPix.isNull()) return;
+    if (m_originalIllustration.isNull()) {
+        m_originalIllustration = loadAssetPixmap(":/assets/textures/login_illustration.png", "assets/textures/login_illustration.png");
+    }
+    if (m_originalIllustration.isNull()) return;
 
-    // HiDPI Supersampling 2.0x hoặc theo devicePixelRatio của màn hình
     qreal dpr = qMax(qreal(2.0), devicePixelRatioF());
     int targetH = m_cardWidget->height() - 130;
     int targetW = (m_cardWidget->width() / 2) + 30;
@@ -381,255 +575,7 @@ void Login::updateIllustrationScale() {
     int physW = qRound(targetW * dpr);
     int physH = qRound(targetH * dpr);
 
-    QPixmap scaledPix = illPix.scaled(physW, physH, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    QPixmap scaledPix = m_originalIllustration.scaled(physW, physH, Qt::KeepAspectRatio, Qt::SmoothTransformation);
     scaledPix.setDevicePixelRatio(dpr);
     m_lblIllustration->setPixmap(scaledPix);
-}
-
-void Login::setupConnections() {
-    // Nút Log in & phím Enter tại các ô nhập
-    connect(m_btnLogin, &QPushButton::clicked, this, &Login::loginClicked);
-    connect(m_txtUsername, &QLineEdit::returnPressed, this, &Login::loginClicked);
-    connect(m_txtPassword, &QLineEdit::returnPressed, this, &Login::loginClicked);
-
-    // Toggle ẩn/hiện mật khẩu
-    connect(m_actionTogglePassword, &QAction::triggered, this, &Login::onTogglePasswordVisibility);
-}
-
-void Login::onTogglePasswordVisibility() {
-    m_isPasswordVisible = !m_isPasswordVisible;
-    m_txtPassword->setEchoMode(m_isPasswordVisible ? QLineEdit::Normal : QLineEdit::Password);
-    m_actionTogglePassword->setIcon(UIHelper::createEyeIcon(m_isPasswordVisible));
-}
-
-void Login::paintEvent(QPaintEvent *event) {
-    Q_UNUSED(event);
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
-
-    int w = width();
-    int h = height();
-
-    // 1. Nền Gradient chuyển sắc đồng bộ với ứng dụng An Tâm (Dark Teal Navy)
-    QLinearGradient bgGrad(0, 0, w, h);
-    bgGrad.setColorAt(0.0, QColor("#0F2A3A"));  // Dark Teal Navy (đồng bộ sidebar ứng dụng)
-    bgGrad.setColorAt(0.5, QColor("#0A1F2C"));  // Midnight Teal
-    bgGrad.setColorAt(1.0, QColor("#06131C"));  // Deep Dark Teal Slate
-    painter.fillRect(rect(), bgGrad);
-
-    // 2. Các quầng sáng Ambient Lighting tạo chiều sâu không gian (Tone Teal/Cyan/Emerald)
-    // Quầng sáng trung tâm chiếu sau thẻ Card
-    QRadialGradient centerGlow(w * 0.5, h * 0.5, qMax(w, h) * 0.52);
-    centerGlow.setColorAt(0.0, QColor(13, 148, 136, 55));
-    centerGlow.setColorAt(0.65, QColor(15, 118, 110, 20));
-    centerGlow.setColorAt(1.0, QColor(0, 0, 0, 0));
-    painter.fillRect(rect(), centerGlow);
-
-    // Quầng sáng Cyan góc trên trái
-    QRadialGradient cyanGlow(w * 0.15, h * 0.22, w * 0.38);
-    cyanGlow.setColorAt(0.0, QColor(20, 184, 166, 45));
-    cyanGlow.setColorAt(1.0, QColor(0, 0, 0, 0));
-    painter.fillRect(rect(), cyanGlow);
-
-    // Quầng sáng Emerald góc dưới phải
-    QRadialGradient emeraldGlow(w * 0.85, h * 0.78, w * 0.38);
-    emeraldGlow.setColorAt(0.0, QColor(16, 185, 129, 40));
-    emeraldGlow.setColorAt(1.0, QColor(0, 0, 0, 0));
-    painter.fillRect(rect(), emeraldGlow);
-
-    // 3. Đường sóng nhịp tim ECG (Cardiogram Waveforms) hai nhịp liên tục hai bên lề
-    auto drawECGWave = [&](qreal startX, qreal endX, qreal midY, qreal amp, const QColor &color) {
-        if (endX <= startX + 60) return;
-        QPainterPath path;
-        qreal totalLen = endX - startX;
-        path.moveTo(startX, midY);
-
-        // Nhịp 1 (ở 35% độ dài)
-        path.lineTo(startX + totalLen * 0.15, midY);
-        path.lineTo(startX + totalLen * 0.20, midY - amp * 0.25); // P
-        path.lineTo(startX + totalLen * 0.24, midY);
-        path.lineTo(startX + totalLen * 0.28, midY + amp * 0.20); // Q
-        path.lineTo(startX + totalLen * 0.33, midY - amp);        // R
-        path.lineTo(startX + totalLen * 0.38, midY + amp * 0.50); // S
-        path.lineTo(startX + totalLen * 0.43, midY);
-        path.lineTo(startX + totalLen * 0.48, midY - amp * 0.35); // T
-        path.lineTo(startX + totalLen * 0.54, midY);
-
-        // Nhịp 2 (ở 75% độ dài)
-        path.lineTo(startX + totalLen * 0.62, midY);
-        path.lineTo(startX + totalLen * 0.66, midY - amp * 0.20); // P
-        path.lineTo(startX + totalLen * 0.70, midY);
-        path.lineTo(startX + totalLen * 0.73, midY + amp * 0.18); // Q
-        path.lineTo(startX + totalLen * 0.77, midY - amp * 0.90); // R
-        path.lineTo(startX + totalLen * 0.81, midY + amp * 0.45); // S
-        path.lineTo(startX + totalLen * 0.85, midY);
-        path.lineTo(startX + totalLen * 0.89, midY - amp * 0.30); // T
-        path.lineTo(endX, midY);
-
-        QLinearGradient fadeGrad(startX, midY, endX, midY);
-        QColor c0 = color; c0.setAlpha(0);
-        QColor c1 = color;
-        QColor c2 = color; c2.setAlpha(0);
-        fadeGrad.setColorAt(0.0, c0);
-        fadeGrad.setColorAt(0.5, c1);
-        fadeGrad.setColorAt(1.0, c2);
-
-        QPen pen(fadeGrad, 2.0);
-        painter.setPen(pen);
-        painter.setBrush(Qt::NoBrush);
-        painter.drawPath(path);
-
-        // Điểm sáng nhịp tim tại đỉnh R nhịp 1
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(QColor(45, 212, 191, 230));
-        painter.drawEllipse(QPointF(startX + totalLen * 0.33, midY - amp), 3.0, 3.0);
-    };
-
-    // Tọa độ mép của Card
-    qreal cardLeft = (m_cardWidget) ? m_cardWidget->x() : (w * 0.5 - 520);
-    qreal cardRight = (m_cardWidget) ? (m_cardWidget->x() + m_cardWidget->width()) : (w * 0.5 + 520);
-
-    // Nếu khoảng trống hai bên đủ rộng (khi phóng to), vẽ sóng nhịp tim sinh động
-    if (cardLeft > 130) {
-        drawECGWave(20, cardLeft - 20, h * 0.38, 28, QColor(20, 184, 166, 140));
-        drawECGWave(35, cardLeft - 35, h * 0.65, 22, QColor(13, 148, 136, 110));
-    }
-    if (w - cardRight > 130) {
-        drawECGWave(cardRight + 20, w - 20, h * 0.42, 28, QColor(20, 184, 166, 140));
-        drawECGWave(cardRight + 35, w - 35, h * 0.68, 22, QColor(13, 148, 136, 110));
-    }
-
-    // 4. Biểu tượng chữ thập y tế (Medical Crosses) bo tròn sang trọng
-    auto drawMedicalCross = [&](qreal cx, qreal cy, qreal size, const QColor &color, qreal angle) {
-        painter.save();
-        painter.translate(cx, cy);
-        if (angle != 0.0) painter.rotate(angle);
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(color);
-        qreal armW = size * 0.34;
-        qreal halfArm = armW / 2.0;
-        qreal halfSize = size / 2.0;
-        painter.drawRoundedRect(QRectF(-halfArm, -halfSize, armW, size), armW * 0.35, armW * 0.35);
-        painter.drawRoundedRect(QRectF(-halfSize, -halfArm, size, armW), armW * 0.35, armW * 0.35);
-        painter.restore();
-    };
-
-    // Phân bổ chữ thập y tế hai bên lề và trên/dưới
-    drawMedicalCross(w * 0.07, h * 0.18, 38, QColor(20, 184, 166, 70), 0);
-    drawMedicalCross(w * 0.12, h * 0.82, 28, QColor(255, 255, 255, 55), 15);
-    drawMedicalCross(w * 0.05, h * 0.52, 24, QColor(13, 148, 136, 65), -10);
-
-    drawMedicalCross(w * 0.93, h * 0.22, 36, QColor(20, 184, 166, 70), -5);
-    drawMedicalCross(w * 0.88, h * 0.76, 30, QColor(255, 255, 255, 55), 12);
-    drawMedicalCross(w * 0.95, h * 0.88, 24, QColor(13, 148, 136, 65), 0);
-
-    // Chữ thập y tế trên và dưới card
-    drawMedicalCross(w * 0.28, h * 0.06, 20, QColor(255, 255, 255, 45), 0);
-    drawMedicalCross(w * 0.72, h * 0.94, 22, QColor(20, 184, 166, 60), 0);
-    drawMedicalCross(w * 0.50, h * 0.05, 18, QColor(20, 184, 166, 45), 0);
-
-    // 5. Biểu tượng viên thuốc con nhộng (Pill Capsule) hiện đại
-    auto drawCapsulePill = [&](qreal cx, qreal cy, qreal len, qreal thick, qreal angle, const QColor &c1, const QColor &c2) {
-        painter.save();
-        painter.translate(cx, cy);
-        painter.rotate(angle);
-        painter.setPen(Qt::NoPen);
-
-        // Nửa trái
-        painter.setBrush(c1);
-        QPainterPath leftP;
-        leftP.moveTo(0, -thick / 2.0);
-        leftP.lineTo(-len / 2.0 + thick / 2.0, -thick / 2.0);
-        leftP.arcTo(-len / 2.0, -thick / 2.0, thick, thick, 90, 180);
-        leftP.lineTo(0, thick / 2.0);
-        leftP.closeSubpath();
-        painter.drawPath(leftP);
-
-        // Nửa phải
-        painter.setBrush(c2);
-        QPainterPath rightP;
-        rightP.moveTo(0, -thick / 2.0);
-        rightP.lineTo(len / 2.0 - thick / 2.0, -thick / 2.0);
-        rightP.arcTo(len / 2.0 - thick, -thick / 2.0, thick, thick, 90, -180);
-        rightP.lineTo(0, thick / 2.0);
-        rightP.closeSubpath();
-        painter.drawPath(rightP);
-
-        painter.restore();
-    };
-
-    drawCapsulePill(w * 0.09, h * 0.32, 34, 15, -35, QColor(255, 255, 255, 55), QColor(20, 184, 166, 75));
-    drawCapsulePill(w * 0.91, h * 0.60, 32, 14, 40, QColor(13, 148, 136, 70), QColor(255, 255, 255, 50));
-
-    // 6. Lưới điểm chấm công nghệ y tế (Medical Tech Dot Matrix)
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(255, 255, 255, 45));
-    // Lưới góc trên trái
-    for (int r = 0; r < 6; ++r) {
-        for (int c = 0; c < 6; ++c) {
-            painter.drawEllipse(QPointF(w * 0.035 + c * 16, h * 0.065 + r * 16), 1.8, 1.8);
-        }
-    }
-    // Lưới góc dưới phải
-    for (int r = 0; r < 5; ++r) {
-        for (int c = 0; c < 8; ++c) {
-            painter.drawEllipse(QPointF(w * 0.88 + c * 15, h * 0.85 + r * 15), 1.8, 1.8);
-        }
-    }
-
-    // 7. Các vòng tròn hào quang tinh tế (Glass Rings & Bokeh Halos)
-    QPen ringPen(QColor(255, 255, 255, 30), 1.5);
-    painter.setPen(ringPen);
-    painter.setBrush(Qt::NoBrush);
-    painter.drawEllipse(QPointF(w * 0.09, h * 0.88), 75, 75);
-    painter.drawEllipse(QPointF(w * 0.09, h * 0.88), 45, 45);
-
-    painter.drawEllipse(QPointF(w * 0.92, h * 0.14), 60, 60);
-    painter.drawEllipse(QPointF(w * 0.92, h * 0.14), 35, 35);
-
-    // Vòng nét đứt hiện đại
-    QPen dashRing(QColor(20, 184, 166, 60), 1.2, Qt::DashLine);
-    painter.setPen(dashRing);
-    painter.drawEllipse(QPointF(w * 0.18, h * 0.15), 34, 34);
-    painter.drawEllipse(QPointF(w * 0.82, h * 0.88), 44, 44);
-
-    // 8. Các điểm sáng lấp lánh (Sparkle Points)
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(45, 212, 191, 200));
-    painter.drawEllipse(QPointF(w * 0.22, h * 0.28), 3.5, 3.5);
-    painter.drawEllipse(QPointF(w * 0.78, h * 0.72), 3.5, 3.5);
-    painter.setBrush(QColor(255, 255, 255, 220));
-    painter.drawEllipse(QPointF(w * 0.15, h * 0.48), 2.5, 2.5);
-    painter.drawEllipse(QPointF(w * 0.85, h * 0.52), 2.5, 2.5);
-}
-
-QString Login::getUsername() const {
-    return m_txtUsername->text();
-}
-
-QString Login::getPassword() const {
-    return m_txtPassword->text();
-}
-
-void Login::clearInputs() {
-    m_txtUsername->clear();
-    m_txtPassword->clear();
-    m_txtUsername->setFocus();
-}
-
-void Login::showErrorMessage(const QString &message) {
-    m_lblMessage->setText(message);
-    m_lblMessage->setStyleSheet("background-color: #FEF2F2; border: 1px solid #FECACA; border-radius: 10px; color: #DC2626; font-size: 12.5px; font-weight: 600; padding: 8px 14px;");
-    m_lblMessage->show();
-}
-
-void Login::showSuccessMessage(const QString &message) {
-    m_lblMessage->setText(message);
-    m_lblMessage->setStyleSheet("background-color: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 10px; color: #059669; font-size: 12.5px; font-weight: 700; padding: 8px 14px;");
-    m_lblMessage->show();
-}
-
-void Login::clearMessage() {
-    m_lblMessage->clear();
-    m_lblMessage->hide();
 }

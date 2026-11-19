@@ -2,39 +2,41 @@
 #define SYMPTOM_H
 
 #include <string>
-#include <fstream>
 #include "LinkList.h"
 
 class Symptom {
-    private:
-        std::string S_id;
-        std::string sName;
-        std::string Sp_id;
-        int sScore;
-    public:
-        Symptom();
-        Symptom(std::string S_id, std::string sName, std::string Sp_id, int sScore);
-        Symptom(const Symptom &S);
-        Symptom &operator=(const Symptom &S) = default;
-        ~Symptom() = default;
+private:
+    std::string S_id;
+    std::string sName;
+    std::string Sp_id;
+    int sScore;
 
-        void setDefault();
-        bool isDefault() const;
+public:
+    Symptom();
+    Symptom(std::string S_id, std::string sName, std::string Sp_id, int sScore);
+    Symptom(const Symptom &S);
+    Symptom &operator=(const Symptom &S) = default;
+    Symptom(Symptom &&S) noexcept = default;
+    Symptom &operator=(Symptom &&S) noexcept = default;
+    ~Symptom() = default;
 
-        std::string getS_id() const;
-        std::string getSName() const;
-        std::string getSp_id() const;
-        int getSScore() const;
+    void setDefault();
+    bool isDefault() const;
 
-        void setS_id(const std::string &id);
-        void setSName(const std::string &name);
-        void setSp_id(const std::string &spId);
-        void setSScore(int score);
+    std::string getS_id() const;
+    std::string getSName() const;
+    std::string getSp_id() const;
+    int getSScore() const;
 
-        std::string toString() const;
-        static Symptom loadFromString(const std::string &str);
-        static LinkList<Symptom>* loadFromFile(const std::string &path);
-        static bool saveToFile(const std::string &path, const LinkList<Symptom> *list);
+    void setS_id(const std::string &id);
+    void setSName(const std::string &name);
+    void setSp_id(const std::string &spId);
+    void setSScore(int score);
+
+    std::string toString() const;
+    static Symptom loadFromString(const std::string &str);
+    static LinkList<Symptom>* loadFromFile(const std::string &path);
+    static bool saveToFile(const std::string &path, const LinkList<Symptom> *list);
 };
 
 #endif

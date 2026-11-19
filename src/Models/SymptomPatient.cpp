@@ -2,11 +2,8 @@
 #include <string>
 #include <fstream>
 #include <sstream>
-#include <iomanip>
 #include "libPBL2.h"
 #include "../Utils/AppExceptions.h"
-
-using namespace std;
 
 SymptomPatient::SymptomPatient()
     : SP_id(""), P_id(""), Sp_id(""), date(0, 0, 0, 0, 0) {}
@@ -18,9 +15,9 @@ SymptomPatient::SymptomPatient(const SymptomPatient &SP)
     : SP_id(SP.SP_id), P_id(SP.P_id), Sp_id(SP.Sp_id), date(SP.date) {}
 
 void SymptomPatient::setDefault() {
-    SP_id = "";
-    P_id = "";
-    Sp_id = "";
+    SP_id.clear();
+    P_id.clear();
+    Sp_id.clear();
     date = Date(0, 0, 0, 0, 0);
 }
 
@@ -28,32 +25,32 @@ bool SymptomPatient::isDefault() const {
     return SP_id.empty() && P_id.empty();
 }
 
-string SymptomPatient::getSP_id() const { return SP_id; }
-string SymptomPatient::getP_id() const { return P_id; }
-string SymptomPatient::getSp_id() const { return Sp_id; }
+std::string SymptomPatient::getSP_id() const { return SP_id; }
+std::string SymptomPatient::getP_id() const { return P_id; }
+std::string SymptomPatient::getSp_id() const { return Sp_id; }
 Date SymptomPatient::getDate() const { return date; }
 
-void SymptomPatient::setSP_id(const string &value) { this->SP_id = value; }
-void SymptomPatient::setP_id(const string &value) { this->P_id = value; }
-void SymptomPatient::setSp_id(const string &value) { this->Sp_id = value; }
-void SymptomPatient::setDate(const Date &value) { this->date = value; }
+void SymptomPatient::setSP_id(const std::string &value) { SP_id = value; }
+void SymptomPatient::setP_id(const std::string &value) { P_id = value; }
+void SymptomPatient::setSp_id(const std::string &value) { Sp_id = value; }
+void SymptomPatient::setDate(const Date &value) { date = value; }
 
-string SymptomPatient::toString() const {
+std::string SymptomPatient::toString() const {
     return libPBL2::padRightUtf8(SP_id, 6) + " | "
          + libPBL2::padRightUtf8(P_id, 6) + " | "
          + libPBL2::padRightUtf8(Sp_id, 6) + " | "
          + libPBL2::padRightUtf8(date.toString(), 16);
 }
 
-SymptomPatient SymptomPatient::loadFromString(const string &str) {
+SymptomPatient SymptomPatient::loadFromString(const std::string &str) {
     if (str.empty()) return SymptomPatient();
-    stringstream ss(str);
-    string spId, pId, specId, dateStr;
+    std::stringstream ss(str);
+    std::string spId, pId, specId, dateStr;
 
-    if (!getline(ss, spId, '|') ||
-        !getline(ss, pId, '|') ||
-        !getline(ss, specId, '|') ||
-        !getline(ss, dateStr)) {
+    if (!std::getline(ss, spId, '|') ||
+        !std::getline(ss, pId, '|') ||
+        !std::getline(ss, specId, '|') ||
+        !std::getline(ss, dateStr)) {
         return SymptomPatient();
     }
 
@@ -62,15 +59,16 @@ SymptomPatient SymptomPatient::loadFromString(const string &str) {
     libPBL2::trim(specId);
     libPBL2::trim(dateStr);
 
-    if (spId.empty() || pId.empty())
+    if (spId.empty() || pId.empty()) {
         return SymptomPatient();
+    }
 
     Date d = Date::loadFromString(dateStr);
     return SymptomPatient(spId, pId, specId, d);
 }
 
-LinkList<SymptomPatient>* SymptomPatient::loadFromFile(const string &path) {
-    ifstream f(path);
+LinkList<SymptomPatient>* SymptomPatient::loadFromFile(const std::string &path) {
+    std::ifstream f(path);
     if (!f.is_open()) {
         throw FileIOException(path, "Không thể mở tệp để đọc dữ liệu.");
     }
@@ -78,18 +76,18 @@ LinkList<SymptomPatient>* SymptomPatient::loadFromFile(const string &path) {
     LinkList<SymptomPatient> *SPList = nullptr;
     try {
         SPList = new LinkList<SymptomPatient>;
-        string tmp;
-        getline(f, tmp); // Bỏ qua tiêu đề
-        getline(f, tmp); // Bỏ qua dòng phân cách
+        std::string tmp;
+        std::getline(f, tmp);
+        std::getline(f, tmp);
 
-        string line;
+        std::string line;
         int lineNo = 2;
-        while (getline(f, line)) {
-            lineNo++;
+        while (std::getline(f, line)) {
+            ++lineNo;
             libPBL2::trim(line);
             if (line.empty()) continue;
             try {
-                SymptomPatient SP = SymptomPatient::loadFromString(line);
+                auto SP = SymptomPatient::loadFromString(line);
                 if (!SP.isDefault()) {
                     SPList->insert(SP);
                 }
@@ -109,12 +107,11 @@ LinkList<SymptomPatient>* SymptomPatient::loadFromFile(const string &path) {
     }
 }
 
-bool SymptomPatient::saveToFile(const string &path, const LinkList<SymptomPatient> *list) {
-    if (!list || list->getHeader() == nullptr)
-        return false;
+bool SymptomPatient::saveToFile(const std::string &path, const LinkList<SymptomPatient> *list) {
+    if (!list || !list->getHeader()) return false;
 
-    string tempPath = path + ".tmp";
-    ofstream f(tempPath);
+    const std::string tempPath = path + ".tmp";
+    std::ofstream f(tempPath);
     if (!f.is_open()) {
         throw FileIOException(path, "Không thể mở tệp tạm để ghi dữ liệu.");
     }
@@ -123,15 +120,19 @@ bool SymptomPatient::saveToFile(const string &path, const LinkList<SymptomPatien
         f << "SP_ID  | P_ID   | Sp_ID  | Date            \n";
         f << "-------+--------+--------+-----------------\n";
 
-        LinkList<SymptomPatient>::Node *tmp = list->getHeader()->next;
-        while (tmp != nullptr && tmp->next != nullptr) {
+        for (auto *tmp = list->getHeader()->next; tmp && tmp->next; tmp = tmp->next) {
             if (!tmp->info.isDefault()) {
-                f << tmp->info.toString() << "\n";
+                f << tmp->info.toString() << '\n';
             }
-            tmp = tmp->next;
         }
 
+        f.flush();
+        const bool writeOk = f.good();
         f.close();
+        if (!writeOk || f.fail()) {
+            std::remove(tempPath.c_str());
+            throw FileIOException(path, "Lỗi ghi dữ liệu hồ sơ triệu chứng xuống tệp tạm.");
+        }
         libPBL2::safeAtomicCommit(tempPath, path);
         return true;
     } catch (...) {
@@ -141,22 +142,6 @@ bool SymptomPatient::saveToFile(const string &path, const LinkList<SymptomPatien
     }
 }
 
-string SymptomPatient::generateNextId(const LinkList<SymptomPatient> *list) {
-    int maxId = 0;
-    if (list && list->getHeader()) {
-        LinkList<SymptomPatient>::Node *cur = list->getHeader()->next;
-        while (cur != nullptr && cur->next != nullptr) {
-            string id = cur->info.getSP_id();
-            if (id.rfind("SP_", 0) == 0 && id.length() > 3) {
-                try {
-                    int num = stoi(id.substr(3));
-                    if (num > maxId) maxId = num;
-                } catch (...) {}
-            }
-            cur = cur->next;
-        }
-    }
-    ostringstream oss;
-    oss << "SP_" << setfill('0') << setw(3) << (maxId + 1);
-    return oss.str();
+std::string SymptomPatient::generateNextId(const LinkList<SymptomPatient> *list) {
+    return libPBL2::generateNextId(list, "SP_", [](const SymptomPatient &sp) { return sp.getSP_id(); });
 }

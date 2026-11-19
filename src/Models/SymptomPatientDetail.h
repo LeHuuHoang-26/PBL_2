@@ -2,7 +2,6 @@
 #define SYMPTOMPATIENTDETAIL_H
 
 #include <string>
-#include <fstream>
 #include "LinkList.h"
 
 class SymptomPatientDetail {
@@ -15,6 +14,8 @@ public:
     SymptomPatientDetail(std::string SP_id, std::string S_id);
     SymptomPatientDetail(const SymptomPatientDetail &other);
     SymptomPatientDetail &operator=(const SymptomPatientDetail &other) = default;
+    SymptomPatientDetail(SymptomPatientDetail &&other) noexcept = default;
+    SymptomPatientDetail &operator=(SymptomPatientDetail &&other) noexcept = default;
     ~SymptomPatientDetail() = default;
 
     void setDefault();
@@ -32,4 +33,4 @@ public:
     static bool saveToFile(const std::string &path, const LinkList<SymptomPatientDetail> *list);
 };
 
-#endif // SYMPTOMPATIENTDETAIL_H
+#endif

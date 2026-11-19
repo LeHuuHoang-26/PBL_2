@@ -2,7 +2,6 @@
 #define SYMPTOMPATIENT_H
 
 #include <string>
-#include <fstream>
 #include "Date.h"
 #include "LinkList.h"
 
@@ -18,6 +17,8 @@ public:
     SymptomPatient(std::string SP_id, std::string P_id, std::string Sp_id = "", Date date = Date());
     SymptomPatient(const SymptomPatient &SP);
     SymptomPatient &operator=(const SymptomPatient &SP) = default;
+    SymptomPatient(SymptomPatient &&SP) noexcept = default;
+    SymptomPatient &operator=(SymptomPatient &&SP) noexcept = default;
     ~SymptomPatient() = default;
 
     void setDefault();
@@ -40,4 +41,4 @@ public:
     static std::string generateNextId(const LinkList<SymptomPatient> *list);
 };
 
-#endif // SYMPTOMPATIENT_H
+#endif

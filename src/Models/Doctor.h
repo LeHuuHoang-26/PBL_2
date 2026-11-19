@@ -15,7 +15,10 @@ private:
 
 public:
     Doctor(std::string _id = "", std::string _fullName = "", std::string _phone = "", bool _gender = true, int _age = 0, std::string _spId = "", int _state = 1, std::string _roomId = "", double _fee = 0.0, double _rating = 5.0);
-
+    Doctor(const Doctor &) = default;
+    Doctor &operator=(const Doctor &) = default;
+    Doctor(Doctor &&) noexcept = default;
+    Doctor &operator=(Doctor &&) noexcept = default;
     ~Doctor() = default;
 
     bool isDefault() const;

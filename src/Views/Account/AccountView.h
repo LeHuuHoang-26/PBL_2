@@ -23,6 +23,7 @@ protected:
 
 private:
     MainWindow *mainWindow = nullptr;
+    QLabel *subtitleLabel = nullptr;
     QPushButton *addBtn = nullptr;
     QTableWidget *table = nullptr;
 
@@ -37,8 +38,8 @@ private:
     static const int PAGE_SIZE = 8;
 
     void setupUI();
-    void addManagerDialog();
+    bool addManagerDialog();
     void editManagerDialog(const std::string &managerId);
 };
 
-#endif // ACCOUNTVIEW_H
+#endif

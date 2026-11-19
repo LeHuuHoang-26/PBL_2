@@ -5,8 +5,6 @@
 #include "libPBL2.h"
 #include "../Utils/AppExceptions.h"
 
-using namespace std;
-
 SymptomPatientDetail::SymptomPatientDetail()
     : SP_id(""), S_id("") {}
 
@@ -17,46 +15,45 @@ SymptomPatientDetail::SymptomPatientDetail(const SymptomPatientDetail &other)
     : SP_id(other.SP_id), S_id(other.S_id) {}
 
 void SymptomPatientDetail::setDefault() {
-    SP_id = "";
-    S_id = "";
+    SP_id.clear();
+    S_id.clear();
 }
 
 bool SymptomPatientDetail::isDefault() const {
     return SP_id.empty() && S_id.empty();
 }
 
-string SymptomPatientDetail::getSP_id() const { return SP_id; }
-string SymptomPatientDetail::getS_id() const { return S_id; }
+std::string SymptomPatientDetail::getSP_id() const { return SP_id; }
+std::string SymptomPatientDetail::getS_id() const { return S_id; }
 
-void SymptomPatientDetail::setSP_id(const string &val) { this->SP_id = val; }
-void SymptomPatientDetail::setS_id(const string &val) { this->S_id = val; }
+void SymptomPatientDetail::setSP_id(const std::string &val) { SP_id = val; }
+void SymptomPatientDetail::setS_id(const std::string &val) { S_id = val; }
 
-string SymptomPatientDetail::toString() const {
-    return libPBL2::padRightUtf8(SP_id, 6) + " | "
-         + libPBL2::padRightUtf8(S_id, 6);
+std::string SymptomPatientDetail::toString() const {
+    return libPBL2::padRightUtf8(SP_id, 6) + " | " + libPBL2::padRightUtf8(S_id, 6);
 }
 
-SymptomPatientDetail SymptomPatientDetail::loadFromString(const string &str) {
+SymptomPatientDetail SymptomPatientDetail::loadFromString(const std::string &str) {
     if (str.empty()) return SymptomPatientDetail();
-    stringstream ss(str);
-    string spId, sId;
+    std::stringstream ss(str);
+    std::string spId, sId;
 
-    if (!getline(ss, spId, '|') ||
-        !getline(ss, sId)) {
+    if (!std::getline(ss, spId, '|') || !std::getline(ss, sId)) {
         return SymptomPatientDetail();
     }
 
     libPBL2::trim(spId);
     libPBL2::trim(sId);
 
-    if (spId.empty() || sId.empty())
+    if (spId.empty() || sId.empty()) {
         return SymptomPatientDetail();
+    }
 
     return SymptomPatientDetail(spId, sId);
 }
 
-LinkList<SymptomPatientDetail>* SymptomPatientDetail::loadFromFile(const string &path) {
-    ifstream f(path);
+LinkList<SymptomPatientDetail>* SymptomPatientDetail::loadFromFile(const std::string &path) {
+    std::ifstream f(path);
     if (!f.is_open()) {
         throw FileIOException(path, "Không thể mở tệp để đọc dữ liệu.");
     }
@@ -64,18 +61,18 @@ LinkList<SymptomPatientDetail>* SymptomPatientDetail::loadFromFile(const string 
     LinkList<SymptomPatientDetail> *list = nullptr;
     try {
         list = new LinkList<SymptomPatientDetail>;
-        string tmp;
-        getline(f, tmp); // Bỏ qua tiêu đề
-        getline(f, tmp); // Bỏ qua dòng phân cách
+        std::string tmp;
+        std::getline(f, tmp);
+        std::getline(f, tmp);
 
-        string line;
+        std::string line;
         int lineNo = 2;
-        while (getline(f, line)) {
-            lineNo++;
+        while (std::getline(f, line)) {
+            ++lineNo;
             libPBL2::trim(line);
             if (line.empty()) continue;
             try {
-                SymptomPatientDetail item = SymptomPatientDetail::loadFromString(line);
+                auto item = SymptomPatientDetail::loadFromString(line);
                 if (!item.isDefault()) {
                     list->insert(item);
                 }
@@ -95,12 +92,11 @@ LinkList<SymptomPatientDetail>* SymptomPatientDetail::loadFromFile(const string 
     }
 }
 
-bool SymptomPatientDetail::saveToFile(const string &path, const LinkList<SymptomPatientDetail> *list) {
-    if (!list || list->getHeader() == nullptr)
-        return false;
+bool SymptomPatientDetail::saveToFile(const std::string &path, const LinkList<SymptomPatientDetail> *list) {
+    if (!list || !list->getHeader()) return false;
 
-    string tempPath = path + ".tmp";
-    ofstream f(tempPath);
+    const std::string tempPath = path + ".tmp";
+    std::ofstream f(tempPath);
     if (!f.is_open()) {
         throw FileIOException(path, "Không thể mở tệp tạm để ghi dữ liệu.");
     }
@@ -109,15 +105,19 @@ bool SymptomPatientDetail::saveToFile(const string &path, const LinkList<Symptom
         f << "SP_ID  | S_ID  \n";
         f << "-------+-------\n";
 
-        LinkList<SymptomPatientDetail>::Node *tmp = list->getHeader()->next;
-        while (tmp != nullptr && tmp->next != nullptr) {
+        for (auto *tmp = list->getHeader()->next; tmp && tmp->next; tmp = tmp->next) {
             if (!tmp->info.isDefault()) {
-                f << tmp->info.toString() << "\n";
+                f << tmp->info.toString() << '\n';
             }
-            tmp = tmp->next;
         }
 
+        f.flush();
+        const bool writeOk = f.good();
         f.close();
+        if (!writeOk || f.fail()) {
+            std::remove(tempPath.c_str());
+            throw FileIOException(path, "Lỗi ghi chi tiết triệu chứng xuống tệp tạm.");
+        }
         libPBL2::safeAtomicCommit(tempPath, path);
         return true;
     } catch (...) {

@@ -17,4 +17,4 @@ public:
     static void clearSpecialtyCache();
 };
 
-#endif // DOCTORCONTROLLER_H
+#endif

@@ -9,28 +9,39 @@
 #include <QLabel>
 #include <QFrame>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QProgressBar>
-#include <QLocale>
-#include <QDate>
-#include <QTime>
+#include <QPushButton>
+#include <QStackedWidget>
+#include <QLineEdit>
+#include <QIntValidator>
+#include <QDialog>
+#include <QTimer>
+#include <QCalendarWidget>
 #include <QPainter>
 #include <QPainterPath>
+#include <QLocale>
+#include <QTime>
+#include <QMouseEvent>
+#include <QShowEvent>
+#include <QSignalBlocker>
+#include <cmath>
+#include <memory>
 
 namespace {
 
-// Widget vẽ thanh phân đoạn nhiều màu cho trạng thái lịch hẹn
-class SegmentedStatusBar : public QWidget {
+class LinearStatusBar : public QWidget {
 public:
     int completed = 0;
     int pending = 0;
     int delayed = 0;
     int rescheduled = 0;
 
-    explicit SegmentedStatusBar(QWidget *parent = nullptr) : QWidget(parent) {
-        setFixedHeight(16);
+    explicit LinearStatusBar(QWidget *parent = nullptr) : QWidget(parent) {
+        setFixedHeight(18);
     }
 
-    void setCounts(int c, int p, int d, int r = 0) {
+    void setCounts(int c, int p, int d, int r) {
         completed = c;
         pending = p;
         delayed = d;
@@ -47,12 +58,12 @@ protected:
         if (total <= 0) {
             painter.setBrush(QColor("#e2e8f0"));
             painter.setPen(Qt::NoPen);
-            painter.drawRoundedRect(rect(), 8, 8);
+            painter.drawRoundedRect(rect(), 9, 9);
             return;
         }
 
         QPainterPath clipPath;
-        clipPath.addRoundedRect(QRectF(rect()), 8, 8);
+        clipPath.addRoundedRect(QRectF(rect()), 9, 9);
         painter.setClipPath(clipPath);
 
         double w = width();
@@ -65,20 +76,19 @@ protected:
             x += segW;
         };
 
-        drawSegment(completed, QColor("#0d9488"));   // Teal (Đã khám)
-        drawSegment(pending, QColor("#ea580c"));     // Orange (Chưa khám)
-        drawSegment(delayed, QColor("#f59e0b"));     // Amber (Trễ hẹn)
-        drawSegment(rescheduled, QColor("#64748b")); // Slate (Đã dời lịch)
+        drawSegment(completed, QColor("#0d9488"));
+        drawSegment(pending, QColor("#ea580c"));
+        drawSegment(delayed, QColor("#f59e0b"));
+        drawSegment(rescheduled, QColor("#64748b"));
     }
 };
 
-// Widget vẽ biểu đồ tròn (Donut chart) cho phân bổ độ tuổi bệnh nhân
 class PatientDonutChart : public QWidget {
 public:
-    int c1 = 0, c2 = 0, c3 = 0, c4 = 0; // <18, 18-45, 46-60, >60
+    int c1 = 0, c2 = 0, c3 = 0, c4 = 0;
 
     explicit PatientDonutChart(QWidget *parent = nullptr) : QWidget(parent) {
-        setFixedSize(115, 115);
+        setFixedSize(100, 100);
     }
 
     void setData(int under18, int from18to45, int from46to60, int over60) {
@@ -95,8 +105,8 @@ protected:
         painter.setRenderHint(QPainter::Antialiasing);
 
         int total = c1 + c2 + c3 + c4;
-        QRectF outerRect(6, 6, width() - 12, height() - 12);
-        QRectF innerRect(25, 25, width() - 50, height() - 50);
+        QRectF outerRect(5, 5, width() - 10, height() - 10);
+        QRectF innerRect(21, 21, width() - 42, height() - 42);
 
         if (total <= 0) {
             painter.setBrush(QColor("#e2e8f0"));
@@ -105,7 +115,7 @@ protected:
             painter.setBrush(QColor("#ffffff"));
             painter.drawEllipse(innerRect);
 
-            painter.setFont(QFont("Segoe UI", 12, QFont::Bold));
+            painter.setFont(QFont("Segoe UI", 16, QFont::Bold));
             painter.setPen(QColor("#94a3b8"));
             painter.drawText(innerRect, Qt::AlignCenter, "0");
             return;
@@ -113,10 +123,10 @@ protected:
 
         const int counts[4] = {c1, c2, c3, c4};
         const QColor colors[4] = {
-            QColor("#38bdf8"), // <18 Sky blue
-            QColor("#0d9488"), // 18-45 Teal
-            QColor("#f59e0b"), // 46-60 Amber
-            QColor("#8b5cf6")  // >60 Purple
+            QColor("#38bdf8"),
+            QColor("#0d9488"),
+            QColor("#f59e0b"),
+            QColor("#8b5cf6")
         };
 
         int startAngle = 90 * 16;
@@ -129,128 +139,1559 @@ protected:
             startAngle += spanAngle;
         }
 
-        // Lỗ rỗng ở giữa tạo hình Donut
         painter.setBrush(QColor("#ffffff"));
         painter.setPen(Qt::NoPen);
         painter.drawEllipse(innerRect);
 
-        // Hiển thị tổng số bệnh nhân ở giữa Donut
-        painter.setFont(QFont("Segoe UI", 12, QFont::Bold));
+        painter.setFont(QFont("Segoe UI", 16, QFont::Bold));
         painter.setPen(QColor("#0f172a"));
-        QRectF textTopRect(innerRect.x(), innerRect.y() + 8, innerRect.width(), 20);
-        painter.drawText(textTopRect, Qt::AlignCenter, QString::number(total));
-
-        painter.setFont(QFont("Segoe UI", 8, QFont::Normal));
-        painter.setPen(QColor("#64748b"));
-        QRectF textSubRect(innerRect.x(), innerRect.y() + 27, innerRect.width(), 16);
-        painter.drawText(textSubRect, Qt::AlignCenter, "Bệnh nhân");
+        painter.drawText(innerRect, Qt::AlignCenter, QString::number(total));
     }
 };
 
-// Widget vẽ biểu đồ cột 7 ngày gần nhất
-class WeeklyTrendChart : public QWidget {
-public:
-    int counts[7] = {0};
-    QString dates[7];
+struct CoordPoint {
+    QString label;
+    double value = 0.0;
+};
 
-    explicit WeeklyTrendChart(QWidget *parent = nullptr) : QWidget(parent) {
-        setFixedHeight(130);
+class RevenueLineChart : public QWidget {
+public:
+    QVector<CoordPoint> points;
+    int hoveredIndex = -1;
+
+    explicit RevenueLineChart(QWidget *parent = nullptr) : QWidget(parent) {
+        setMinimumHeight(240);
+        setMouseTracking(true);
     }
 
-    void setData(const int c[7], const QString d[7]) {
-        for (int i = 0; i < 7; ++i) {
-            counts[i] = c[i];
-            dates[i] = d[i];
-        }
+    void setData(const QVector<CoordPoint> &pts) {
+        points = pts;
+        hoveredIndex = -1;
         update();
     }
 
 protected:
+    void mouseMoveEvent(QMouseEvent *event) override {
+        if (points.isEmpty()) return;
+        int n = points.size();
+        int left = 75, right = 30;
+        int plotW = width() - left - right;
+        if (plotW <= 0) return;
+
+        double mouseX = event->position().x();
+        if (mouseX < left - 15 || mouseX > left + plotW + 15) {
+            if (hoveredIndex != -1) {
+                hoveredIndex = -1;
+                update();
+            }
+            return;
+        }
+
+        double stepX = (n > 1) ? static_cast<double>(plotW) / (n - 1) : 0.0;
+        int closest = -1;
+        if (stepX > 0.0) {
+            int approx = qRound((mouseX - left) / stepX);
+            if (approx >= 0 && approx < n) {
+                closest = approx;
+            }
+        } else if (n == 1) {
+            closest = 0;
+        }
+
+        if (closest != hoveredIndex) {
+            hoveredIndex = closest;
+            update();
+        }
+    }
+
+    void leaveEvent(QEvent *) override {
+        if (hoveredIndex != -1) {
+            hoveredIndex = -1;
+            update();
+        }
+    }
+
     void paintEvent(QPaintEvent *) override {
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
 
-        int maxVal = 1;
-        for (int i = 0; i < 7; ++i) {
-            if (counts[i] > maxVal) maxVal = counts[i];
-        }
-
         int w = width();
         int h = height();
-        if (w <= 32 || h <= 50) return;
-        int colWidth = (w - 32) / 7;
-        int barWidth = 32;
-        int maxBarH = h - 50;
+        int left = 75, right = 30, top = 25, bottom = 40;
+        int plotW = w - left - right;
+        int plotH = h - top - bottom;
 
-        for (int i = 0; i < 7; ++i) {
-            int centerX = 16 + i * colWidth + colWidth / 2;
-            int barH = static_cast<int>((static_cast<double>(counts[i]) / maxVal) * maxBarH);
-            if (barH < 6 && counts[i] > 0) barH = 6;
-            if (counts[i] == 0) barH = 4;
+        if (points.isEmpty() || plotW <= 0 || plotH <= 0) {
+            painter.setFont(QFont("Segoe UI", 11));
+            painter.setPen(QColor("#94a3b8"));
+            painter.drawText(rect(), Qt::AlignCenter, "Không có dữ liệu trong khoảng thời gian này.");
+            return;
+        }
 
-            int barX = centerX - barWidth / 2;
-            int barY = h - 28 - barH;
+        double maxVal = 100000.0;
+        for (const auto &p : points) {
+            if (p.value > maxVal) maxVal = p.value;
+        }
 
-            // Nền cột
-            QRectF barRect(barX, barY, barWidth, barH);
-            QColor colColor = (i == 6) ? QColor("#0d9488") : QColor("#99f6e4");
-            if (counts[i] == 0) colColor = QColor("#e2e8f0");
+        maxVal = std::ceil(maxVal / 100000.0) * 100000.0;
+        if (maxVal <= 0.0) maxVal = 100000.0;
 
-            painter.setBrush(colColor);
+        painter.setFont(QFont("Segoe UI", 8.5));
+        for (int i = 0; i <= 4; ++i) {
+            double val = (maxVal / 4.0) * i;
+            int y = top + plotH - static_cast<int>((val / maxVal) * plotH);
+
+            painter.setPen(QPen(QColor("#f1f5f9"), 1, Qt::DashLine));
+            painter.drawLine(left, y, left + plotW, y);
+
+            painter.setPen(QColor("#64748b"));
+            QString yStr;
+            if (val >= 1000000.0) {
+                yStr = QString::number(val / 1000000.0, 'f', 1) + " Tr";
+            } else if (val >= 1000.0) {
+                yStr = QString::number(val / 1000.0, 'f', 0) + " k";
+            } else {
+                yStr = QString::number(val, 'f', 0);
+            }
+            painter.drawText(QRect(0, y - 8, left - 8, 16), Qt::AlignRight | Qt::AlignVCenter, yStr);
+        }
+
+        painter.setPen(QPen(QColor("#cbd5e1"), 1.5));
+        painter.drawLine(left, top + plotH, left + plotW, top + plotH);
+        painter.drawLine(left, top, left, top + plotH);
+
+        int n = points.size();
+        double stepX = (n > 1) ? static_cast<double>(plotW) / (n - 1) : 0.0;
+
+        QVector<QPointF> screenPts;
+        for (int i = 0; i < n; ++i) {
+            double px = (n > 1) ? left + i * stepX : left + plotW / 2.0;
+            double py = top + plotH - (points[i].value / maxVal) * plotH;
+            screenPts.append(QPointF(px, py));
+        }
+
+        if (n > 1) {
+            QPainterPath areaPath;
+            areaPath.moveTo(screenPts[0].x(), top + plotH);
+            for (const auto &pt : screenPts) {
+                areaPath.lineTo(pt);
+            }
+            areaPath.lineTo(screenPts.last().x(), top + plotH);
+            areaPath.closeSubpath();
+
+            QLinearGradient grad(0, top, 0, top + plotH);
+            grad.setColorAt(0.0, QColor(13, 148, 136, 70));
+            grad.setColorAt(1.0, QColor(13, 148, 136, 0));
+            painter.setBrush(grad);
             painter.setPen(Qt::NoPen);
-            painter.drawRoundedRect(barRect, 5, 5);
+            painter.drawPath(areaPath);
+        }
 
-            // Số lượng ca trên đầu cột
-            painter.setFont(QFont("Segoe UI", 9, QFont::Bold));
-            painter.setPen(counts[i] > 0 ? QColor("#0f766e") : QColor("#94a3b8"));
-            painter.drawText(QRect(barX - 10, barY - 18, barWidth + 20, 16), Qt::AlignCenter, QString::number(counts[i]));
+        painter.setPen(QPen(QColor("#0d9488"), (n > 100) ? 1.8 : 2.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        for (int i = 0; i < n - 1; ++i) {
+            painter.drawLine(screenPts[i], screenPts[i + 1]);
+        }
 
-            // Ngày tháng bên dưới cột
-            painter.setFont(QFont("Segoe UI", 9, i == 6 ? QFont::Bold : QFont::Normal));
-            painter.setPen(i == 6 ? QColor("#0d9488") : QColor("#64748b"));
-            painter.drawText(QRect(barX - 15, h - 22, barWidth + 30, 20), Qt::AlignCenter, dates[i]);
+        int labelStep = 1;
+        if (n > 100) labelStep = 30;
+        else if (n > 35) labelStep = 7;
+        else if (n > 15) labelStep = 3;
+        else if (n > 8) labelStep = 2;
+        else labelStep = 1;
+
+        for (int i = 0; i < n; ++i) {
+
+            bool isLast = (i == n - 1);
+            bool isStep = (i % labelStep == 0);
+            if (isStep || (isLast && (n - 1) % labelStep >= labelStep / 2)) {
+                painter.setFont(QFont("Segoe UI", 8.5));
+                painter.setPen(QColor("#64748b"));
+                painter.drawText(QRect(static_cast<int>(screenPts[i].x()) - 25, top + plotH + 8, 50, 18), Qt::AlignCenter, points[i].label);
+            }
+
+            if (n <= 35) {
+                painter.setPen(QPen(QColor("#0d9488"), 2));
+                painter.setBrush(QColor("#ffffff"));
+                painter.drawEllipse(screenPts[i], 4.0, 4.0);
+            } else if (n <= 100) {
+                painter.setPen(QPen(QColor("#0d9488"), 1.5));
+                painter.setBrush(QColor("#ffffff"));
+                painter.drawEllipse(screenPts[i], 2.2, 2.2);
+            } else {
+                if (isStep || isLast) {
+                    painter.setPen(QPen(QColor("#0d9488"), 1.5));
+                    painter.setBrush(QColor("#ffffff"));
+                    painter.drawEllipse(screenPts[i], 2.0, 2.0);
+                }
+            }
+        }
+
+        if (hoveredIndex >= 0 && hoveredIndex < n) {
+            const auto &pt = screenPts[hoveredIndex];
+            painter.setPen(QPen(QColor("#0f766e"), 3));
+            painter.setBrush(QColor("#ffffff"));
+            painter.drawEllipse(pt, 6.0, 6.0);
+
+            QString tipText = QStringLiteral("%1: %2 đ").arg(points[hoveredIndex].label, QLocale(QLocale::Vietnamese).toString(points[hoveredIndex].value, 'f', 0));
+            painter.setFont(QFont("Segoe UI", 8.5, QFont::Bold));
+            QFontMetrics fm(painter.font());
+            int tipW = fm.horizontalAdvance(tipText) + 16;
+            int tipH = 24;
+            int tipX = static_cast<int>(pt.x()) - tipW / 2;
+            int tipY = qMax(4, static_cast<int>(pt.y()) - tipH - 8);
+            if (tipX < left) tipX = left;
+            if (tipX + tipW > w - right) tipX = w - right - tipW;
+
+            painter.setBrush(QColor("#0f172a"));
+            painter.setPen(Qt::NoPen);
+            painter.drawRoundedRect(QRect(tipX, tipY, tipW, tipH), 6, 6);
+
+            painter.setPen(QColor("#ffffff"));
+            painter.drawText(QRect(tipX, tipY, tipW, tipH), Qt::AlignCenter, tipText);
         }
     }
 };
 
-} // namespace
+struct StatusPoint {
+    QString label;
+    int completed = 0;
+    int delayed = 0;
+    int rescheduled = 0;
+};
+
+class StatusMultiLineChart : public QWidget {
+public:
+    QVector<StatusPoint> points;
+    int hoveredIndex = -1;
+
+    explicit StatusMultiLineChart(QWidget *parent = nullptr) : QWidget(parent) {
+        setMinimumHeight(240);
+        setMouseTracking(true);
+    }
+
+    void setData(const QVector<StatusPoint> &pts) {
+        points = pts;
+        hoveredIndex = -1;
+        update();
+    }
+
+protected:
+    void mouseMoveEvent(QMouseEvent *event) override {
+        if (points.isEmpty()) return;
+        int n = points.size();
+        int left = 55, right = 30;
+        int plotW = width() - left - right;
+        if (plotW <= 0) return;
+
+        double mouseX = event->position().x();
+        if (mouseX < left - 15 || mouseX > left + plotW + 15) {
+            if (hoveredIndex != -1) {
+                hoveredIndex = -1;
+                update();
+            }
+            return;
+        }
+
+        double stepX = (n > 1) ? static_cast<double>(plotW) / (n - 1) : 0.0;
+        int closest = -1;
+        if (stepX > 0.0) {
+            int approx = qRound((mouseX - left) / stepX);
+            if (approx >= 0 && approx < n) {
+                closest = approx;
+            }
+        } else if (n == 1) {
+            closest = 0;
+        }
+
+        if (closest != hoveredIndex) {
+            hoveredIndex = closest;
+            update();
+        }
+    }
+
+    void leaveEvent(QEvent *) override {
+        if (hoveredIndex != -1) {
+            hoveredIndex = -1;
+            update();
+        }
+    }
+
+    void paintEvent(QPaintEvent *) override {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+
+        int w = width();
+        int h = height();
+        int left = 55, right = 30, top = 35, bottom = 40;
+        int plotW = w - left - right;
+        int plotH = h - top - bottom;
+
+        if (points.isEmpty() || plotW <= 0 || plotH <= 0) {
+            painter.setFont(QFont("Segoe UI", 11));
+            painter.setPen(QColor("#94a3b8"));
+            painter.drawText(rect(), Qt::AlignCenter, "Không có dữ liệu trong khoảng thời gian này.");
+            return;
+        }
+
+        int maxVal = 4;
+        for (const auto &p : points) {
+            if (p.completed > maxVal) maxVal = p.completed;
+            if (p.delayed > maxVal) maxVal = p.delayed;
+            if (p.rescheduled > maxVal) maxVal = p.rescheduled;
+        }
+        maxVal = ((maxVal + 3) / 4) * 4;
+
+        painter.setFont(QFont("Segoe UI", 8.5));
+        for (int i = 0; i <= 4; ++i) {
+            int val = (maxVal * i) / 4;
+            int y = top + plotH - static_cast<int>((static_cast<double>(val) / maxVal) * plotH);
+
+            painter.setPen(QPen(QColor("#f1f5f9"), 1, Qt::DashLine));
+            painter.drawLine(left, y, left + plotW, y);
+
+            painter.setPen(QColor("#64748b"));
+            painter.drawText(QRect(0, y - 8, left - 8, 16), Qt::AlignRight | Qt::AlignVCenter, QString::number(val));
+        }
+
+        painter.setPen(QPen(QColor("#cbd5e1"), 1.5));
+        painter.drawLine(left, top + plotH, left + plotW, top + plotH);
+        painter.drawLine(left, top, left, top + plotH);
+
+        int legY = 10;
+        int legRight = w - right;
+
+        auto drawLegendItem = [&](const QString &txt, const QColor &col, int &curRight) {
+            QFont font("Segoe UI", 8.5, QFont::Bold);
+            QFontMetrics fm(font);
+            int txtW = fm.horizontalAdvance(txt);
+            int itemW = txtW + 20;
+            curRight -= itemW;
+
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(col);
+            painter.drawEllipse(curRight, legY + 2, 8, 8);
+
+            painter.setFont(font);
+            painter.setPen(QColor("#334155"));
+            painter.drawText(curRight + 12, legY + 10, txt);
+            curRight -= 12;
+        };
+
+        int curLegRight = legRight;
+        drawLegendItem("Đã dời lịch", QColor("#64748b"), curLegRight);
+        drawLegendItem("Trễ hẹn", QColor("#f59e0b"), curLegRight);
+        drawLegendItem("Đã khám", QColor("#0d9488"), curLegRight);
+
+        int n = points.size();
+        double stepX = (n > 1) ? static_cast<double>(plotW) / (n - 1) : 0.0;
+
+        int labelStep = 1;
+        if (n > 100) labelStep = 30;
+        else if (n > 35) labelStep = 7;
+        else if (n > 15) labelStep = 3;
+        else if (n > 8) labelStep = 2;
+        else labelStep = 1;
+
+        QVector<QPointF> ptsComp, ptsDelay, ptsResched;
+        for (int i = 0; i < n; ++i) {
+            double px = (n > 1) ? left + i * stepX : left + plotW / 2.0;
+            double pyC = top + plotH - (static_cast<double>(points[i].completed) / maxVal) * plotH;
+            double pyD = top + plotH - (static_cast<double>(points[i].delayed) / maxVal) * plotH;
+            double pyR = top + plotH - (static_cast<double>(points[i].rescheduled) / maxVal) * plotH;
+
+            ptsComp.append(QPointF(px, pyC));
+            ptsDelay.append(QPointF(px, pyD));
+            ptsResched.append(QPointF(px, pyR));
+        }
+
+        auto drawSeriesLine = [&](const QVector<QPointF> &pts, const QColor &col) {
+            painter.setPen(QPen(col, (n > 100) ? 1.8 : 2.2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            for (int i = 0; i < pts.size() - 1; ++i) {
+                painter.drawLine(pts[i], pts[i + 1]);
+            }
+            if (n <= 35) {
+                for (const auto &p : pts) {
+                    painter.setPen(QPen(col, 1.8));
+                    painter.setBrush(QColor("#ffffff"));
+                    painter.drawEllipse(p, 3.5, 3.5);
+                }
+            } else if (n <= 100) {
+                for (const auto &p : pts) {
+                    painter.setPen(QPen(col, 1.2));
+                    painter.setBrush(QColor("#ffffff"));
+                    painter.drawEllipse(p, 2.0, 2.0);
+                }
+            } else {
+                for (int i = 0; i < pts.size(); ++i) {
+                    if (i % labelStep == 0 || i == pts.size() - 1) {
+                        painter.setPen(QPen(col, 1.2));
+                        painter.setBrush(QColor("#ffffff"));
+                        painter.drawEllipse(pts[i], 1.8, 1.8);
+                    }
+                }
+            }
+        };
+
+        drawSeriesLine(ptsResched, QColor("#64748b"));
+        drawSeriesLine(ptsDelay, QColor("#f59e0b"));
+        drawSeriesLine(ptsComp, QColor("#0d9488"));
+
+        for (int i = 0; i < n; ++i) {
+            bool isLast = (i == n - 1);
+            bool isStep = (i % labelStep == 0);
+            if (isStep || (isLast && (n - 1) % labelStep >= labelStep / 2)) {
+                painter.setFont(QFont("Segoe UI", 8.5));
+                painter.setPen(QColor("#64748b"));
+                painter.drawText(QRect(static_cast<int>(ptsComp[i].x()) - 25, top + plotH + 8, 50, 18), Qt::AlignCenter, points[i].label);
+            }
+        }
+
+        if (hoveredIndex >= 0 && hoveredIndex < n) {
+            const auto &p = points[hoveredIndex];
+            double px = ptsComp[hoveredIndex].x();
+
+            painter.setPen(QPen(QColor("#cbd5e1"), 1, Qt::DashLine));
+            painter.drawLine(QPointF(px, top), QPointF(px, top + plotH));
+
+            painter.setPen(QPen(QColor("#64748b"), 2));
+            painter.setBrush(QColor("#ffffff"));
+            painter.drawEllipse(ptsResched[hoveredIndex], 4.5, 4.5);
+
+            painter.setPen(QPen(QColor("#f59e0b"), 2));
+            painter.setBrush(QColor("#ffffff"));
+            painter.drawEllipse(ptsDelay[hoveredIndex], 4.5, 4.5);
+
+            painter.setPen(QPen(QColor("#0d9488"), 2));
+            painter.setBrush(QColor("#ffffff"));
+            painter.drawEllipse(ptsComp[hoveredIndex], 4.5, 4.5);
+
+            QString tipText = QStringLiteral("%1: %2 khám · %3 trễ · %4 dời").arg(p.label).arg(p.completed).arg(p.delayed).arg(p.rescheduled);
+            painter.setFont(QFont("Segoe UI", 8.5, QFont::Bold));
+            QFontMetrics fm(painter.font());
+            int tipW = fm.horizontalAdvance(tipText) + 16;
+            int tipH = 24;
+            int tipX = static_cast<int>(px) - tipW / 2;
+            int tipY = qMax(4, top - 18);
+            if (tipX < left) tipX = left;
+            if (tipX + tipW > w - right) tipX = w - right - tipW;
+
+            painter.setBrush(QColor("#0f172a"));
+            painter.setPen(Qt::NoPen);
+            painter.drawRoundedRect(QRect(tipX, tipY, tipW, tipH), 6, 6);
+
+            painter.setPen(QColor("#ffffff"));
+            painter.drawText(QRect(tipX, tipY, tipW, tipH), Qt::AlignCenter, tipText);
+        }
+    }
+};
+
+class PeriodSelectionDialog : public QDialog {
+public:
+    enum PeriodType { Week, Month, Quarter, Year };
+
+    PeriodType pType;
+    int selectedYear;
+    int selectedMonth;
+    int selectedQuarter;
+    int selectedWeekIndex = 0;
+    QVector<QPair<QDate, QDate>> weeksList;
+
+    int originYear = 0;
+    int originWeekIndex = -1;
+    int originMonth = -1;
+    int originQuarter = -1;
+
+    QDate resultStart;
+    QDate resultEnd;
+
+    QLineEdit *txtYear = nullptr;
+    QPushButton *btnConfirm = nullptr;
+    QVBoxLayout *contentBox = nullptr;
+
+    bool eventFilter(QObject *obj, QEvent *ev) override {
+        if (obj == txtYear && ev->type() == QEvent::FocusIn) {
+            QTimer::singleShot(0, txtYear, &QLineEdit::selectAll);
+        }
+        return QDialog::eventFilter(obj, ev);
+    }
+
+    PeriodSelectionDialog(PeriodType type, const QDate &initDate, QWidget *parent = nullptr)
+        : QDialog(parent), pType(type) {
+        setWindowTitle("Chọn thời gian thống kê");
+        setModal(true);
+        setStyleSheet("QDialog { background-color: #ffffff; border-radius: 14px; font-family: 'Segoe UI'; }");
+
+        if (pType == Week) {
+            setFixedSize(480, 480);
+        } else if (pType == Month) {
+            setFixedSize(420, 275);
+        } else if (pType == Quarter) {
+            setFixedSize(370, 245);
+        } else {
+            setFixedSize(340, 215);
+        }
+
+        selectedYear = initDate.year();
+        originYear = selectedYear;
+        selectedMonth = initDate.month();
+        selectedQuarter = (selectedMonth - 1) / 3 + 1;
+
+        if (pType == Week) {
+            calculateWeeks();
+            selectedWeekIndex = 0;
+            for (int i = 0; i < weeksList.size(); ++i) {
+                if (initDate >= weeksList[i].first && initDate <= weeksList[i].second) {
+                    selectedWeekIndex = i;
+                    break;
+                }
+            }
+            originWeekIndex = selectedWeekIndex;
+        } else if (pType == Month) {
+            originMonth = selectedMonth;
+        } else if (pType == Quarter) {
+            originQuarter = selectedQuarter;
+        }
+
+        setupUI();
+    }
+
+    void updateConfirmButtonState() {
+        if (!btnConfirm) return;
+        bool canConfirm = true;
+        if (pType == Week && (selectedWeekIndex < 0 || selectedWeekIndex >= weeksList.size())) {
+            canConfirm = false;
+        } else if (pType == Month && (selectedMonth < 1 || selectedMonth > 12)) {
+            canConfirm = false;
+        } else if (pType == Quarter && (selectedQuarter < 1 || selectedQuarter > 4)) {
+            canConfirm = false;
+        }
+
+        btnConfirm->setEnabled(canConfirm);
+        if (canConfirm) {
+            btnConfirm->setStyleSheet(
+                "QPushButton { "
+                "    background: #0d9488; color: #ffffff; font-family: 'Segoe UI'; font-weight: 700; font-size: 12.5px; "
+                "    border: 1px solid #0d9488; border-radius: 8px; padding: 0 22px; outline: none; "
+                "} "
+                "QPushButton:hover { background: #0f766e; border: 1px solid #0f766e; border-radius: 8px; }"
+            );
+        } else {
+            btnConfirm->setStyleSheet(
+                "QPushButton { "
+                "    background: #e2e8f0; color: #94a3b8; font-family: 'Segoe UI'; font-weight: 700; font-size: 12.5px; "
+                "    border: 1px solid #cbd5e1; border-radius: 8px; padding: 0 22px; outline: none; "
+                "}"
+            );
+        }
+    }
+
+    void changeYear(int newYear) {
+        if (newYear < 2000 || newYear > 2099 || newYear == selectedYear) return;
+        selectedYear = newYear;
+        if (txtYear) {
+            QSignalBlocker blocker(txtYear);
+            txtYear->setText(QString::number(selectedYear));
+        }
+
+        if (pType == Week) {
+            calculateWeeks();
+            if (selectedYear == originYear) {
+                selectedWeekIndex = originWeekIndex;
+            } else {
+                selectedWeekIndex = -1;
+            }
+        } else if (pType == Month) {
+            if (selectedYear == originYear) {
+                selectedMonth = originMonth;
+            } else {
+                selectedMonth = -1;
+            }
+        } else if (pType == Quarter) {
+            if (selectedYear == originYear) {
+                selectedQuarter = originQuarter;
+            } else {
+                selectedQuarter = -1;
+            }
+        }
+
+        rebuildContent();
+        updateConfirmButtonState();
+    }
+
+    void setupUI() {
+        auto *root = new QVBoxLayout(this);
+        root->setContentsMargins(20, 16, 20, 16);
+        root->setSpacing(10);
+
+        auto *yearNav = new QHBoxLayout;
+        yearNav->setSpacing(6);
+
+        auto *btnPrevYear = new QPushButton("‹");
+        btnPrevYear->setFixedSize(28, 28);
+        btnPrevYear->setCursor(Qt::PointingHandCursor);
+        btnPrevYear->setStyleSheet(
+            "QPushButton { "
+            "    background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; "
+            "    font-family: 'Segoe UI'; font-size: 15px; font-weight: bold; color: #475569; padding-bottom: 2px; outline: none; "
+            "} "
+            "QPushButton:hover { background: #f0fdfa; border: 1.5px solid #0d9488; border-radius: 8px; color: #0d9488; } "
+            "QPushButton:pressed { background: #ccfbf1; border: 1.5px solid #0f766e; border-radius: 8px; color: #0f766e; }"
+        );
+
+        auto *lblYearPrefix = new QLabel("Năm");
+        lblYearPrefix->setStyleSheet("font-family: 'Segoe UI'; font-size: 13.5px; font-weight: 700; color: #334155;");
+
+        txtYear = new QLineEdit(QString::number(selectedYear));
+        txtYear->setFixedSize(58, 28);
+        txtYear->setAlignment(Qt::AlignCenter);
+        txtYear->setMaxLength(4);
+        txtYear->setValidator(new QIntValidator(2000, 2099, txtYear));
+        txtYear->setStyleSheet(
+            "QLineEdit { "
+            "    background-color: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 8px; "
+            "    font-family: 'Segoe UI'; font-size: 13.5px; font-weight: 700; color: #0f766e; "
+            "    padding: 0px 2px; margin: 0px; outline: none; "
+            "} "
+            "QLineEdit:hover { border: 1.5px solid #0d9488; border-radius: 8px; background-color: #f0fdfa; } "
+            "QLineEdit:focus { border: 1.5px solid #0d9488; border-radius: 8px; background-color: #ffffff; color: #0d9488; }"
+        );
+        txtYear->installEventFilter(this);
+
+        auto *btnNextYear = new QPushButton("›");
+        btnNextYear->setFixedSize(28, 28);
+        btnNextYear->setCursor(Qt::PointingHandCursor);
+        btnNextYear->setStyleSheet(
+            "QPushButton { "
+            "    background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; "
+            "    font-family: 'Segoe UI'; font-size: 15px; font-weight: bold; color: #475569; padding-bottom: 2px; outline: none; "
+            "} "
+            "QPushButton:hover { background: #f0fdfa; border: 1.5px solid #0d9488; border-radius: 8px; color: #0d9488; } "
+            "QPushButton:pressed { background: #ccfbf1; border: 1.5px solid #0f766e; border-radius: 8px; color: #0f766e; }"
+        );
+
+        yearNav->addStretch();
+        yearNav->addWidget(btnPrevYear);
+        yearNav->addSpacing(2);
+        yearNav->addWidget(lblYearPrefix);
+        yearNav->addWidget(txtYear);
+        yearNav->addSpacing(2);
+        yearNav->addWidget(btnNextYear);
+        yearNav->addStretch();
+        root->addLayout(yearNav);
+
+        connect(btnPrevYear, &QPushButton::clicked, this, [this]() {
+            changeYear(selectedYear - 1);
+        });
+        connect(btnNextYear, &QPushButton::clicked, this, [this]() {
+            changeYear(selectedYear + 1);
+        });
+        connect(txtYear, &QLineEdit::editingFinished, this, [this]() {
+            bool ok = false;
+            int y = txtYear->text().toInt(&ok);
+            if (ok && y >= 2000 && y <= 2099) {
+                if (y != selectedYear) {
+                    changeYear(y);
+                }
+            } else {
+                QSignalBlocker blocker(txtYear);
+                txtYear->setText(QString::number(selectedYear));
+            }
+        });
+
+        contentBox = new QVBoxLayout;
+        contentBox->setContentsMargins(0, 4, 0, 4);
+        contentBox->setSpacing(8);
+        root->addLayout(contentBox, 1);
+
+        rebuildContent();
+
+        auto *footH = new QHBoxLayout;
+        footH->setSpacing(10);
+
+        auto *btnCancel = new QPushButton("Hủy bỏ");
+        btnCancel->setFixedHeight(34);
+        btnCancel->setCursor(Qt::PointingHandCursor);
+        btnCancel->setStyleSheet(
+            "QPushButton { "
+            "    background: #f1f5f9; color: #475569; font-family: 'Segoe UI'; font-weight: 600; font-size: 12.5px; "
+            "    border: 1px solid #cbd5e1; border-radius: 8px; padding: 0 18px; outline: none; "
+            "} "
+            "QPushButton:hover { background: #e2e8f0; color: #0f172a; border: 1px solid #94a3b8; border-radius: 8px; }"
+        );
+
+        btnConfirm = new QPushButton("Xác nhận");
+        btnConfirm->setFixedHeight(34);
+        btnConfirm->setCursor(Qt::PointingHandCursor);
+        updateConfirmButtonState();
+
+        footH->addStretch();
+        footH->addWidget(btnCancel);
+        footH->addWidget(btnConfirm);
+        root->addLayout(footH);
+
+        connect(btnCancel, &QPushButton::clicked, this, &QDialog::reject);
+        connect(btnConfirm, &QPushButton::clicked, this, [this]() {
+            calculateResultBounds();
+            accept();
+        });
+    }
+
+    void calculateWeeks() {
+        weeksList.clear();
+        QDate jan1(selectedYear, 1, 1);
+        int dow = jan1.dayOfWeek();
+
+        QDate wStart = jan1.addDays(-(dow - 1));
+
+        while (true) {
+            QDate wEnd = wStart.addDays(6);
+            weeksList.append(qMakePair(wStart, wEnd));
+            wStart = wStart.addDays(7);
+
+            if (wEnd.year() >= selectedYear && wEnd.month() == 12 && wEnd.day() >= 31) {
+                break;
+            }
+            if (wStart.year() > selectedYear) {
+                break;
+            }
+        }
+    }
+
+    void clearLayoutRecursive(QLayout *lay) {
+        if (!lay) return;
+        while (QLayoutItem *item = lay->takeAt(0)) {
+            if (QLayout *sub = item->layout()) {
+                clearLayoutRecursive(sub);
+            }
+            if (QWidget *w = item->widget()) {
+                w->hide();
+                w->deleteLater();
+            }
+            delete item;
+        }
+    }
+
+    void rebuildContent() {
+        clearLayoutRecursive(contentBox);
+
+        if (pType == Week) {
+
+            if (weeksList.isEmpty()) calculateWeeks();
+            if (selectedWeekIndex >= weeksList.size()) selectedWeekIndex = -1;
+
+            auto *scroll = new QScrollArea;
+            scroll->setWidgetResizable(true);
+            scroll->setFrameShape(QFrame::NoFrame);
+            scroll->setStyleSheet(
+                "QScrollArea { background: transparent; border: none; } "
+                "QScrollBar:vertical { width: 6px; background: transparent; } "
+                "QScrollBar::handle:vertical { background: #cbd5e1; border-radius: 3px; } "
+                "QScrollBar::handle:vertical:hover { background: #94a3b8; } "
+                "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }"
+            );
+
+            auto *weekWidget = new QWidget;
+            weekWidget->setStyleSheet("background: transparent; border: none;");
+            auto *weekGrid = new QGridLayout(weekWidget);
+            weekGrid->setHorizontalSpacing(6);
+            weekGrid->setVerticalSpacing(6);
+            weekGrid->setContentsMargins(2, 2, 6, 2);
+
+            QPushButton *activeBtn = nullptr;
+
+            for (int i = 0; i < weeksList.size(); ++i) {
+                const auto &w = weeksList[i];
+                bool isSel = (i == selectedWeekIndex);
+
+                auto *btnW = new QPushButton;
+                btnW->setFixedHeight(44);
+                btnW->setCursor(Qt::PointingHandCursor);
+
+                auto *bLay = new QVBoxLayout(btnW);
+                bLay->setContentsMargins(4, 3, 4, 3);
+                bLay->setSpacing(1);
+                bLay->setAlignment(Qt::AlignCenter);
+
+                auto *wTitle = new QLabel(QStringLiteral("Tuần %1").arg(i + 1));
+                wTitle->setAttribute(Qt::WA_TransparentForMouseEvents);
+                wTitle->setStyleSheet(QStringLiteral(
+                    "font-family: 'Segoe UI'; font-size: 12px; font-weight: 700; color: %1; background: transparent; border: none;"
+                ).arg(isSel ? "#ffffff" : "#0f172a"));
+                wTitle->setAlignment(Qt::AlignCenter);
+
+                QString dateRangeStr = QStringLiteral("(%1 - %2)")
+                    .arg(w.first.toString("dd/MM"))
+                    .arg(w.second.toString("dd/MM"));
+                auto *wDateRange = new QLabel(dateRangeStr);
+                wDateRange->setAttribute(Qt::WA_TransparentForMouseEvents);
+                wDateRange->setStyleSheet(QStringLiteral(
+                    "font-family: 'Segoe UI'; font-size: 10.5px; font-weight: 500; color: %1; background: transparent; border: none;"
+                ).arg(isSel ? "#ccfbf1" : "#64748b"));
+                wDateRange->setAlignment(Qt::AlignCenter);
+
+                bLay->addWidget(wTitle);
+                bLay->addWidget(wDateRange);
+
+                btnW->setStyleSheet(QStringLiteral(
+                    "QPushButton { "
+                    "    background-color: %1; "
+                    "    border: 1.5px solid %2; "
+                    "    border-radius: 8px; "
+                    "    outline: none; "
+                    "} "
+                    "QPushButton:hover { "
+                    "    background-color: %3; "
+                    "    border: 1.5px solid %4; "
+                    "    border-radius: 8px; "
+                    "}")
+                    .arg(isSel ? "#0d9488" : "#ffffff",
+                         isSel ? "#0f766e" : "#cbd5e1",
+                         isSel ? "#0f766e" : "#f0fdfa",
+                         isSel ? "#0f766e" : "#0d9488"));
+
+                if (isSel) activeBtn = btnW;
+
+                connect(btnW, &QPushButton::clicked, this, [this, i]() {
+                    selectedWeekIndex = i;
+                    if (selectedYear == originYear) {
+                        originWeekIndex = i;
+                    }
+                    rebuildContent();
+                    updateConfirmButtonState();
+                });
+
+                weekGrid->addWidget(btnW, i / 4, i % 4);
+            }
+
+            scroll->setWidget(weekWidget);
+            contentBox->addWidget(scroll, 1);
+
+            if (activeBtn) {
+                QTimer::singleShot(30, scroll, [scroll, activeBtn]() {
+                    scroll->ensureWidgetVisible(activeBtn, 0, 40);
+                });
+            }
+        }
+        else if (pType == Month) {
+
+            auto *grid = new QGridLayout;
+            grid->setSpacing(8);
+            grid->setContentsMargins(0, 4, 0, 4);
+
+            for (int m = 1; m <= 12; ++m) {
+                auto *btnM = new QPushButton;
+                btnM->setFixedHeight(46);
+                btnM->setCursor(Qt::PointingHandCursor);
+                bool isSel = (m == selectedMonth);
+
+                auto *bLay = new QVBoxLayout(btnM);
+                bLay->setContentsMargins(4, 4, 4, 4);
+                bLay->setSpacing(1);
+                bLay->setAlignment(Qt::AlignCenter);
+
+                auto *lblTitle = new QLabel(QStringLiteral("Tháng %1").arg(m));
+                lblTitle->setAttribute(Qt::WA_TransparentForMouseEvents);
+                lblTitle->setStyleSheet(QStringLiteral("font-family: 'Segoe UI'; font-size: 12.5px; font-weight: 700; color: %1; background: transparent; border: none;").arg(isSel ? "#ffffff" : "#0f172a"));
+                lblTitle->setAlignment(Qt::AlignCenter);
+
+                QDate dFirst(selectedYear, m, 1);
+                auto *lblSub = new QLabel(QStringLiteral("01/%1 – %2/%1").arg(QString::number(m).rightJustified(2, '0')).arg(dFirst.daysInMonth()));
+                lblSub->setAttribute(Qt::WA_TransparentForMouseEvents);
+                lblSub->setStyleSheet(QStringLiteral("font-family: 'Segoe UI'; font-size: 10px; font-weight: 500; color: %1; background: transparent; border: none;").arg(isSel ? "#ccfbf1" : "#64748b"));
+                lblSub->setAlignment(Qt::AlignCenter);
+
+                bLay->addWidget(lblTitle);
+                bLay->addWidget(lblSub);
+
+                btnM->setStyleSheet(QStringLiteral(
+                    "QPushButton { "
+                    "    background-color: %1; "
+                    "    border: 1.5px solid %2; "
+                    "    border-radius: 8px; "
+                    "    outline: none; "
+                    "} "
+                    "QPushButton:hover { "
+                    "    background-color: %3; "
+                    "    border: 1.5px solid %4; "
+                    "    border-radius: 8px; "
+                    "}")
+                    .arg(isSel ? "#0d9488" : "#ffffff",
+                         isSel ? "#0f766e" : "#cbd5e1",
+                         isSel ? "#0f766e" : "#f0fdfa",
+                         isSel ? "#0f766e" : "#0d9488"));
+
+                connect(btnM, &QPushButton::clicked, this, [this, m]() {
+                    selectedMonth = m;
+                    if (selectedYear == originYear) {
+                        originMonth = m;
+                    }
+                    rebuildContent();
+                    updateConfirmButtonState();
+                });
+                grid->addWidget(btnM, (m - 1) / 4, (m - 1) % 4);
+            }
+            contentBox->addLayout(grid);
+        }
+        else if (pType == Quarter) {
+
+            auto *grid = new QGridLayout;
+            grid->setSpacing(10);
+            grid->setContentsMargins(0, 4, 0, 4);
+
+            const QString qTitles[4] = {"Quý 1", "Quý 2", "Quý 3", "Quý 4"};
+            const QString qRanges[4] = {"Tháng 01 – Tháng 03", "Tháng 04 – Tháng 06", "Tháng 07 – Tháng 09", "Tháng 10 – Tháng 12"};
+
+            for (int q = 1; q <= 4; ++q) {
+                auto *btnQ = new QPushButton;
+                btnQ->setFixedHeight(54);
+                btnQ->setCursor(Qt::PointingHandCursor);
+                bool isSel = (q == selectedQuarter);
+
+                auto *qLay = new QVBoxLayout(btnQ);
+                qLay->setContentsMargins(8, 6, 8, 6);
+                qLay->setSpacing(2);
+                qLay->setAlignment(Qt::AlignCenter);
+
+                auto *t = new QLabel(qTitles[q - 1]);
+                t->setAttribute(Qt::WA_TransparentForMouseEvents);
+                t->setStyleSheet(QStringLiteral("font-family: 'Segoe UI'; font-size: 13.5px; font-weight: 700; color: %1; background: transparent; border: none;").arg(isSel ? "#ffffff" : "#0f172a"));
+                t->setAlignment(Qt::AlignCenter);
+
+                auto *s = new QLabel(qRanges[q - 1]);
+                s->setAttribute(Qt::WA_TransparentForMouseEvents);
+                s->setStyleSheet(QStringLiteral("font-family: 'Segoe UI'; font-size: 11px; font-weight: 500; color: %1; background: transparent; border: none;").arg(isSel ? "#ccfbf1" : "#64748b"));
+                s->setAlignment(Qt::AlignCenter);
+
+                qLay->addWidget(t);
+                qLay->addWidget(s);
+
+                btnQ->setStyleSheet(QStringLiteral(
+                    "QPushButton { "
+                    "    background-color: %1; "
+                    "    border: 1.5px solid %2; "
+                    "    border-radius: 8px; "
+                    "    outline: none; "
+                    "} "
+                    "QPushButton:hover { "
+                    "    background-color: %3; "
+                    "    border: 1.5px solid %4; "
+                    "    border-radius: 8px; "
+                    "}")
+                    .arg(isSel ? "#0d9488" : "#ffffff",
+                         isSel ? "#0f766e" : "#cbd5e1",
+                         isSel ? "#0f766e" : "#f0fdfa",
+                         isSel ? "#0f766e" : "#0d9488"));
+
+                connect(btnQ, &QPushButton::clicked, this, [this, q]() {
+                    selectedQuarter = q;
+                    if (selectedYear == originYear) {
+                        originQuarter = q;
+                    }
+                    rebuildContent();
+                    updateConfirmButtonState();
+                });
+                grid->addWidget(btnQ, (q - 1) / 2, (q - 1) % 2);
+            }
+            contentBox->addLayout(grid);
+        }
+        else if (pType == Year) {
+
+            auto *vBox = new QVBoxLayout;
+            vBox->setAlignment(Qt::AlignCenter);
+            vBox->setSpacing(6);
+
+            auto *iconLbl = new QLabel("📅");
+            iconLbl->setStyleSheet("font-size: 30px; background: transparent; border: none;");
+            iconLbl->setAlignment(Qt::AlignCenter);
+
+            auto *lbl = new QLabel(QStringLiteral("Toàn bộ năm %1").arg(selectedYear));
+            lbl->setStyleSheet("font-family: 'Segoe UI'; font-size: 15.5px; font-weight: 800; color: #0d9488; background: transparent; border: none;");
+            lbl->setAlignment(Qt::AlignCenter);
+
+            auto *sub = new QLabel(QStringLiteral("Thống kê từ 01/01/%1 đến 31/12/%1").arg(selectedYear));
+            sub->setStyleSheet("font-family: 'Segoe UI'; font-size: 12px; font-weight: 500; color: #64748b; background: transparent; border: none;");
+            sub->setAlignment(Qt::AlignCenter);
+
+            vBox->addStretch();
+            vBox->addWidget(iconLbl);
+            vBox->addWidget(lbl);
+            vBox->addWidget(sub);
+            vBox->addStretch();
+            contentBox->addLayout(vBox);
+        }
+    }
+
+    void calculateResultBounds() {
+        if (pType == Week) {
+            if (weeksList.isEmpty()) calculateWeeks();
+            if (selectedWeekIndex >= 0 && selectedWeekIndex < weeksList.size()) {
+                resultStart = weeksList[selectedWeekIndex].first;
+                resultEnd = weeksList[selectedWeekIndex].second;
+            } else if (!weeksList.isEmpty()) {
+                resultStart = weeksList[0].first;
+                resultEnd = weeksList[0].second;
+            }
+        } else if (pType == Month) {
+            int m = (selectedMonth >= 1 && selectedMonth <= 12) ? selectedMonth : 1;
+            resultStart = QDate(selectedYear, m, 1);
+            resultEnd = QDate(selectedYear, m, resultStart.daysInMonth());
+        } else if (pType == Quarter) {
+            int q = (selectedQuarter >= 1 && selectedQuarter <= 4) ? selectedQuarter : 1;
+            int sMonth = (q - 1) * 3 + 1;
+            int eMonth = sMonth + 2;
+            resultStart = QDate(selectedYear, sMonth, 1);
+            QDate lastM(selectedYear, eMonth, 1);
+            resultEnd = QDate(selectedYear, eMonth, lastM.daysInMonth());
+        } else if (pType == Year) {
+            resultStart = QDate(selectedYear, 1, 1);
+            resultEnd = QDate(selectedYear, 12, 31);
+        }
+    }
+};
+
+class DateSelectionDialog : public QDialog {
+public:
+    QCalendarWidget *calendar = nullptr;
+    QDate chosenDate;
+    QLineEdit *txtMonth = nullptr;
+    QLineEdit *txtYear = nullptr;
+
+    bool eventFilter(QObject *obj, QEvent *ev) override {
+        if ((obj == txtMonth || obj == txtYear) && ev->type() == QEvent::FocusIn) {
+            auto *le = qobject_cast<QLineEdit*>(obj);
+            if (le) {
+                QTimer::singleShot(0, le, &QLineEdit::selectAll);
+            }
+        }
+        return QDialog::eventFilter(obj, ev);
+    }
+
+    DateSelectionDialog(const QString &title, const QDate &initDate, QWidget *parent = nullptr)
+        : QDialog(parent), chosenDate(initDate.isValid() ? initDate : QDate::currentDate()) {
+        setWindowTitle(title);
+        setFixedSize(330, 340);
+        setModal(true);
+        setStyleSheet("QDialog { background-color: #ffffff; border-radius: 14px; font-family: 'Segoe UI'; }");
+
+        auto *root = new QVBoxLayout(this);
+        root->setContentsMargins(16, 14, 16, 14);
+        root->setSpacing(8);
+
+        auto *navH = new QHBoxLayout;
+        navH->setSpacing(4);
+
+        auto *btnPrevM = new QPushButton("‹");
+        btnPrevM->setFixedSize(28, 28);
+        btnPrevM->setCursor(Qt::PointingHandCursor);
+        btnPrevM->setStyleSheet(
+            "QPushButton { "
+            "    background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; "
+            "    font-family: 'Segoe UI'; font-size: 15px; font-weight: bold; color: #475569; padding-bottom: 2px; outline: none; "
+            "} "
+            "QPushButton:hover { background: #f0fdfa; border: 1.5px solid #0d9488; border-radius: 8px; color: #0d9488; } "
+            "QPushButton:pressed { background: #ccfbf1; border: 1.5px solid #0f766e; border-radius: 8px; color: #0f766e; }"
+        );
+
+        auto *lblMonthPrefix = new QLabel("Tháng");
+        lblMonthPrefix->setStyleSheet("font-family: 'Segoe UI'; font-size: 13.5px; font-weight: 700; color: #334155; background: transparent; border: none;");
+
+        const QString flatInputStyle =
+            "QLineEdit { "
+            "    background: transparent; border: none; border-bottom: 2px solid transparent; "
+            "    font-family: 'Segoe UI'; font-size: 14px; font-weight: 700; color: #0f766e; "
+            "    padding: 1px 2px; margin: 0px; outline: none; "
+            "} "
+            "QLineEdit:hover { border-bottom: 2px solid #cbd5e1; color: #0d9488; } "
+            "QLineEdit:focus { background-color: #f0fdfa; border: none; border-bottom: 2px solid #0d9488; border-radius: 4px; color: #0d9488; }";
+
+        txtMonth = new QLineEdit(QString::number(chosenDate.month()));
+        txtMonth->setFixedSize(28, 26);
+        txtMonth->setAlignment(Qt::AlignCenter);
+        txtMonth->setMaxLength(2);
+        txtMonth->setValidator(new QIntValidator(1, 12, txtMonth));
+        txtMonth->setStyleSheet(flatInputStyle);
+        txtMonth->installEventFilter(this);
+
+        txtYear = new QLineEdit(QString::number(chosenDate.year()));
+        txtYear->setFixedSize(48, 26);
+        txtYear->setAlignment(Qt::AlignCenter);
+        txtYear->setMaxLength(4);
+        txtYear->setValidator(new QIntValidator(2000, 2099, txtYear));
+        txtYear->setStyleSheet(flatInputStyle);
+        txtYear->installEventFilter(this);
+
+        auto *btnNextM = new QPushButton("›");
+        btnNextM->setFixedSize(28, 28);
+        btnNextM->setCursor(Qt::PointingHandCursor);
+        btnNextM->setStyleSheet(
+            "QPushButton { "
+            "    background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; "
+            "    font-family: 'Segoe UI'; font-size: 15px; font-weight: bold; color: #475569; padding-bottom: 2px; outline: none; "
+            "} "
+            "QPushButton:hover { background: #f0fdfa; border: 1.5px solid #0d9488; border-radius: 8px; color: #0d9488; } "
+            "QPushButton:pressed { background: #ccfbf1; border: 1.5px solid #0f766e; border-radius: 8px; color: #0f766e; }"
+        );
+
+        navH->addStretch();
+        navH->addWidget(btnPrevM);
+        navH->addSpacing(8);
+        navH->addWidget(lblMonthPrefix);
+        navH->addSpacing(2);
+        navH->addWidget(txtMonth);
+        navH->addSpacing(6);
+        navH->addWidget(txtYear);
+        navH->addSpacing(8);
+        navH->addWidget(btnNextM);
+        navH->addStretch();
+        root->addLayout(navH);
+
+        calendar = new QCalendarWidget(this);
+        calendar->setGridVisible(false);
+        calendar->setDateRange(QDate(2000, 1, 1), QDate(2099, 12, 31));
+        calendar->setSelectedDate(chosenDate);
+        UIHelper::applyCalendarStyle(calendar);
+        calendar->setNavigationBarVisible(false);
+        calendar->setMinimumHeight(220);
+        root->addWidget(calendar, 1);
+
+        auto syncInputs = [this]() {
+            if (txtMonth) {
+                QSignalBlocker b(txtMonth);
+                txtMonth->setText(QString::number(chosenDate.month()));
+            }
+            if (txtYear) {
+                QSignalBlocker b(txtYear);
+                txtYear->setText(QString::number(chosenDate.year()));
+            }
+        };
+
+        connect(calendar, &QCalendarWidget::clicked, this, [this, syncInputs](const QDate &d) {
+            chosenDate = d;
+            syncInputs();
+        });
+
+        connect(btnPrevM, &QPushButton::clicked, this, [this, syncInputs]() {
+            QDate d = chosenDate.addMonths(-1);
+            if (d.year() >= 2000) {
+                chosenDate = d;
+                calendar->setSelectedDate(chosenDate);
+                calendar->setCurrentPage(chosenDate.year(), chosenDate.month());
+                syncInputs();
+            }
+        });
+
+        connect(btnNextM, &QPushButton::clicked, this, [this, syncInputs]() {
+            QDate d = chosenDate.addMonths(1);
+            if (d.year() <= 2099) {
+                chosenDate = d;
+                calendar->setSelectedDate(chosenDate);
+                calendar->setCurrentPage(chosenDate.year(), chosenDate.month());
+                syncInputs();
+            }
+        });
+
+        connect(txtMonth, &QLineEdit::editingFinished, this, [this, syncInputs]() {
+            bool ok = false;
+            int m = txtMonth->text().toInt(&ok);
+            if (ok && m >= 1 && m <= 12) {
+                int y = chosenDate.year();
+                int maxD = QDate(y, m, 1).daysInMonth();
+                int day = qMin(chosenDate.day(), maxD);
+                chosenDate = QDate(y, m, day);
+                calendar->setSelectedDate(chosenDate);
+                calendar->setCurrentPage(y, m);
+            }
+            syncInputs();
+        });
+
+        connect(txtYear, &QLineEdit::editingFinished, this, [this, syncInputs]() {
+            bool ok = false;
+            int y = txtYear->text().toInt(&ok);
+            if (ok && y >= 2000 && y <= 2099) {
+                int m = chosenDate.month();
+                int maxD = QDate(y, m, 1).daysInMonth();
+                int day = qMin(chosenDate.day(), maxD);
+                chosenDate = QDate(y, m, day);
+                calendar->setSelectedDate(chosenDate);
+                calendar->setCurrentPage(y, m);
+            }
+            syncInputs();
+        });
+
+        auto *footH = new QHBoxLayout;
+        footH->setSpacing(10);
+        auto *btnCancel = new QPushButton("Hủy");
+        btnCancel->setFixedHeight(34);
+        btnCancel->setCursor(Qt::PointingHandCursor);
+        btnCancel->setStyleSheet(
+            "QPushButton { "
+            "    background: #f1f5f9; color: #475569; font-family: 'Segoe UI'; font-weight: 600; font-size: 12.5px; "
+            "    border: 1px solid #cbd5e1; border-radius: 8px; padding: 0 18px; outline: none; "
+            "} "
+            "QPushButton:hover { background: #e2e8f0; color: #0f172a; border: 1px solid #94a3b8; border-radius: 8px; }"
+        );
+
+        auto *btnOk = new QPushButton("Xác nhận");
+        btnOk->setFixedHeight(34);
+        btnOk->setCursor(Qt::PointingHandCursor);
+        btnOk->setStyleSheet(
+            "QPushButton { "
+            "    background: #0d9488; color: #ffffff; font-family: 'Segoe UI'; font-weight: 700; font-size: 12.5px; "
+            "    border: 1px solid #0d9488; border-radius: 8px; padding: 0 22px; outline: none; "
+            "} "
+            "QPushButton:hover { background: #0f766e; border: 1px solid #0f766e; border-radius: 8px; }"
+        );
+
+        footH->addStretch();
+        footH->addWidget(btnCancel);
+        footH->addWidget(btnOk);
+        root->addLayout(footH);
+
+        connect(btnCancel, &QPushButton::clicked, this, &QDialog::reject);
+        connect(btnOk, &QPushButton::clicked, this, &QDialog::accept);
+    }
+};
+
+inline void styleCard(QWidget *card) {
+    card->setStyleSheet(
+        "QFrame#panel { background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; } "
+        "QFrame#panel QLabel { background: transparent; border: none; }"
+    );
+}
+
+QFrame *makeKpiCard(const QString &accent, const QString &title, const QString &value, const QString &sub) {
+    auto *card = new QFrame;
+    card->setObjectName("kpiCard");
+    card->setFixedHeight(96);
+    card->setStyleSheet(QStringLiteral(
+        "QFrame#kpiCard { background: #ffffff; border: 1px solid #e2e8f0; "
+        "border-left: 4px solid %1; border-radius: 12px; }").arg(accent));
+
+    auto *lay = new QVBoxLayout(card);
+    lay->setContentsMargins(18, 12, 18, 12);
+    lay->setSpacing(2);
+
+    auto *t = new QLabel(title);
+    t->setStyleSheet("font-size: 11.5px; font-weight: 600; color: #64748b; background: transparent; border: none;");
+    auto *v = new QLabel(value);
+    v->setStyleSheet("font-size: 24px; font-weight: 800; color: #0f172a; background: transparent; border: none;");
+    auto *s = new QLabel(sub);
+    s->setStyleSheet("font-size: 11px; color: #94a3b8; background: transparent; border: none;");
+
+    lay->addWidget(t);
+    lay->addWidget(v);
+    lay->addWidget(s);
+    return card;
+}
+
+}
 
 StatisticView::StatisticView(MainWindow *mainWindow, QWidget *parent)
     : QWidget(parent), mainWindow(mainWindow) {
+
+    QDate today = QDate::currentDate();
+    int dow = today.dayOfWeek();
+    filterStartDate = today.addDays(-(dow - 1));
+    filterEndDate = filterStartDate.addDays(6);
+
     setupUI();
     refresh();
 }
 
-void StatisticView::setupUI() {
-    auto *rootLayout = new QVBoxLayout(this);
-    rootLayout->setContentsMargins(0, 0, 0, 0);
-
-    scrollArea = new QScrollArea(this);
-    scrollArea->setWidgetResizable(true);
-    scrollArea->setFrameShape(QFrame::NoFrame);
-    scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    scrollArea->setStyleSheet("QScrollArea { background-color: #f8fafc; border: none; } QScrollBar:vertical, QScrollBar:horizontal { width: 0px; height: 0px; background: transparent; border: none; }");
-
-    rootLayout->addWidget(scrollArea);
+void StatisticView::refresh() {
+    refreshTab1();
+    refreshTab2();
 }
 
-void StatisticView::refresh() {
-    if (!mainWindow || !scrollArea) return;
+void StatisticView::showEvent(QShowEvent *event) {
+    QWidget::showEvent(event);
+    if (event->spontaneous()) return;
+    refresh();
+}
 
-    // Xóa nội dung cũ một cách an toàn thông qua cấu trúc QObject
-    if (contentWidget) {
-        delete contentWidget;
-        contentWidget = nullptr;
-        contentLayout = nullptr;
+void StatisticView::setupUI() {
+    setAttribute(Qt::WA_StyledBackground, true);
+    setStyleSheet("StatisticView { background-color: #eaedf2; }");
+
+    auto *rootLayout = new QVBoxLayout(this);
+    rootLayout->setContentsMargins(0, 0, 0, 0);
+    rootLayout->setSpacing(0);
+
+    auto *topBar = new QFrame;
+    topBar->setObjectName("statTopBar");
+    topBar->setFixedHeight(52);
+    topBar->setStyleSheet("QFrame#statTopBar { background-color: #ffffff; border-bottom: 1px solid #e2e8f0; }");
+    auto *topBarLayout = new QHBoxLayout(topBar);
+    topBarLayout->setContentsMargins(24, 0, 24, 0);
+    topBarLayout->setSpacing(12);
+
+    auto *tabGroup = new QFrame;
+    tabGroup->setObjectName("mainTabPillGroup");
+    tabGroup->setFixedHeight(36);
+    tabGroup->setStyleSheet(
+        "QFrame#mainTabPillGroup { "
+        "    background-color: #f1f5f9; "
+        "    border: 1px solid #cbd5e1; "
+        "    border-radius: 9px; "
+        "}"
+    );
+    auto *tabLay = new QHBoxLayout(tabGroup);
+    tabLay->setContentsMargins(3, 3, 3, 3);
+    tabLay->setSpacing(3);
+
+    btnTab1 = new QPushButton("Tổng quan && Cơ cấu");
+    btnTab1->setFixedHeight(28);
+    btnTab1->setCursor(Qt::PointingHandCursor);
+
+    btnTab2 = new QPushButton("Doanh thu");
+    btnTab2->setFixedHeight(28);
+    btnTab2->setCursor(Qt::PointingHandCursor);
+
+    tabLay->addWidget(btnTab1);
+    tabLay->addWidget(btnTab2);
+
+    topBarLayout->addWidget(tabGroup, 0, Qt::AlignVCenter);
+    topBarLayout->addStretch();
+
+    auto *filterContainer = new QWidget;
+    filterContainer->setFixedHeight(34);
+    filterContainer->setStyleSheet("background: transparent; border: none;");
+    auto *filterLay = new QHBoxLayout(filterContainer);
+    filterLay->setContentsMargins(0, 0, 0, 0);
+    filterLay->setSpacing(8);
+
+    auto *pillGroup = new QFrame;
+    pillGroup->setObjectName("periodPillGroup");
+    pillGroup->setFixedHeight(32);
+    pillGroup->setStyleSheet(
+        "QFrame#periodPillGroup { "
+        "    background-color: #f1f5f9; "
+        "    border: 1px solid #cbd5e1; "
+        "    border-radius: 8px; "
+        "}"
+    );
+    auto *pillLay = new QHBoxLayout(pillGroup);
+    pillLay->setContentsMargins(2, 2, 2, 2);
+    pillLay->setSpacing(2);
+
+    const QString pillLabels[4] = {"Tuần", "Tháng", "Quý", "Năm"};
+    for (int i = 0; i < 4; ++i) {
+        btnPeriods[i] = new QPushButton(pillLabels[i]);
+        btnPeriods[i]->setFixedHeight(26);
+        btnPeriods[i]->setCursor(Qt::PointingHandCursor);
+        connect(btnPeriods[i], &QPushButton::clicked, this, [this, i]() {
+            openPeriodSelectionDialog(i);
+        });
+        pillLay->addWidget(btnPeriods[i]);
+    }
+    updatePeriodButtonStyles(currentPeriodIndex);
+
+    btnStartDate = new QPushButton(filterStartDate.toString("dd/MM/yyyy"));
+    btnStartDate->setFixedHeight(32);
+    btnStartDate->setFixedWidth(108);
+    btnStartDate->setCursor(Qt::PointingHandCursor);
+
+    auto *lblDash = new QLabel("–");
+    lblDash->setStyleSheet("font-size: 12px; font-weight: bold; color: #64748b; padding: 0 1px;");
+
+    btnEndDate = new QPushButton(filterEndDate.toString("dd/MM/yyyy"));
+    btnEndDate->setFixedHeight(32);
+    btnEndDate->setFixedWidth(108);
+    btnEndDate->setCursor(Qt::PointingHandCursor);
+
+    updateDateButtonStyles();
+
+    filterLay->addWidget(pillGroup);
+    filterLay->addWidget(btnStartDate);
+    filterLay->addWidget(lblDash);
+    filterLay->addWidget(btnEndDate);
+
+    topBarLayout->addWidget(filterContainer, 0, Qt::AlignVCenter);
+    rootLayout->addWidget(topBar);
+
+    tabStack = new QStackedWidget(this);
+    tabStack->setStyleSheet("QStackedWidget { background-color: #eaedf2; border: none; }");
+
+    pageTab1 = new QWidget;
+    pageTab1->setObjectName("pageTab1");
+    pageTab1->setAttribute(Qt::WA_StyledBackground, true);
+    pageTab1->setStyleSheet("QWidget#pageTab1 { background-color: #eaedf2; }");
+
+    pageTab2 = new QWidget;
+    pageTab2->setObjectName("pageTab2");
+    pageTab2->setAttribute(Qt::WA_StyledBackground, true);
+    pageTab2->setStyleSheet("QWidget#pageTab2 { background-color: #eaedf2; }");
+
+    tabStack->addWidget(pageTab1);
+    tabStack->addWidget(pageTab2);
+    rootLayout->addWidget(tabStack, 1);
+
+    connect(btnTab1, &QPushButton::clicked, this, [this]() {
+        tabStack->setCurrentIndex(0);
+        updateTabStyles(0);
+    });
+    connect(btnTab2, &QPushButton::clicked, this, [this]() {
+        tabStack->setCurrentIndex(1);
+        updateTabStyles(1);
+    });
+
+    connect(btnStartDate, &QPushButton::clicked, this, [this]() {
+        openDateDialog(true);
+    });
+    connect(btnEndDate, &QPushButton::clicked, this, [this]() {
+        openDateDialog(false);
+    });
+
+    updateTabStyles(0);
+}
+
+void StatisticView::updateTabStyles(int activeIndex) {
+    const QString activeStyle =
+        "QPushButton { "
+        "   background-color: #0d9488; color: #ffffff; font-weight: 700; font-size: 13px; "
+        "   border: 1px solid #0d9488; border-radius: 7px; padding: 0 16px; outline: none; "
+        "}";
+    const QString inactiveStyle =
+        "QPushButton { "
+        "   background-color: transparent; color: #64748b; font-weight: 600; font-size: 13px; "
+        "   border: 1px solid transparent; border-radius: 7px; padding: 0 16px; outline: none; "
+        "} "
+        "QPushButton:hover { background-color: #e2e8f0; color: #0f172a; border: 1px solid transparent; border-radius: 7px; }";
+
+    if (activeIndex == 0) {
+        btnTab1->setStyleSheet(activeStyle);
+        btnTab2->setStyleSheet(inactiveStyle);
+    } else {
+        btnTab1->setStyleSheet(inactiveStyle);
+        btnTab2->setStyleSheet(activeStyle);
+    }
+}
+
+void StatisticView::updatePeriodButtonStyles(int selectedIndex) {
+    const QString activePill =
+        "QPushButton { "
+        "   background-color: #0d9488; color: #ffffff; font-weight: 700; font-size: 12px; "
+        "   border: 1px solid #0d9488; border-radius: 6px; padding: 2px 10px; outline: none; "
+        "}";
+    const QString inactivePill =
+        "QPushButton { "
+        "   background-color: transparent; color: #475569; font-weight: 600; font-size: 12px; "
+        "   border: 1px solid transparent; border-radius: 6px; padding: 2px 10px; outline: none; "
+        "} "
+        "QPushButton:hover { background-color: #e2e8f0; color: #0f172a; border: 1px solid transparent; border-radius: 6px; }";
+
+    for (int i = 0; i < 4; ++i) {
+        if (btnPeriods[i]) {
+            btnPeriods[i]->setStyleSheet((i == selectedIndex && selectedIndex >= 0) ? activePill : inactivePill);
+        }
+    }
+}
+
+void StatisticView::updateDateButtonStyles() {
+    bool isCustom = (currentPeriodIndex == -1);
+    QString dateBtnStyle = QStringLiteral(
+        "QPushButton { "
+        "    background-color: %1; "
+        "    border: 1.5px solid %2; "
+        "    border-radius: 8px; "
+        "    padding: 0 6px; "
+        "    font-family: 'Segoe UI'; "
+        "    font-size: 12.5px; "
+        "    font-weight: 700; "
+        "    color: %3; "
+        "    outline: none; "
+        "} "
+        "QPushButton:hover { "
+        "    background-color: %4; "
+        "    border: 1.5px solid %5; "
+        "    border-radius: 8px; "
+        "    color: %5; "
+        "} "
+        "QPushButton:pressed { "
+        "    background-color: #ccfbf1; "
+        "    border: 1.5px solid #0f766e; "
+        "    border-radius: 8px; "
+        "    color: #0f766e; "
+        "}")
+        .arg(isCustom ? "#f0fdfa" : "#ffffff",
+             isCustom ? "#0d9488" : "#cbd5e1",
+             isCustom ? "#0d9488" : "#0f766e",
+             isCustom ? "#e6fffa" : "#f0fdfa",
+             isCustom ? "#0f766e" : "#0d9488");
+
+    if (btnStartDate) btnStartDate->setStyleSheet(dateBtnStyle);
+    if (btnEndDate) btnEndDate->setStyleSheet(dateBtnStyle);
+}
+
+void StatisticView::openPeriodSelectionDialog(int periodTypeIndex) {
+    PeriodSelectionDialog::PeriodType ptype = PeriodSelectionDialog::Week;
+    if (periodTypeIndex == 1) ptype = PeriodSelectionDialog::Month;
+    else if (periodTypeIndex == 2) ptype = PeriodSelectionDialog::Quarter;
+    else if (periodTypeIndex == 3) ptype = PeriodSelectionDialog::Year;
+
+    PeriodSelectionDialog dlg(ptype, filterStartDate, this);
+
+    if (window()) {
+        dlg.move(window()->geometry().center() - dlg.rect().center());
     }
 
-    contentWidget = new QWidget;
-    contentWidget->setStyleSheet("background-color: #f8fafc;");
-    contentLayout = new QVBoxLayout(contentWidget);
-    contentLayout->setContentsMargins(36, 28, 36, 32);
-    contentLayout->setSpacing(20);
-    scrollArea->setWidget(contentWidget);
+    if (dlg.exec() == QDialog::Accepted) {
+        filterStartDate = dlg.resultStart;
+        filterEndDate = dlg.resultEnd;
+        btnStartDate->setText(filterStartDate.toString("dd/MM/yyyy"));
+        btnEndDate->setText(filterEndDate.toString("dd/MM/yyyy"));
+        currentPeriodIndex = periodTypeIndex;
+        updatePeriodButtonStyles(currentPeriodIndex);
+        updateDateButtonStyles();
+        refresh();
+    }
+}
+
+void StatisticView::openDateDialog(bool isStartDate) {
+    QString title = isStartDate ? "Chọn ngày bắt đầu" : "Chọn ngày kết thúc";
+    QDate currentD = isStartDate ? filterStartDate : filterEndDate;
+
+    DateSelectionDialog dlg(title, currentD, this);
+    if (window()) {
+        dlg.move(window()->geometry().center() - dlg.rect().center());
+    }
+
+    if (dlg.exec() == QDialog::Accepted) {
+        if (isStartDate) {
+            filterStartDate = dlg.chosenDate;
+            btnStartDate->setText(filterStartDate.toString("dd/MM/yyyy"));
+        } else {
+            filterEndDate = dlg.chosenDate;
+            btnEndDate->setText(filterEndDate.toString("dd/MM/yyyy"));
+        }
+
+        if (filterStartDate.isValid() && filterEndDate.isValid()) {
+            if (filterStartDate > filterEndDate) {
+
+                std::swap(filterStartDate, filterEndDate);
+                btnStartDate->setText(filterStartDate.toString("dd/MM/yyyy"));
+                btnEndDate->setText(filterEndDate.toString("dd/MM/yyyy"));
+            }
+
+            currentPeriodIndex = -1;
+            updatePeriodButtonStyles(-1);
+            updateDateButtonStyles();
+            refresh();
+        }
+    }
+}
+
+void StatisticView::refreshTab1() {
+    if (!mainWindow || !pageTab1) return;
+
+    const QObjectList oldKids = pageTab1->children();
+    for (QObject *child : oldKids) {
+        delete child;
+    }
+
+    auto *rootLay = new QVBoxLayout(pageTab1);
+    rootLay->setContentsMargins(24, 18, 24, 20);
+    rootLay->setSpacing(16);
 
     auto *patients = mainWindow->getPatients();
     auto *doctors = mainWindow->getDoctors();
@@ -258,24 +1699,12 @@ void StatisticView::refresh() {
 
     QDate curDate = QDate::currentDate();
     QTime curTime = QTime::currentTime();
-    int curDay = curDate.day();
-    int curMonth = curDate.month();
-    int curYear = curDate.year();
-    int curHour = curTime.hour();
-    int curMin = curTime.minute();
-
-    // 1. Dữ liệu tính toán từ StatisticController
-    double totalRev = StatisticController::totalRevenue(appts, doctors);
-    double todayRev = StatisticController::todayRevenue(appts, doctors, curDay, curMonth, curYear);
-    int compDone = 0, compTotalUntilNow = 0;
-    double compRate = StatisticController::completionRate(appts, curDay, curMonth, curYear, curHour, curMin, compDone, compTotalUntilNow);
+    int curDay = curDate.day(), curMonth = curDate.month(), curYear = curDate.year();
+    int curHour = curTime.hour(), curMin = curTime.minute();
 
     int completed = 0, pending = 0, delayed = 0, rescheduled = 0;
     StatisticController::appointmentStatusCounts(appts, completed, pending, delayed, rescheduled, curDay, curMonth, curYear, curHour, curMin);
     int totalAppts = completed + pending + delayed + rescheduled;
-
-    int totalToday = 0, completedToday = 0, pendingToday = 0;
-    StatisticController::todayAppointmentCounts(appts, curDay, curMonth, curYear, totalToday, completedToday, pendingToday);
 
     int male = 0, female = 0;
     StatisticController::patientGenderCounts(patients, male, female);
@@ -284,98 +1713,40 @@ void StatisticView::refresh() {
     int under18 = 0, from18to45 = 0, from46to60 = 0, over60 = 0;
     StatisticController::patientAgeDistribution(patients, under18, from18to45, from46to60, over60);
 
-    // 2. Header Tiêu đề
-    auto *headerBox = new QVBoxLayout;
-    headerBox->setSpacing(4);
-    auto *title = new QLabel("Thống kê & Báo cáo");
-    title->setObjectName("pageTitle");
-    auto *subtitle = new QLabel("Phân tích tổng hợp hiệu suất khám bệnh, doanh thu và đặc điểm nhân khẩu học bệnh nhân.");
-    subtitle->setObjectName("pageSubtitle");
-    headerBox->addWidget(title);
-    headerBox->addWidget(subtitle);
-    contentLayout->addLayout(headerBox);
-
-    // 3. Hàng 4 Thẻ chỉ số nổi bật (Top KPI Cards)
-    auto *kpiGrid = new QGridLayout;
-    kpiGrid->setSpacing(16);
-
-    auto makeKpiCard = [](const QString &valText, const QString &label, const QString &subText, const QString &color) {
-        auto *card = new QFrame;
-        card->setStyleSheet(QStringLiteral(
-            "QFrame { "
-            "    background: #ffffff; "
-            "    border: 1px solid #e2e8f0; "
-            "    border-left: 5px solid %1; "
-            "    border-radius: 12px; "
-            "}").arg(color));
-        auto *v = new QVBoxLayout(card);
-        v->setContentsMargins(20, 16, 20, 16);
-        v->setSpacing(5);
-
-        auto *valLbl = new QLabel(valText);
-        valLbl->setStyleSheet(QStringLiteral("font-size: 26px; font-weight: 800; color: %1;").arg(color));
-
-        auto *nameLbl = new QLabel(label);
-        nameLbl->setStyleSheet("font-size: 11px; font-weight: 700; color: #475569; letter-spacing: 0.5px;");
-
-        auto *subLbl = new QLabel(subText);
-        subLbl->setStyleSheet("font-size: 12px; color: #64748b; font-weight: 500;");
-
-        v->addWidget(valLbl);
-        v->addWidget(nameLbl);
-        v->addWidget(subLbl);
-        return card;
-    };
-
-    QString revStr = QLocale(QLocale::Vietnamese).toString(totalRev, 'f', 0) + " đ";
-    QString todayRevStr = QStringLiteral("Hôm nay: %1 đ").arg(QLocale(QLocale::Vietnamese).toString(todayRev, 'f', 0));
-    kpiGrid->addWidget(makeKpiCard(revStr, "DOANH THU THỰC TẾ", todayRevStr, "#0d9488"), 0, 0);
-
-    QString compStr = QString::number(compRate, 'f', 1) + "%";
-    QString compSub = QStringLiteral("%1 / %2 ca đến nay đã hoàn thành").arg(compDone).arg(compTotalUntilNow);
-    kpiGrid->addWidget(makeKpiCard(compStr, "TỈ LỆ HOÀN THÀNH", compSub, "#0284c7"), 0, 1);
-
-    QString todayStr = QStringLiteral("%1 ca").arg(totalToday);
-    QString todaySub = QStringLiteral("%1 chờ khám · %2 đã xong").arg(pendingToday).arg(completedToday);
-    kpiGrid->addWidget(makeKpiCard(todayStr, "LỊCH KHÁM HÔM NAY", todaySub, "#6366f1"), 0, 2);
-
-    QString pendStr = QStringLiteral("%1 ca").arg(pending);
-    kpiGrid->addWidget(makeKpiCard(pendStr, "ĐANG CHỜ TIẾP NHẬN", "Lịch hẹn sắp tới chưa khám", "#ea580c"), 0, 3);
-
-    contentLayout->addLayout(kpiGrid);
-
-    // 4. Hàng 2 Card: Trạng thái lịch khám & Nhân khẩu học bệnh nhân
     auto *row1 = new QHBoxLayout;
     row1->setSpacing(16);
 
-    // Card 1: Trạng thái lịch khám
     auto *statusCard = UIHelper::panel();
-    statusCard->setStyleSheet("QFrame#panel { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; }");
-    auto *statusLayout = new QVBoxLayout(statusCard);
-    statusLayout->setContentsMargins(22, 18, 22, 20);
-    statusLayout->setSpacing(14);
+    statusCard->setFixedHeight(215);
+    styleCard(statusCard);
+    auto *statusLay = new QVBoxLayout(statusCard);
+    statusLay->setContentsMargins(22, 18, 22, 18);
+    statusLay->setSpacing(12);
 
     auto *statusTitle = new QLabel("Phân bổ trạng thái lịch khám");
-    statusTitle->setStyleSheet("font-size: 14.5px; font-weight: 700; color: #1e293b;");
-    statusLayout->addWidget(statusTitle);
+    statusTitle->setStyleSheet("font-size: 14.5px; font-weight: 700; color: #0f172a; background: transparent; border: none;");
+    statusLay->addWidget(statusTitle);
 
-    auto *statusBar = new SegmentedStatusBar;
+    statusLay->addStretch(1);
+    auto *statusBar = new LinearStatusBar;
     statusBar->setCounts(completed, pending, delayed, rescheduled);
-    statusLayout->addWidget(statusBar);
+    statusLay->addWidget(statusBar);
+    statusLay->addSpacing(14);
 
     auto *chipsGrid = new QGridLayout;
-    chipsGrid->setSpacing(10);
+    chipsGrid->setHorizontalSpacing(20);
+    chipsGrid->setVerticalSpacing(10);
+    chipsGrid->setContentsMargins(4, 4, 4, 4);
 
     auto makeStatusChip = [](const QString &dotColor, const QString &name, int count, int total) {
-        auto *f = new QFrame;
-        f->setStyleSheet("QFrame { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 10px; }");
-        auto *h = new QHBoxLayout(f);
-        h->setContentsMargins(6, 4, 6, 4);
+        auto *w = new QWidget;
+        w->setStyleSheet("background: transparent; border: none;");
+        auto *h = new QHBoxLayout(w);
+        h->setContentsMargins(2, 2, 2, 2);
         h->setSpacing(8);
 
         auto *dot = new QLabel("●");
-        dot->setStyleSheet(QStringLiteral("color: %1; font-size: 14px;").arg(dotColor));
-
+        dot->setStyleSheet(QStringLiteral("color: %1; font-size: 13px;").arg(dotColor));
         auto *title = new QLabel(name);
         title->setStyleSheet("font-size: 12px; font-weight: 600; color: #334155;");
 
@@ -387,32 +1758,31 @@ void StatisticView::refresh() {
         h->addWidget(title);
         h->addStretch();
         h->addWidget(val);
-        return f;
+        return w;
     };
 
     chipsGrid->addWidget(makeStatusChip("#0d9488", "Đã khám", completed, totalAppts), 0, 0);
     chipsGrid->addWidget(makeStatusChip("#ea580c", "Chưa khám", pending, totalAppts), 0, 1);
     chipsGrid->addWidget(makeStatusChip("#f59e0b", "Trễ hẹn", delayed, totalAppts), 1, 0);
     chipsGrid->addWidget(makeStatusChip("#64748b", "Đã dời lịch", rescheduled, totalAppts), 1, 1);
-    statusLayout->addLayout(chipsGrid);
-
+    statusLay->addLayout(chipsGrid);
+    statusLay->addStretch(1);
     row1->addWidget(statusCard, 1);
 
-    // Card 2: Nhân khẩu học bệnh nhân (Giới tính & Độ tuổi với Donut chart)
     auto *demoCard = UIHelper::panel();
-    demoCard->setStyleSheet("QFrame#panel { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; }");
-    auto *demoLayout = new QVBoxLayout(demoCard);
-    demoLayout->setContentsMargins(22, 18, 22, 20);
-    demoLayout->setSpacing(10);
+    demoCard->setFixedHeight(215);
+    styleCard(demoCard);
+    auto *demoLay = new QVBoxLayout(demoCard);
+    demoLay->setContentsMargins(22, 18, 22, 18);
+    demoLay->setSpacing(8);
 
     auto *demoTitle = new QLabel("Đặc điểm bệnh nhân");
-    demoTitle->setStyleSheet("font-size: 14.5px; font-weight: 700; color: #1e293b;");
-    demoLayout->addWidget(demoTitle);
+    demoTitle->setStyleSheet("font-size: 14.5px; font-weight: 700; color: #0f172a; background: transparent; border: none;");
+    demoLay->addWidget(demoTitle);
+    demoLay->addSpacing(4);
 
-    // Giới tính
     double malePct = (totalPatients > 0) ? (male * 100.0 / totalPatients) : 0.0;
     double femalePct = (totalPatients > 0) ? (female * 100.0 / totalPatients) : 0.0;
-
     auto *genderH = new QHBoxLayout;
     auto *maleLbl = new QLabel(QStringLiteral("Nam: <b>%1%</b> (%2)").arg(QString::number(malePct, 'f', 0)).arg(male));
     maleLbl->setStyleSheet("font-size: 11.5px; color: #0284c7; font-weight: 600;");
@@ -421,7 +1791,7 @@ void StatisticView::refresh() {
     genderH->addWidget(maleLbl);
     genderH->addStretch();
     genderH->addWidget(femaleLbl);
-    demoLayout->addLayout(genderH);
+    demoLay->addLayout(genderH);
 
     auto *genderBar = new QProgressBar;
     genderBar->setFixedHeight(6);
@@ -429,185 +1799,458 @@ void StatisticView::refresh() {
     genderBar->setRange(0, totalPatients > 0 ? totalPatients : 1);
     genderBar->setValue(male);
     genderBar->setStyleSheet("QProgressBar { background: #fce7f3; border-radius: 3px; border: none; } QProgressBar::chunk { background: #0284c7; border-radius: 3px; }");
-    demoLayout->addWidget(genderBar);
+    demoLay->addWidget(genderBar);
 
-    demoLayout->addSpacing(4);
+    demoLay->addSpacing(6);
 
-    // Nhóm tuổi với sơ đồ hình tròn Donut
-    auto *ageSection = new QHBoxLayout;
-    ageSection->setSpacing(14);
+    auto *ageH = new QHBoxLayout;
+    ageH->setSpacing(28);
 
-    auto *donutChart = new PatientDonutChart;
-    donutChart->setData(under18, from18to45, from46to60, over60);
-    ageSection->addWidget(donutChart, 0, Qt::AlignCenter);
+    auto *donut = new PatientDonutChart;
+    donut->setData(under18, from18to45, from46to60, over60);
 
-    auto *ageList = new QVBoxLayout;
-    ageList->setSpacing(5);
+    auto *ageGrid = new QGridLayout;
+    ageGrid->setHorizontalSpacing(6);
+    ageGrid->setVerticalSpacing(5);
+    ageGrid->setContentsMargins(0, 0, 0, 0);
 
-    auto makeAgeLegendRow = [](const QString &dotColor, const QString &label, int count, int total) {
-        auto *h = new QHBoxLayout;
-        h->setContentsMargins(0, 0, 0, 0);
-        h->setSpacing(6);
-
-        auto *dot = new QLabel("●");
-        dot->setStyleSheet(QStringLiteral("color: %1; font-size: 11px;").arg(dotColor));
-
-        auto *name = new QLabel(label);
-        name->setStyleSheet("font-size: 11.5px; color: #475569; font-weight: 600;");
-
-        double pct = (total > 0) ? (count * 100.0 / total) : 0.0;
-        auto *val = new QLabel(QStringLiteral("<b>%1</b> (%2%)").arg(count).arg(QString::number(pct, 'f', 0)));
-        val->setStyleSheet("font-size: 11.5px; color: #0f172a;");
-
-        h->addWidget(dot);
-        h->addWidget(name);
-        h->addStretch();
-        h->addWidget(val);
-        return h;
+    struct AgeRowItem {
+        QString dotColor;
+        QString label;
+        int count;
+    };
+    AgeRowItem ageItems[4] = {
+        {"#38bdf8", "Dưới 18 tuổi", under18},
+        {"#0d9488", "18 – 45 tuổi", from18to45},
+        {"#f59e0b", "46 – 60 tuổi", from46to60},
+        {"#8b5cf6", "Trên 60 tuổi", over60}
     };
 
-    ageList->addLayout(makeAgeLegendRow("#38bdf8", "Dưới 18 tuổi", under18, totalPatients));
-    ageList->addLayout(makeAgeLegendRow("#0d9488", "18 – 45 tuổi", from18to45, totalPatients));
-    ageList->addLayout(makeAgeLegendRow("#f59e0b", "46 – 60 tuổi", from46to60, totalPatients));
-    ageList->addLayout(makeAgeLegendRow("#8b5cf6", "Trên 60 tuổi", over60, totalPatients));
+    for (int r = 0; r < 4; ++r) {
+        auto *dot = new QLabel("●");
+        dot->setStyleSheet(QStringLiteral("color: %1; font-size: 11px;").arg(ageItems[r].dotColor));
+        dot->setFixedWidth(12);
 
-    ageSection->addLayout(ageList, 1);
-    demoLayout->addLayout(ageSection);
+        auto *name = new QLabel(ageItems[r].label);
+        name->setStyleSheet("font-size: 11.5px; color: #475569; font-weight: 600;");
+        name->setFixedWidth(86);
+
+        auto *countVal = new QLabel(QStringLiteral("<b>%1</b>").arg(ageItems[r].count));
+        countVal->setStyleSheet("font-size: 11.5px; color: #0f172a;");
+        countVal->setFixedWidth(24);
+        countVal->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+
+        double pct = (totalPatients > 0) ? (ageItems[r].count * 100.0 / totalPatients) : 0.0;
+        auto *pctVal = new QLabel(QStringLiteral("(%1%)").arg(QString::number(pct, 'f', 0)));
+        pctVal->setStyleSheet("font-size: 11.5px; color: #64748b; font-weight: 500;");
+        pctVal->setFixedWidth(46);
+        pctVal->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+
+        ageGrid->addWidget(dot, r, 0);
+        ageGrid->addWidget(name, r, 1);
+        ageGrid->addWidget(countVal, r, 2);
+        ageGrid->addWidget(pctVal, r, 3);
+    }
+
+    ageH->addStretch(1);
+    ageH->addWidget(donut, 0, Qt::AlignVCenter);
+    ageH->addLayout(ageGrid);
+    ageH->addStretch(1);
+
+    demoLay->addLayout(ageH);
+    demoLay->addStretch();
 
     row1->addWidget(demoCard, 1);
-    contentLayout->addLayout(row1);
+    rootLay->addLayout(row1, 0);
 
-    // 5. Hàng 2 Card: Nhu cầu theo Chuyên khoa & Bảng xếp hạng Bác sĩ
     auto *row2 = new QHBoxLayout;
     row2->setSpacing(16);
 
-    // Card Nhu cầu Chuyên khoa (bỏ % theo yêu cầu)
     auto *specCard = UIHelper::panel();
-    specCard->setStyleSheet("QFrame#panel { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; }");
-    auto *specLayout = new QVBoxLayout(specCard);
-    specLayout->setContentsMargins(22, 18, 22, 20);
-    specLayout->setSpacing(12);
+    styleCard(specCard);
+    auto *specLay = new QVBoxLayout(specCard);
+    specLay->setContentsMargins(22, 18, 22, 18);
+    specLay->setSpacing(12);
 
     auto *specTitle = new QLabel("Nhu cầu khám theo chuyên khoa");
-    specTitle->setStyleSheet("font-size: 14.5px; font-weight: 700; color: #1e293b;");
-    specLayout->addWidget(specTitle);
+    specTitle->setStyleSheet("font-size: 14.5px; font-weight: 700; color: #0f172a; background: transparent; border: none;");
+    specLay->addWidget(specTitle);
 
-    SpecialtyDemandItem topSpecs[5];
-    int specCount = StatisticController::getSpecialtyDemand(appts, doctors, topSpecs, 5);
+    auto *specScroll = new QScrollArea(specCard);
+    specScroll->setWidgetResizable(true);
+    specScroll->setFrameShape(QFrame::NoFrame);
+    specScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    specScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    specScroll->setStyleSheet("QScrollArea { background: transparent; border: none; } QScrollBar:vertical, QScrollBar:horizontal { width: 0px; height: 0px; }");
 
-    if (specCount > 0) {
+    auto *specContainer = new QWidget;
+    specContainer->setStyleSheet("background: transparent;");
+    auto *specListLay = new QVBoxLayout(specContainer);
+    specListLay->setContentsMargins(0, 4, 8, 4);
+    specListLay->setSpacing(10);
+
+    SpecialtyDemandItem allSpecs[50];
+    int specCount = StatisticController::getSpecialtyDemand(appts, doctors, allSpecs, 50);
+
+    int maxDemand = 1;
+    int activeSpecCount = 0;
+    for (int i = 0; i < specCount; ++i) {
+        if (allSpecs[i].count > 0) {
+            activeSpecCount++;
+            if (allSpecs[i].count > maxDemand) maxDemand = allSpecs[i].count;
+        }
+    }
+
+    if (activeSpecCount > 0) {
+        int rank = 1;
         for (int i = 0; i < specCount; ++i) {
-            QString spName = mainWindow->specialty(topSpecs[i].spId);
-            auto *v = new QVBoxLayout;
-            v->setSpacing(3);
+            if (allSpecs[i].count <= 0) continue;
+
+            auto *itemBox = new QVBoxLayout;
+            itemBox->setSpacing(3);
 
             auto *h = new QHBoxLayout;
-            auto *name = new QLabel(QStringLiteral("<b>%1. %2</b>").arg(i + 1).arg(spName));
-            name->setStyleSheet("font-size: 12.5px; color: #1e293b;");
+            QString spName = mainWindow->specialty(allSpecs[i].spId);
+            auto *nameLbl = new QLabel(QStringLiteral("<b>%1. %2</b>").arg(rank++).arg(spName));
+            nameLbl->setStyleSheet("font-size: 12.5px; font-weight: 700; color: #1e293b;");
 
-            auto *val = new QLabel(QStringLiteral("<b>%1</b> lượt khám").arg(topSpecs[i].count));
-            val->setStyleSheet("font-size: 12px; color: #0d9488; font-weight: 600;");
-            h->addWidget(name);
+            auto *valLbl = new QLabel(QStringLiteral("<b>%1</b> lượt khám").arg(allSpecs[i].count));
+            valLbl->setStyleSheet("font-size: 12px; font-weight: 700; color: #0284c7;");
+
+            h->addWidget(nameLbl);
             h->addStretch();
-            h->addWidget(val);
-            v->addLayout(h);
+            h->addWidget(valLbl);
+            itemBox->addLayout(h);
 
             auto *bar = new QProgressBar;
-            bar->setFixedHeight(7);
+            bar->setFixedHeight(6);
             bar->setTextVisible(false);
-            bar->setRange(0, totalAppts > 0 ? totalAppts : 1);
-            bar->setValue(topSpecs[i].count);
-            bar->setStyleSheet("QProgressBar { background: #f1f5f9; border-radius: 3.5px; border: none; } QProgressBar::chunk { background: #0284c7; border-radius: 3.5px; }");
-            v->addWidget(bar);
+            bar->setRange(0, maxDemand);
+            bar->setValue(allSpecs[i].count);
+            bar->setStyleSheet("QProgressBar { background: #f1f5f9; border-radius: 3px; border: none; } QProgressBar::chunk { background: #0284c7; border-radius: 3px; }");
+            itemBox->addWidget(bar);
 
-            specLayout->addLayout(v);
+            specListLay->addLayout(itemBox);
         }
+        specListLay->addStretch();
     } else {
-        auto *emptyLbl = new QLabel("Chưa có số liệu chuyên khoa.");
+        auto *emptyLbl = new QLabel("Chưa có lượt khám nào.");
         emptyLbl->setStyleSheet("color: #94a3b8; font-style: italic;");
-        specLayout->addWidget(emptyLbl);
+        specListLay->addWidget(emptyLbl);
     }
-    specLayout->addStretch();
+
+    specScroll->setWidget(specContainer);
+    specLay->addWidget(specScroll, 1);
     row2->addWidget(specCard, 1);
 
-    // Card Top Bác sĩ
     auto *docCard = UIHelper::panel();
-    docCard->setStyleSheet("QFrame#panel { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; }");
-    auto *docLayout = new QVBoxLayout(docCard);
-    docLayout->setContentsMargins(22, 18, 22, 20);
-    docLayout->setSpacing(10);
+    styleCard(docCard);
+    auto *docLay = new QVBoxLayout(docCard);
+    docLay->setContentsMargins(22, 18, 22, 18);
+    docLay->setSpacing(8);
 
-    auto *docTitle = new QLabel("Bác sĩ tiếp nhận nhiều bệnh nhân nhất");
-    docTitle->setStyleSheet("font-size: 14.5px; font-weight: 700; color: #1e293b;");
-    docLayout->addWidget(docTitle);
+    auto *docTitle = new QLabel("Top bác sĩ nhận nhiều ca khám nhất");
+    docTitle->setStyleSheet("font-size: 14.5px; font-weight: 700; color: #0f172a; background: transparent; border: none;");
+    docLay->addWidget(docTitle);
+    docLay->addSpacing(4);
 
-    DoctorLeaderboardItem topDocs[5];
-    int docRankCount = StatisticController::getTopDoctors(appts, doctors, topDocs, 5);
+    auto *docScroll = new QScrollArea(docCard);
+    docScroll->setWidgetResizable(true);
+    docScroll->setFrameShape(QFrame::NoFrame);
+    docScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    docScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    docScroll->setStyleSheet("QScrollArea { background: transparent; border: none; } QScrollBar:vertical, QScrollBar:horizontal { width: 0px; height: 0px; }");
+    docScroll->viewport()->setStyleSheet("background: transparent; border: none;");
 
-    const QString badges[5] = {"🥇", "🥈", "🥉", "4", "5"};
+    connect(docScroll->verticalScrollBar(), &QScrollBar::valueChanged, docScroll->viewport(), [docScroll]() {
+        docScroll->viewport()->update();
+    });
+
+    auto *docContainer = new QWidget;
+    docContainer->setStyleSheet("background: transparent; border: none;");
+    auto *docListLay = new QVBoxLayout(docContainer);
+    docListLay->setContentsMargins(4, 4, 8, 4);
+    docListLay->setSpacing(8);
+
+    DoctorLeaderboardItem topDocs[10];
+    int docRankCount = StatisticController::getTopDoctors(
+        appts, doctors, topDocs, 10,
+        filterStartDate.day(), filterStartDate.month(), filterStartDate.year(),
+        filterEndDate.day(), filterEndDate.month(), filterEndDate.year()
+    );
+    const QString medals[3] = {"🥇", "🥈", "🥉"};
 
     for (int i = 0; i < docRankCount; ++i) {
         auto *itemFrame = new QFrame;
-        itemFrame->setStyleSheet("QFrame { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 4px 8px; }");
-        auto *h = new QHBoxLayout(itemFrame);
-        h->setContentsMargins(8, 6, 8, 6);
-        h->setSpacing(10);
+        itemFrame->setAttribute(Qt::WA_StyledBackground, true);
+        itemFrame->setObjectName(QStringLiteral("topDocCard%1").arg(i));
+        itemFrame->setFixedHeight(46);
 
-        auto *badge = new QLabel(badges[i]);
-        badge->setStyleSheet(i < 3 ? "font-size: 16px;" : "font-size: 12px; font-weight: bold; color: #64748b; padding: 0 4px;");
+        QString frameStyle;
+        if (i == 0) {
+
+            frameStyle =
+                "QFrame#topDocCard0 { "
+                "   background-color: #fffbeb; "
+                "   border: 1px solid #facc15; "
+                "   border-radius: 8px; "
+                "} "
+                "QFrame#topDocCard0:hover { "
+                "   background-color: #fef3c7; "
+                "   border: 1px solid #eab308; "
+                "   border-radius: 8px; "
+                "}";
+        } else if (i == 1) {
+
+            frameStyle =
+                "QFrame#topDocCard1 { "
+                "   background-color: #f8fafc; "
+                "   border: 1px solid #cbd5e1; "
+                "   border-radius: 8px; "
+                "} "
+                "QFrame#topDocCard1:hover { "
+                "   background-color: #f1f5f9; "
+                "   border: 1px solid #94a3b8; "
+                "   border-radius: 8px; "
+                "}";
+        } else if (i == 2) {
+
+            frameStyle =
+                "QFrame#topDocCard2 { "
+                "   background-color: #fff7ed; "
+                "   border: 1px solid #fed7aa; "
+                "   border-radius: 8px; "
+                "} "
+                "QFrame#topDocCard2:hover { "
+                "   background-color: #ffedd5; "
+                "   border: 1px solid #fb923c; "
+                "   border-radius: 8px; "
+                "}";
+        } else {
+
+            frameStyle = QStringLiteral(
+                "QFrame#topDocCard%1 { "
+                "   background-color: #f8fafc; "
+                "   border: 1px solid #e2e8f0; "
+                "   border-radius: 8px; "
+                "} "
+                "QFrame#topDocCard%1:hover { "
+                "   background-color: #f1f5f9; "
+                "   border: 1px solid #cbd5e1; "
+                "   border-radius: 8px; "
+                "}").arg(i);
+        }
+        itemFrame->setStyleSheet(frameStyle);
+
+        auto *h = new QHBoxLayout(itemFrame);
+        h->setContentsMargins(12, 4, 12, 4);
+        h->setSpacing(12);
+
+        QLabel *badge = nullptr;
+        if (i < 3) {
+            badge = new QLabel(medals[i]);
+            badge->setFixedWidth(28);
+            badge->setAlignment(Qt::AlignCenter);
+            badge->setStyleSheet("font-size: 17px; background: transparent; border: none;");
+        } else {
+            badge = new QLabel(QString::number(i + 1));
+            badge->setFixedSize(22, 22);
+            badge->setAlignment(Qt::AlignCenter);
+            badge->setStyleSheet("background-color: #e2e8f0; color: #475569; font-size: 11px; font-weight: 800; border-radius: 11px; border: none;");
+        }
 
         auto *infoCol = new QVBoxLayout;
-        infoCol->setSpacing(2);
+        infoCol->setSpacing(1);
         auto *dName = new QLabel(QStringLiteral("BS. %1").arg(UIHelper::qs(topDocs[i].doctorName)));
-        dName->setStyleSheet("font-size: 12.5px; font-weight: 700; color: #0f172a;");
+        dName->setStyleSheet("font-size: 12px; font-weight: 700; color: #0f172a; background: transparent; border: none;");
         QString specStr = mainWindow->specialty(topDocs[i].specialtyId);
         QString roomStr = UIHelper::formatRoom(UIHelper::qs(topDocs[i].roomId));
         auto *dSub = new QLabel(QStringLiteral("%1 · %2").arg(specStr, roomStr));
-        dSub->setStyleSheet("font-size: 11px; color: #64748b;");
+        dSub->setStyleSheet("font-size: 10.5px; color: #64748b; background: transparent; border: none;");
         infoCol->addWidget(dName);
         infoCol->addWidget(dSub);
 
         auto *ratingLbl = new QLabel(QStringLiteral("⭐ %1").arg(QString::number(topDocs[i].rating, 'f', 1)));
-        ratingLbl->setStyleSheet("font-size: 12px; font-weight: bold; color: #d97706;");
+        ratingLbl->setFixedWidth(56);
+        ratingLbl->setAlignment(Qt::AlignCenter);
+        ratingLbl->setStyleSheet("font-size: 11px; font-weight: 700; color: #b45309; background-color: #fef3c7; border: 1px solid #fde68a; border-radius: 5px; padding: 2px 4px;");
 
         auto *countLbl = new QLabel(QStringLiteral("<b>%1</b> ca").arg(topDocs[i].appointmentCount));
-        countLbl->setStyleSheet("font-size: 12.5px; font-weight: 700; color: #0d9488;");
+        countLbl->setFixedWidth(52);
+        countLbl->setAlignment(Qt::AlignCenter);
+        countLbl->setStyleSheet("font-size: 11.5px; font-weight: 700; color: #0f766e; background-color: #ccfbf1; border: 1px solid #99f6e4; border-radius: 5px; padding: 2px 4px;");
 
-        h->addWidget(badge);
+        h->addWidget(badge, 0, Qt::AlignVCenter);
         h->addLayout(infoCol, 1);
-        h->addWidget(ratingLbl);
-        h->addWidget(countLbl);
+        h->addWidget(ratingLbl, 0, Qt::AlignVCenter);
+        h->addWidget(countLbl, 0, Qt::AlignVCenter);
 
-        docLayout->addWidget(itemFrame);
+        docListLay->addWidget(itemFrame);
     }
-    docLayout->addStretch();
+    if (docRankCount == 0) {
+        auto *emptyLbl = new QLabel("Chưa có bác sĩ nào có ca khám trong khoảng thời gian này.");
+        emptyLbl->setStyleSheet("color: #94a3b8; font-style: italic; font-size: 13px; padding: 28px 0;");
+        emptyLbl->setAlignment(Qt::AlignCenter);
+        docListLay->addWidget(emptyLbl);
+    }
+    docListLay->addStretch();
+    docScroll->setWidget(docContainer);
+    docLay->addWidget(docScroll, 1);
     row2->addWidget(docCard, 1);
 
-    contentLayout->addLayout(row2);
+    rootLay->addLayout(row2, 1);
+}
 
-    // 6. Xu hướng lịch khám 7 ngày gần nhất (Weekly Trend)
-    auto *trendCard = UIHelper::panel();
-    trendCard->setStyleSheet("QFrame#panel { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; }");
-    auto *trendLayout = new QVBoxLayout(trendCard);
-    trendLayout->setContentsMargins(22, 18, 22, 20);
-    trendLayout->setSpacing(12);
+void StatisticView::refreshTab2() {
+    if (!mainWindow || !pageTab2) return;
 
-    auto *trendTitle = new QLabel("Lưu lượng lịch khám 7 ngày gần nhất");
-    trendTitle->setStyleSheet("font-size: 14.5px; font-weight: 700; color: #1e293b;");
-    trendLayout->addWidget(trendTitle);
-
-    int weekCounts[7] = {0};
-    StatisticController::getWeeklyTrend(appts, curDay, curMonth, curYear, weekCounts);
-
-    QString weekDates[7];
-    for (int i = 0; i < 7; ++i) {
-        QDate d = curDate.addDays(i - 6);
-        weekDates[i] = (i == 6) ? "Hôm nay" : d.toString("dd/MM");
+    const QObjectList oldKids = pageTab2->children();
+    for (QObject *child : oldKids) {
+        delete child;
     }
 
-    auto *trendChart = new WeeklyTrendChart;
-    trendChart->setData(weekCounts, weekDates);
-    trendLayout->addWidget(trendChart);
+    auto *rootLay = new QVBoxLayout(pageTab2);
+    rootLay->setContentsMargins(0, 0, 0, 0);
 
-    contentLayout->addWidget(trendCard);
+    auto *scrollArea = new QScrollArea(pageTab2);
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setFrameShape(QFrame::NoFrame);
+    scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scrollArea->setStyleSheet("QScrollArea { background-color: #eaedf2; border: none; } QScrollBar:vertical, QScrollBar:horizontal { width: 0px; height: 0px; }");
+
+    auto *contentWidget = new QWidget;
+    contentWidget->setStyleSheet("background-color: #eaedf2;");
+    auto *contentLayout = new QVBoxLayout(contentWidget);
+    contentLayout->setContentsMargins(24, 18, 24, 24);
+    contentLayout->setSpacing(16);
+
+    auto *doctors = mainWindow->getDoctors();
+    auto *appts = mainWindow->getAppointments();
+
+    QDate curDate = QDate::currentDate();
+    QTime curTime = QTime::currentTime();
+    int curDay = curDate.day(), curMonth = curDate.month(), curYear = curDate.year();
+    int curHour = curTime.hour(), curMin = curTime.minute();
+
+    int daysDiff = filterStartDate.daysTo(filterEndDate);
+    bool useMonthly = (daysDiff > 366);
+    int maxPoints = useMonthly
+        ? qMax(24, (filterEndDate.year() - filterStartDate.year()) * 12 + (filterEndDate.month() - filterStartDate.month()) + 2)
+        : qMax(64, daysDiff + 5);
+
+    auto items = std::make_unique<TimeSeriesItem[]>(maxPoints);
+    int itemCount = 0;
+    if (useMonthly) {
+        itemCount = StatisticController::getTimeSeriesMonthlyRange(
+            appts, doctors,
+            filterStartDate.month(), filterStartDate.year(),
+            filterEndDate.month(), filterEndDate.year(),
+            curDay, curMonth, curYear, curHour, curMin,
+            items.get(), maxPoints
+        );
+    } else {
+        itemCount = StatisticController::getTimeSeriesDaily(
+            appts, doctors,
+            filterStartDate.day(), filterStartDate.month(), filterStartDate.year(),
+            filterEndDate.day(), filterEndDate.month(), filterEndDate.year(),
+            curDay, curMonth, curYear, curHour, curMin,
+            items.get(), maxPoints
+        );
+    }
+
+    QVector<CoordPoint> revPoints;
+    QVector<StatusPoint> statusPoints;
+    double totalFilterRev = 0.0;
+    int totalFilterComp = 0, totalFilterDelay = 0, totalFilterResched = 0;
+
+    for (int i = 0; i < itemCount; ++i) {
+        CoordPoint cp;
+        cp.label = QString::fromStdString(items[i].label);
+        cp.value = items[i].revenue;
+        revPoints.append(cp);
+        totalFilterRev += items[i].revenue;
+
+        StatusPoint sp;
+        sp.label = QString::fromStdString(items[i].label);
+        sp.completed = items[i].completedCount;
+        sp.delayed = items[i].delayedCount;
+        sp.rescheduled = items[i].rescheduledCount;
+        statusPoints.append(sp);
+
+        totalFilterComp += items[i].completedCount;
+        totalFilterDelay += items[i].delayedCount;
+        totalFilterResched += items[i].rescheduledCount;
+    }
+
+    {
+        double peakRev = 0.0;
+        QString peakLabel = "—";
+        for (const auto &p : revPoints) {
+            if (p.value > peakRev) { peakRev = p.value; peakLabel = p.label; }
+        }
+        const double avgRev = (itemCount > 0) ? totalFilterRev / itemCount : 0.0;
+        const QLocale vi(QLocale::Vietnamese);
+        auto money = [&vi](double v) { return vi.toString(v, 'f', 0) + QStringLiteral(" đ"); };
+
+        auto *kpiRow = new QHBoxLayout;
+        kpiRow->setSpacing(16);
+        kpiRow->addWidget(makeKpiCard("#0d9488", "Tổng doanh thu", money(totalFilterRev),
+                                      QStringLiteral("%1 – %2").arg(filterStartDate.toString("dd/MM/yyyy"),
+                                                                    filterEndDate.toString("dd/MM/yyyy"))), 1);
+        kpiRow->addWidget(makeKpiCard("#0284c7", useMonthly ? "Trung bình mỗi tháng" : "Trung bình mỗi ngày",
+                                      money(avgRev), QStringLiteral("%1 %2").arg(itemCount).arg(useMonthly ? "tháng" : "mốc thời gian")), 1);
+        kpiRow->addWidget(makeKpiCard("#f59e0b", "Cao nhất", money(peakRev),
+                                      peakRev > 0 ? QStringLiteral( "%1 %2").arg(useMonthly ? "Tại tháng" : "Tại ngày", peakLabel) : QStringLiteral("Chưa có dữ liệu")), 1);
+        kpiRow->addWidget(makeKpiCard("#16a34a", "Ca đã khám", QString::number(totalFilterComp),
+                                      QStringLiteral("%1 trễ · %2 dời").arg(totalFilterDelay).arg(totalFilterResched)), 1);
+        contentLayout->addLayout(kpiRow);
+    }
+
+    auto *revCard = UIHelper::panel();
+    styleCard(revCard);
+    auto *revLay = new QVBoxLayout(revCard);
+    revLay->setContentsMargins(22, 18, 22, 20);
+    revLay->setSpacing(12);
+
+    auto *revHeader = new QHBoxLayout;
+    auto *revTitle = new QLabel("Biểu đồ doanh thu(VND)");
+    revTitle->setStyleSheet("font-size: 14.5px; font-weight: 700; color: #0f172a; background: transparent; border: none;");
+    auto *revTotalLbl = new QLabel(QStringLiteral("Tổng doanh thu: <b>%1 đ</b>").arg(QLocale(QLocale::Vietnamese).toString(totalFilterRev, 'f', 0)));
+    revTotalLbl->setStyleSheet("font-size: 13px; color: #0f766e; font-weight: 600; background: transparent; border: none;");
+    revHeader->addWidget(revTitle);
+    revHeader->addStretch();
+    revHeader->addWidget(revTotalLbl);
+    revLay->addLayout(revHeader);
+
+    auto *revChart = new RevenueLineChart;
+    revChart->setData(revPoints);
+    revLay->addWidget(revChart);
+
+    contentLayout->addWidget(revCard);
+
+    auto *statusCard = UIHelper::panel();
+    styleCard(statusCard);
+    auto *statusLay = new QVBoxLayout(statusCard);
+    statusLay->setContentsMargins(22, 18, 22, 20);
+    statusLay->setSpacing(12);
+
+    auto *statusHeader = new QHBoxLayout;
+    auto *statusTitle = new QLabel("Biểu đồ lịch khám");
+    statusTitle->setStyleSheet("font-size: 14.5px; font-weight: 700; color: #0f172a; background: transparent; border: none;");
+    auto *statusSummary = new QLabel(QStringLiteral("Tổng: <b>%1</b> đã khám · <b>%2</b> trễ · <b>%3</b> dời").arg(totalFilterComp).arg(totalFilterDelay).arg(totalFilterResched));
+    statusSummary->setStyleSheet("font-size: 12.5px; color: #475569; background: transparent; border: none;");
+    statusHeader->addWidget(statusTitle);
+    statusHeader->addStretch();
+    statusHeader->addWidget(statusSummary);
+    statusLay->addLayout(statusHeader);
+
+    auto *statusChart = new StatusMultiLineChart;
+    statusChart->setData(statusPoints);
+    statusLay->addWidget(statusChart);
+
+    contentLayout->addWidget(statusCard);
+
+    scrollArea->setWidget(contentWidget);
+    rootLay->addWidget(scrollArea);
 }

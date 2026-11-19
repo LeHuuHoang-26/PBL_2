@@ -39,8 +39,8 @@ private:
     static const int PAGE_SIZE = 50;
 
     void setupUI();
+    bool addDoctorDialog();
     void editDoctorDialog(const std::string &id);
-    void addDoctorDialog();
 };
 
-#endif // DOCTORVIEW_H
+#endif

@@ -7,6 +7,7 @@
 class AppException : public std::exception {
 protected:
     std::string message;
+
 public:
     explicit AppException(const std::string &msg);
     virtual ~AppException() = default;
@@ -21,6 +22,7 @@ public:
 class FileIOException : public AppException {
 private:
     std::string filePath;
+
 public:
     FileIOException(const std::string &path, const std::string &detail);
     const std::string& getFilePath() const;
@@ -37,4 +39,4 @@ public:
     explicit ValidationException(const std::string &msg);
 };
 
-#endif // APPEXCEPTIONS_H
+#endif

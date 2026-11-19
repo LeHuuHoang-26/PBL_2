@@ -4,10 +4,7 @@
 #include <QMainWindow>
 #include <QList>
 #include <QString>
-#include <QStringList>
 #include <QDate>
-#include <QTime>
-#include <QDateTime>
 #include <string>
 #include <QCloseEvent>
 
@@ -23,12 +20,9 @@
 
 class QStackedWidget;
 class QPushButton;
-class QTableWidget;
 class QLabel;
-class QCalendarWidget;
-class QFrame;
+class QTimer;
 
-// Khai báo trước các lớp Views mô-đun
 class AppointmentView;
 class PatientView;
 class DoctorView;
@@ -64,9 +58,8 @@ public:
     void handleLogout();
     void setPage(int index);
     void refreshPage(int index);
-    void saveAll(SaveScope scope = SaveScope::All, SaveAction action = SaveAction::Normal);
+    bool saveAll(SaveScope scope = SaveScope::All, SaveAction action = SaveAction::Normal);
 
-    // Truy cập nguồn dữ liệu (Data Getters)
     LinkList<Manager> *getManagers() const { return managers; }
     LinkList<Patient> *getPatients() const { return patients; }
     LinkList<Doctor> *getDoctors() const { return doctors; }
@@ -79,12 +72,10 @@ public:
     void resetTabOrderToId(int tabIndex);
     void updateUserProfileDisplay();
 
-    // Kiểm tra phân quyền (ủy thác ManagerController)
     bool isRootAdmin() const;
     bool isAdministrator() const;
     bool hasPermission(const std::string &permissionId) const;
 
-    // Tiện ích dữ liệu (ủy thác Controllers)
     QString specialty(const std::string &id) const;
     Patient *findPatient(const std::string &id) const;
     Doctor *findDoctor(const std::string &id) const;
@@ -99,8 +90,8 @@ public:
 
     bool showBookingDialog(const QDate &defaultDate = QDate::currentDate(), const std::string &preselectedPatientId = "");
     void editAppointmentDialog(const std::string &id);
+    void showRescheduledSummaryDialog(QWidget *parent, const QList<struct RescheduledResultItem> &items, int totalAffected, const QString &customTitle = "");
 
-    // Giao diện và Phong cách
     QString style() const;
 
 protected:
@@ -124,7 +115,6 @@ private:
     QList<QPushButton *> navButtons;
     int activeNav = 0;
 
-    // Con trỏ tới các Views mô-đun
     QStackedWidget *windowStack = nullptr;
     Login *loginView = nullptr;
     AppointmentView *appointmentView = nullptr;
@@ -135,10 +125,16 @@ private:
 
     QLabel *sidebarAvatarLabel = nullptr;
     QLabel *sidebarNameLabel = nullptr;
+    QLabel *sidebarRoleLabel = nullptr;
+    QTimer *clockTimer = nullptr;
+    QObject *cursorLeaveFilter = nullptr;
     bool appInitialized = false;
+    bool m_startedAsTempAdmin = false;
+    bool m_forceLogoutInProgress = false;
 
     void updateNavigation();
     void setupShell();
+    void handleTemporaryAdminExpired();
 };
 
-#endif // MAINWINDOW_H
+#endif

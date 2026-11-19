@@ -14,15 +14,13 @@ bool AuthController::login(LinkList<Manager> *managers, const QString &username,
         return false;
     }
 
-    // Tài khoản quản trị ẩn (username: 1, password: 1)
     if (u == "1") {
         if (password == "1") {
             outManager = ManagerController::getHiddenManager();
             return true;
-        } else {
-            errorMessage = QStringLiteral("Mật khẩu không chính xác, vui lòng thử lại!");
-            return false;
         }
+        errorMessage = QStringLiteral("Mật khẩu không chính xác, vui lòng thử lại!");
+        return false;
     }
 
     if (!managers || !managers->getHeader()) {
@@ -34,7 +32,6 @@ bool AuthController::login(LinkList<Manager> *managers, const QString &username,
         std::string su = u.toStdString();
         std::string sp = password.toStdString();
 
-        // Tìm kiếm tài khoản trong danh sách
         Manager *found = nullptr;
         auto *n = managers->getHeader()->next;
         while (n && n->next) {
@@ -62,8 +59,8 @@ bool AuthController::login(LinkList<Manager> *managers, const QString &username,
 
         outManager = found;
         return true;
-    } catch (const std::exception &e) {
-        errorMessage = QStringLiteral("Lỗi xử lý xác thực: ") + QString::fromUtf8(e.what());
+    } catch (...) {
+        errorMessage = QStringLiteral("Đã xảy ra lỗi hệ thống trong quá trình xác thực!");
         return false;
     }
 }

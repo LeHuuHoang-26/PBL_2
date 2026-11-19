@@ -1,18 +1,16 @@
 #include "Human.h"
-#include <string>
-using namespace std;
 
-Human::Human(string id, string fullName, string phone, bool gender, int age)
+Human::Human(std::string id, std::string fullName, std::string phone, bool gender, int age)
     : id(id), fullName(fullName), phone(phone), gender(gender), age(age) {}
 
-string Human::getID() const {return this->id;}
-string Human::getfullName() const {return this->fullName;}
-string Human::getPhone() const {return this->phone;}
-bool Human::getGender() const {return this->gender;}
-int Human::getAge() const {return this->age;}
+std::string Human::getID() const { return id; }
+std::string Human::getfullName() const { return fullName; }
+std::string Human::getPhone() const { return phone; }
+bool Human::getGender() const { return gender; }
+int Human::getAge() const { return age; }
 
-void Human::setID(const string &id) {this->id = id;}
-void Human::setfullName(const string &fullName) {this->fullName = fullName;}
-void Human::setPhone(const string &phone) {this->phone = phone;}
-void Human::setGender(bool gender) {this->gender = gender;}
-void Human::setAge(int age) {this->age = age;}
+void Human::setID(const std::string &identifier) { id = identifier; }
+void Human::setfullName(const std::string &fn) { fullName = fn; }
+void Human::setPhone(const std::string &p) { phone = p; }
+void Human::setGender(bool g) { gender = g; }
+void Human::setAge(int a) { age = a; }

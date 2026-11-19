@@ -1,6 +1,4 @@
 #include "PatientController.h"
-#include "libPBL2.h"
-#include <sstream>
 
 Patient *PatientController::findById(LinkList<Patient> *patients, const std::string &id) {
     if (id.empty() || !patients || !patients->getHeader()) return nullptr;

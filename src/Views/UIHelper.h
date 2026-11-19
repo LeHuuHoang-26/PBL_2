@@ -7,20 +7,13 @@
 #include <QFrame>
 #include <QPushButton>
 #include <QTableWidget>
-#include <QHeaderView>
-#include <QVBoxLayout>
-#include <QLabel>
 #include <QPixmap>
-#include <QPainter>
 #include <QIcon>
-#include <QHBoxLayout>
 #include <QVector>
-#include <QDate>
 #include <string>
 
 class QCalendarWidget;
 class QLineEdit;
-class QDateTimeEdit;
 
 class UIHelper {
 public:
@@ -60,4 +53,4 @@ public:
     static void showSuccess(QWidget *parent, const QString &title, const QString &message);
 };
 
-#endif // UIHELPER_H
+#endif

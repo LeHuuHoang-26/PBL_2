@@ -1,25 +1,36 @@
 #include "ManagerController.h"
 #include "libPBL2.h"
-#include <fstream>
-#include <sstream>
 #include <cstdio>
 
 Manager *ManagerController::findById(LinkList<Manager> *managers, const std::string &id) {
+    if (id.empty()) return nullptr;
     if (id == "MA_HIDDEN" || id == "1") return getHiddenManager();
     if (!managers || !managers->getHeader()) return nullptr;
     auto *node = managers->getHeader()->next;
     while (node && node->next) {
-        if (node->info.getID() == id) return &node->info;
+        if (!node->info.isDefault() && node->info.getID() == id) return &node->info;
         node = node->next;
     }
     return nullptr;
 }
 
-QString ManagerController::roleName(ManagerRole role) {
-    switch (role) {
-        case ManagerRole::Administrator: return QStringLiteral("Quản trị viên");
-        case ManagerRole::Receptionist: return QStringLiteral("Lễ tân");
-        case ManagerRole::SpecialReceptionist: return QStringLiteral("Lễ tân chuyên trách");
+EffectiveRole ManagerController::getEffectiveRole(const Manager *m, const LinkList<PermissionManager> *permissionRecords) {
+    if (!m) return EffectiveRole::Empty;
+    if (isRootAdmin(m)) return EffectiveRole::RootAdmin;
+    if (m->getRole() == ManagerRole::Administrator) return EffectiveRole::Administrator;
+    if (isTemporaryAdmin(m, permissionRecords)) return EffectiveRole::TemporaryAdmin;
+    if (m->getRole() == ManagerRole::SpecialReceptionist) return EffectiveRole::SpecialReceptionist;
+    if (m->getRole() == ManagerRole::Receptionist) return EffectiveRole::Receptionist;
+    return EffectiveRole::Empty;
+}
+
+QString ManagerController::displayRoleName(const Manager *m, const LinkList<PermissionManager> *permissionRecords) {
+    switch (getEffectiveRole(m, permissionRecords)) {
+        case EffectiveRole::RootAdmin: return QStringLiteral("Quản trị viên");
+        case EffectiveRole::Administrator: return QStringLiteral("Quản trị viên");
+        case EffectiveRole::TemporaryAdmin: return QStringLiteral("Quản trị viên tạm thời");
+        case EffectiveRole::SpecialReceptionist: return QStringLiteral("Lễ tân chuyên trách");
+        case EffectiveRole::Receptionist: return QStringLiteral("Lễ tân");
         default: return QStringLiteral("Chưa phân vai trò");
     }
 }
@@ -30,7 +41,7 @@ bool ManagerController::isRootAdmin(const Manager *m) {
     libPBL2::trim(u);
     std::string id = m->getID();
     libPBL2::trim(id);
-    return u == "HoangMA001" || id == "MA_001" || u == "1" || id == "MA_HIDDEN" || m->getRole() == ManagerRole::Administrator;
+    return id == "MA_001" || id == "MA_HIDDEN" || u == "1";
 }
 
 Manager *ManagerController::getHiddenManager() {
@@ -47,16 +58,15 @@ bool ManagerController::isHiddenAccount(const std::string &username, const std::
     return username == "1" || id == "MA_HIDDEN";
 }
 
-// ==========================================
-// In-Memory Permission Logic
-// ==========================================
 QDateTime ManagerController::permissionExpiry(const std::string &managerId, const std::string &permissionId, const LinkList<PermissionManager> *permissionRecords) {
     if (!permissionRecords || !permissionRecords->getHeader()) return QDateTime();
     auto *curr = permissionRecords->getHeader()->next;
     while (curr && curr->next) {
         if (curr->info.getMA_id() == managerId && curr->info.getPer_id() == permissionId && curr->info.isTemporary()) {
             QDateTime parsed = QDateTime::fromString(QString::fromUtf8(curr->info.getExpiresAt().c_str()), Qt::ISODate);
-            if (!parsed.isValid()) parsed = QDateTime::fromString(QString::fromUtf8(curr->info.getExpiresAt().c_str()), "yyyy-MM-dd HH:mm:ss");
+            if (!parsed.isValid()) {
+                parsed = QDateTime::fromString(QString::fromUtf8(curr->info.getExpiresAt().c_str()), "yyyy-MM-dd HH:mm:ss");
+            }
             return parsed;
         }
         curr = curr->next;
@@ -65,18 +75,37 @@ QDateTime ManagerController::permissionExpiry(const std::string &managerId, cons
 }
 
 bool ManagerController::isTemporaryAdmin(const Manager *m, const LinkList<PermissionManager> *permissionRecords) {
-    if (!m || isRootAdmin(m)) return false;
+    if (!m || isRootAdmin(m) || m->getRole() == ManagerRole::Administrator) return false;
     QDateTime expiry = permissionExpiry(m->getID(), "Per_1", permissionRecords);
     return expiry.isValid() && expiry > QDateTime::currentDateTime();
 }
 
 bool ManagerController::isAdministrator(const Manager *m, const LinkList<PermissionManager> *permissionRecords) {
-    return isRootAdmin(m) || isTemporaryAdmin(m, permissionRecords);
+    return getPrivilegeLevel(m, permissionRecords) >= 1;
+}
+
+int ManagerController::getPrivilegeLevel(const Manager *m, const LinkList<PermissionManager> *permissionRecords) {
+    if (!m) return -1;
+    if (isRootAdmin(m)) return 3;
+    if (m->getRole() == ManagerRole::Administrator) return 2;
+    if (isTemporaryAdmin(m, permissionRecords)) return 1;
+    return 0;
+}
+
+bool ManagerController::canViewAccount(const Manager *viewer, const Manager *target, const LinkList<PermissionManager> *permissionRecords) {
+    if (!viewer || !target || isHiddenAccount(target)) return false;
+    return canViewPassword(viewer, target, permissionRecords);
+}
+
+bool ManagerController::canViewPassword(const Manager *viewer, const Manager *target, const LinkList<PermissionManager> *permissionRecords) {
+    if (!viewer || !target) return false;
+    if (isRootAdmin(viewer) || viewer->getID() == target->getID()) return true;
+    return getPrivilegeLevel(viewer, permissionRecords) > getPrivilegeLevel(target, permissionRecords);
 }
 
 bool ManagerController::hasPermission(const Manager *m, const std::string &permissionId, const LinkList<PermissionManager> *permissionRecords) {
     if (!m) return false;
-    if (isRootAdmin(m) || isTemporaryAdmin(m, permissionRecords)) return true;
+    if (isAdministrator(m, permissionRecords)) return true;
     if (permissionId == "Per_1") return false;
 
     if (!permissionRecords || !permissionRecords->getHeader()) return false;
@@ -84,7 +113,8 @@ bool ManagerController::hasPermission(const Manager *m, const std::string &permi
     while (curr && curr->next) {
         if (curr->info.getMA_id() == m->getID() && curr->info.getPer_id() == permissionId) {
             if (curr->info.isTemporary() && curr->info.isExpired()) {
-                return false;
+                curr = curr->next;
+                continue;
             }
             return true;
         }
@@ -128,7 +158,6 @@ bool ManagerController::cleanExpiredPermissions(LinkList<PermissionManager> *per
 bool ManagerController::savePermissions(const std::string &managerId, const LinkList<PermissionManager> &grantsForManager, LinkList<PermissionManager> *permissionRecords) {
     if (!permissionRecords || !permissionRecords->getHeader()) return false;
 
-    // Xóa toàn bộ các quyền cũ của managerId trong danh sách
     auto *curr = permissionRecords->getHeader()->next;
     while (curr && curr->next) {
         auto *next = curr->next;
@@ -138,7 +167,6 @@ bool ManagerController::savePermissions(const std::string &managerId, const Link
         curr = next;
     }
 
-    // Nạp các quyền mới được cấp
     if (grantsForManager.getHeader()) {
         auto *grantNode = grantsForManager.getHeader()->next;
         while (grantNode && grantNode->next) {
@@ -150,25 +178,5 @@ bool ManagerController::savePermissions(const std::string &managerId, const Link
 }
 
 std::string ManagerController::generateNextId(const LinkList<Manager> *managers) {
-    int maximum = 0;
-    if (managers && managers->getHeader()) {
-        auto *n = managers->getHeader()->next;
-        while (n && n->next) {
-            std::string id = n->info.getID();
-            if (id.rfind("MA_", 0) == 0) {
-                try {
-                    int val = std::stoi(id.substr(3));
-                    if (val > maximum) maximum = val;
-                } catch (const std::invalid_argument &) {
-                    // Ký tự ID không hợp lệ, bỏ qua
-                } catch (const std::out_of_range &) {
-                    // ID vượt quá giá trị số nguyên, bỏ qua
-                }
-            }
-            n = n->next;
-        }
-    }
-    char buf[32];
-    std::snprintf(buf, sizeof(buf), "MA_%03d", maximum + 1);
-    return std::string(buf);
+    return libPBL2::generateNextId(managers, "MA_", [](const Manager &m) { return m.getID(); });
 }

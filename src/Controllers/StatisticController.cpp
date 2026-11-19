@@ -1,7 +1,92 @@
 #include "StatisticController.h"
-#include "DoctorController.h"
 #include "libPBL2.h"
 #include "../Utils/AppExceptions.h"
+#include <memory>
+
+namespace {
+
+struct DoctorLookupEntry {
+    std::string id;
+    std::string spId;
+    double fee = 0.0;
+};
+
+struct DoctorLookupTable {
+    std::unique_ptr<DoctorLookupEntry[]> entries;
+    int count = 0;
+
+    void build(const LinkList<Doctor> *docs) {
+        count = 0;
+        entries.reset();
+        if (!docs || !docs->getHeader()) return;
+        int cap = docs->getCount();
+        if (cap <= 0) return;
+        try {
+            entries = std::make_unique<DoctorLookupEntry[]>(cap);
+        } catch (const std::bad_alloc &) {
+            throw MemoryAllocationException("Không đủ bộ nhớ để cấp phát bảng tra cứu bác sĩ.");
+        }
+        auto *dn = docs->getHeader()->next;
+        while (dn && dn->next && count < cap) {
+            if (!dn->info.isDefault()) {
+                entries[count].id = dn->info.getID();
+                entries[count].spId = dn->info.getSpId();
+                entries[count].fee = dn->info.getFee();
+                count++;
+            }
+            dn = dn->next;
+        }
+        if (count > 1) {
+            libPBL2::qsort(entries.get(), 0, count - 1, [](const DoctorLookupEntry &a, const DoctorLookupEntry &b) {
+                return a.id < b.id;
+            });
+        }
+    }
+
+    const DoctorLookupEntry *find(const std::string &id) const {
+        int lo = 0, hi = count - 1;
+        while (lo <= hi) {
+            int mid = lo + (hi - lo) / 2;
+            if (entries[mid].id == id) return &entries[mid];
+            if (entries[mid].id < id) lo = mid + 1;
+            else hi = mid - 1;
+        }
+        return nullptr;
+    }
+};
+
+long long toJulianDay(int d, int m, int y) {
+    int a = (14 - m) / 12;
+    long long yy = static_cast<long long>(y) + 4800 - a;
+    int mm = m + 12 * a - 3;
+    return d + (153 * mm + 2) / 5 + 365 * yy + yy / 4 - yy / 100 + yy / 400 - 32045;
+}
+
+void accumulateBucket(
+    TimeSeriesItem &bucket,
+    const Appointment &appt,
+    const DoctorLookupTable &docTable,
+    int curDay, int curMonth, int curYear, int curHour, int curMin
+) {
+    int st = appt.getState();
+    if (st == 1) {
+        bucket.completedCount++;
+        if (appt.hasPaidFee()) {
+            bucket.revenue += appt.getPaidFee();
+        } else if (const auto *doc = docTable.find(appt.getDoctorId())) {
+            bucket.revenue += doc->fee;
+        }
+    } else if (st == -2) {
+        bucket.rescheduledCount++;
+    } else {
+        int eff = appt.computeEffectiveState(curDay, curMonth, curYear, curHour, curMin);
+        if (eff == -1) {
+            bucket.delayedCount++;
+        }
+    }
+}
+
+}
 
 int StatisticController::patientCount(const LinkList<Patient> *items) {
     if (!items || !items->getHeader()) return 0;
@@ -38,76 +123,16 @@ int StatisticController::appointmentCount(const LinkList<Appointment> *items) {
 
 int StatisticController::pendingAppointmentCount(const LinkList<Appointment> *items) {
     if (!items || !items->getHeader()) return 0;
+    Date now = Date::now();
     int c = 0;
     auto *n = items->getHeader()->next;
     while (n && n->next) {
-        if (!n->info.isDefault() && n->info.getState() == 0) {
+        if (!n->info.isDefault() && n->info.computeEffectiveState(now.getDay(), now.getMonth(), now.getYear(), now.getHour(), now.getMinute()) == 0) {
             c++;
         }
         n = n->next;
     }
     return c;
-}
-
-double StatisticController::totalRevenue(const LinkList<Appointment> *appts, const LinkList<Doctor> *docs) {
-    if (!appts || !appts->getHeader() || !docs) return 0.0;
-    double total = 0.0;
-    auto *docList = const_cast<LinkList<Doctor>*>(docs);
-    auto *n = appts->getHeader()->next;
-    while (n && n->next) {
-        if (!n->info.isDefault() && n->info.getState() == 1) { // 1 = Da kham
-            Doctor *d = DoctorController::findById(docList, n->info.getDoctorId());
-            if (d) {
-                total += d->getFee();
-            }
-        }
-        n = n->next;
-    }
-    return total;
-}
-
-double StatisticController::todayRevenue(const LinkList<Appointment> *appts, const LinkList<Doctor> *docs, int day, int month, int year) {
-    if (!appts || !appts->getHeader() || !docs) return 0.0;
-    double total = 0.0;
-    auto *docList = const_cast<LinkList<Doctor>*>(docs);
-    auto *n = appts->getHeader()->next;
-    while (n && n->next) {
-        if (!n->info.isDefault() && n->info.getState() == 1) {
-            Date dt = n->info.getDateGet();
-            if (dt.getDay() == day && dt.getMonth() == month && dt.getYear() == year) {
-                Doctor *d = DoctorController::findById(docList, n->info.getDoctorId());
-                if (d) {
-                    total += d->getFee();
-                }
-            }
-        }
-        n = n->next;
-    }
-    return total;
-}
-
-double StatisticController::completionRate(const LinkList<Appointment> *appts, int currentDay, int currentMonth, int currentYear, int currentHour, int currentMinute, int &completedCount, int &totalUntilNow) {
-    completedCount = 0;
-    totalUntilNow = 0;
-    if (!appts || !appts->getHeader() || appts->getCount() == 0) return 0.0;
-
-    auto *n = appts->getHeader()->next;
-    while (n && n->next) {
-        if (!n->info.isDefault()) {
-            int st = n->info.computeEffectiveState(currentDay, currentMonth, currentYear, currentHour, currentMinute);
-            // Các ca tính đến thời điểm hiện tại: Đã khám (1), Trễ hẹn (-1)
-            if (st == 1 || st == -1) {
-                totalUntilNow++;
-                if (st == 1) {
-                    completedCount++;
-                }
-            }
-        }
-        n = n->next;
-    }
-
-    if (totalUntilNow == 0) return 0.0;
-    return (completedCount * 100.0) / totalUntilNow;
 }
 
 void StatisticController::appointmentStatusCounts(const LinkList<Appointment> *appts, int &completed, int &pending, int &delayed, int &rescheduled, int currentDay, int currentMonth, int currentYear, int currentHour, int currentMinute) {
@@ -127,26 +152,6 @@ void StatisticController::appointmentStatusCounts(const LinkList<Appointment> *a
                 case -1: delayed++; break;
                 case -2: rescheduled++; break;
                 default: break;
-            }
-        }
-        n = n->next;
-    }
-}
-
-void StatisticController::todayAppointmentCounts(const LinkList<Appointment> *appts, int day, int month, int year, int &totalToday, int &completedToday, int &pendingToday) {
-    totalToday = 0;
-    completedToday = 0;
-    pendingToday = 0;
-    if (!appts || !appts->getHeader()) return;
-
-    auto *n = appts->getHeader()->next;
-    while (n && n->next) {
-        if (!n->info.isDefault() && n->info.getState() != -2) {
-            Date dt = n->info.getDateGet();
-            if (dt.getDay() == day && dt.getMonth() == month && dt.getYear() == year) {
-                totalToday++;
-                if (n->info.getState() == 1) completedToday++;
-                else if (n->info.getState() == 0) pendingToday++;
             }
         }
         n = n->next;
@@ -188,56 +193,91 @@ void StatisticController::patientAgeDistribution(const LinkList<Patient> *patien
     }
 }
 
-int StatisticController::getTopDoctors(const LinkList<Appointment> *appts, const LinkList<Doctor> *docs, DoctorLeaderboardItem outList[], int maxCount) {
-    if (!docs || !docs->getHeader() || maxCount <= 0) return 0;
+int StatisticController::getTopDoctors(
+    const LinkList<Appointment> *appts,
+    const LinkList<Doctor> *docs,
+    DoctorLeaderboardItem outList[],
+    int maxCount,
+    int startDay, int startMonth, int startYear,
+    int endDay, int endMonth, int endYear
+) {
+    if (!docs || !docs->getHeader() || !outList || maxCount <= 0) return 0;
 
     int totalDocs = docs->getCount();
     if (totalDocs <= 0) return 0;
 
-    // Allocate buffer for all doctors
-    DoctorLeaderboardItem *allItems = nullptr;
+    std::unique_ptr<DoctorLeaderboardItem[]> allItems;
     try {
-        allItems = new DoctorLeaderboardItem[totalDocs];
+        allItems = std::make_unique<DoctorLeaderboardItem[]>(totalDocs);
     } catch (const std::bad_alloc &) {
         throw MemoryAllocationException("Không đủ bộ nhớ để cấp phát mảng thống kê bác sĩ.");
     }
-    int idx = 0;
 
+    int validDoctors = 0;
     auto *dn = docs->getHeader()->next;
-    while (dn && dn->next && idx < totalDocs) {
+    while (dn && dn->next && validDoctors < totalDocs) {
         if (!dn->info.isDefault()) {
-            allItems[idx].doctorId = dn->info.getID();
-            allItems[idx].doctorName = dn->info.getfullName();
-            allItems[idx].specialtyId = dn->info.getSpId();
-            allItems[idx].roomId = dn->info.getRoomId();
-            allItems[idx].rating = dn->info.getRating();
-            allItems[idx].appointmentCount = 0;
-            idx++;
+            allItems[validDoctors].doctorId = dn->info.getID();
+            allItems[validDoctors].doctorName = dn->info.getfullName();
+            allItems[validDoctors].specialtyId = dn->info.getSpId();
+            allItems[validDoctors].roomId = dn->info.getRoomId();
+            allItems[validDoctors].rating = dn->info.getRating();
+            allItems[validDoctors].appointmentCount = 0;
+            validDoctors++;
         }
         dn = dn->next;
     }
-    int validDoctors = idx;
 
-    // Count appointments for each doctor
+    if (validDoctors > 1) {
+        libPBL2::qsort(allItems.get(), 0, validDoctors - 1, [](const DoctorLeaderboardItem &a, const DoctorLeaderboardItem &b) {
+            return a.doctorId < b.doctorId;
+        });
+    }
+
+    bool hasDateFilter = (startDay > 0 && startMonth > 0 && startYear > 0 &&
+                          endDay > 0 && endMonth > 0 && endYear > 0);
+    int sVal = startYear * 10000 + startMonth * 100 + startDay;
+    int eVal = endYear * 10000 + endMonth * 100 + endDay;
+
     if (appts && appts->getHeader()) {
         auto *an = appts->getHeader()->next;
         while (an && an->next) {
-            if (!an->info.isDefault() && an->info.getState() != -2) {
-                std::string did = an->info.getDoctorId();
-                for (int i = 0; i < validDoctors; ++i) {
-                    if (allItems[i].doctorId == did) {
-                        allItems[i].appointmentCount++;
+            if (!an->info.isDefault() && an->info.getState() == 1) {
+                if (hasDateFilter) {
+                    Date ad = an->info.getDateGet();
+                    int aVal = ad.getYear() * 10000 + ad.getMonth() * 100 + ad.getDay();
+                    if (aVal < sVal || aVal > eVal) {
+                        an = an->next;
+                        continue;
+                    }
+                }
+                const std::string did = an->info.getDoctorId();
+                int lo = 0, hi = validDoctors - 1;
+                while (lo <= hi) {
+                    int mid = lo + (hi - lo) / 2;
+                    if (allItems[mid].doctorId == did) {
+                        allItems[mid].appointmentCount++;
                         break;
                     }
+                    if (allItems[mid].doctorId < did) lo = mid + 1;
+                    else hi = mid - 1;
                 }
             }
             an = an->next;
         }
     }
 
-    // QuickSort descending by appointmentCount using libPBL2::qsort
+    int positiveCount = 0;
+    for (int i = 0; i < validDoctors; ++i) {
+        if (allItems[i].appointmentCount >= 1) {
+            if (positiveCount != i) allItems[positiveCount] = std::move(allItems[i]);
+            positiveCount++;
+        }
+    }
+    validDoctors = positiveCount;
+
     if (validDoctors > 1) {
-        libPBL2::qsort(allItems, 0, validDoctors - 1, [](const DoctorLeaderboardItem &a, const DoctorLeaderboardItem &b) {
+        libPBL2::qsort(allItems.get(), 0, validDoctors - 1, [](const DoctorLeaderboardItem &a, const DoctorLeaderboardItem &b) {
             if (a.appointmentCount != b.appointmentCount) return a.appointmentCount > b.appointmentCount;
             return a.doctorId < b.doctorId;
         });
@@ -247,19 +287,19 @@ int StatisticController::getTopDoctors(const LinkList<Appointment> *appts, const
     for (int i = 0; i < copyCount; ++i) {
         outList[i] = allItems[i];
     }
-
-    delete[] allItems;
     return copyCount;
 }
 
 int StatisticController::getSpecialtyDemand(const LinkList<Appointment> *appts, const LinkList<Doctor> *docs, SpecialtyDemandItem outList[], int maxCount) {
-    if (!appts || !appts->getHeader() || !docs || maxCount <= 0) return 0;
+    if (!appts || !appts->getHeader() || !docs || !docs->getHeader() || !outList || maxCount <= 0) return 0;
 
-    auto *docList = const_cast<LinkList<Doctor>*>(docs);
-    int cap = (docs->getCount() > 0 ? docs->getCount() : 20);
-    SpecialtyDemandItem *items = nullptr;
+    DoctorLookupTable docTable;
+    docTable.build(docs);
+    if (docTable.count <= 0) return 0;
+
+    std::unique_ptr<SpecialtyDemandItem[]> items;
     try {
-        items = new SpecialtyDemandItem[cap];
+        items = std::make_unique<SpecialtyDemandItem[]>(docTable.count);
     } catch (const std::bad_alloc &) {
         throw MemoryAllocationException("Không đủ bộ nhớ để cấp phát mảng nhu cầu chuyên khoa.");
     }
@@ -268,20 +308,18 @@ int StatisticController::getSpecialtyDemand(const LinkList<Appointment> *appts, 
     auto *an = appts->getHeader()->next;
     while (an && an->next) {
         if (!an->info.isDefault() && an->info.getState() != -2) {
-            Doctor *d = DoctorController::findById(docList, an->info.getDoctorId());
-            if (d) {
-                std::string spId = d->getSpId();
+            if (const auto *doc = docTable.find(an->info.getDoctorId())) {
                 int foundIdx = -1;
                 for (int i = 0; i < uniqueCount; ++i) {
-                    if (items[i].spId == spId) {
+                    if (items[i].spId == doc->spId) {
                         foundIdx = i;
                         break;
                     }
                 }
                 if (foundIdx >= 0) {
                     items[foundIdx].count++;
-                } else if (uniqueCount < cap) {
-                    items[uniqueCount].spId = spId;
+                } else if (uniqueCount < docTable.count) {
+                    items[uniqueCount].spId = doc->spId;
                     items[uniqueCount].count = 1;
                     uniqueCount++;
                 }
@@ -290,9 +328,8 @@ int StatisticController::getSpecialtyDemand(const LinkList<Appointment> *appts, 
         an = an->next;
     }
 
-    // QuickSort descending by count using libPBL2::qsort
     if (uniqueCount > 1) {
-        libPBL2::qsort(items, 0, uniqueCount - 1, [](const SpecialtyDemandItem &a, const SpecialtyDemandItem &b) {
+        libPBL2::qsort(items.get(), 0, uniqueCount - 1, [](const SpecialtyDemandItem &a, const SpecialtyDemandItem &b) {
             if (a.count != b.count) return a.count > b.count;
             return a.spId < b.spId;
         });
@@ -302,35 +339,142 @@ int StatisticController::getSpecialtyDemand(const LinkList<Appointment> *appts, 
     for (int i = 0; i < copyCount; ++i) {
         outList[i] = items[i];
     }
-    delete[] items;
     return copyCount;
 }
 
-void StatisticController::getWeeklyTrend(const LinkList<Appointment> *appts, int currentDay, int currentMonth, int currentYear, int outCounts[7]) {
-    for (int i = 0; i < 7; ++i) outCounts[i] = 0;
-    if (!appts || !appts->getHeader()) return;
+int StatisticController::getTimeSeriesDaily(
+    const LinkList<Appointment> *appts,
+    const LinkList<Doctor> *docs,
+    int startDay, int startMonth, int startYear,
+    int endDay, int endMonth, int endYear,
+    int curDay, int curMonth, int curYear, int curHour, int curMin,
+    TimeSeriesItem outItems[], int maxItems
+) {
+    if (!outItems || maxItems <= 0) return 0;
+    if (startMonth < 1 || startMonth > 12 || endMonth < 1 || endMonth > 12 || startYear < 1 || endYear < 1) return 0;
+    auto isLeap = [](int y) {
+        return y > 0 && ((y % 4 == 0 && y % 100 != 0) || (y % 400 == 0));
+    };
+    auto daysInMonth = [&](int m, int y) {
+        if (m == 2) return isLeap(y) ? 29 : 28;
+        if (m == 4 || m == 6 || m == 9 || m == 11) return 30;
+        return 31;
+    };
+    if (startDay < 1 || startDay > daysInMonth(startMonth, startYear) ||
+        endDay < 1 || endDay > daysInMonth(endMonth, endYear)) return 0;
 
-    Date today(currentDay, currentMonth, currentYear);
+    long long startJdn = toJulianDay(startDay, startMonth, startYear);
+    long long endJdn = toJulianDay(endDay, endMonth, endYear);
+    if (startJdn > endJdn) return 0;
 
-    // Compute dates for the last 7 days: day[0] = 6 days ago, ..., day[6] = today
-    Date days[7];
-    for (int i = 0; i < 7; ++i) {
-        days[i] = today - (6 - i);
+    int count = 0;
+    int cDay = startDay, cMonth = startMonth, cYear = startYear;
+
+    while (count < maxItems) {
+        outItems[count].day = cDay;
+        outItems[count].month = cMonth;
+        outItems[count].year = cYear;
+        std::string dStr = (cDay < 10 ? "0" : "") + std::to_string(cDay);
+        std::string mStr = (cMonth < 10 ? "0" : "") + std::to_string(cMonth);
+        outItems[count].label = dStr + "/" + mStr;
+        outItems[count].revenue = 0.0;
+        outItems[count].completedCount = 0;
+        outItems[count].delayedCount = 0;
+        outItems[count].rescheduledCount = 0;
+        count++;
+
+        if (cDay == endDay && cMonth == endMonth && cYear == endYear) {
+            break;
+        }
+
+        cDay++;
+        if (cDay > daysInMonth(cMonth, cYear)) {
+            cDay = 1;
+            cMonth++;
+            if (cMonth > 12) {
+                cMonth = 1;
+                cYear++;
+            }
+        }
     }
 
+    if (!appts || !appts->getHeader() || count == 0) return count;
+
+    DoctorLookupTable docTable;
+    docTable.build(docs);
     auto *an = appts->getHeader()->next;
     while (an && an->next) {
-        if (!an->info.isDefault() && an->info.getState() != -2) {
-            Date dt = an->info.getDateGet();
-            for (int i = 0; i < 7; ++i) {
-                if (dt.getDay() == days[i].getDay() &&
-                    dt.getMonth() == days[i].getMonth() &&
-                    dt.getYear() == days[i].getYear()) {
-                    outCounts[i]++;
-                    break;
+        if (!an->info.isDefault()) {
+            Date ad = an->info.getDateGet();
+            if (ad.getYear() >= 1 && ad.getMonth() >= 1 && ad.getMonth() <= 12 && ad.getDay() >= 1) {
+                long long offset = toJulianDay(ad.getDay(), ad.getMonth(), ad.getYear()) - startJdn;
+                if (offset >= 0 && offset < count) {
+                    accumulateBucket(outItems[offset], an->info, docTable, curDay, curMonth, curYear, curHour, curMin);
                 }
             }
         }
         an = an->next;
     }
+
+    return count;
+}
+
+int StatisticController::getTimeSeriesMonthlyRange(
+    const LinkList<Appointment> *appts,
+    const LinkList<Doctor> *docs,
+    int startMonth, int startYear,
+    int endMonth, int endYear,
+    int curDay, int curMonth, int curYear, int curHour, int curMin,
+    TimeSeriesItem outItems[], int maxItems
+) {
+    if (!outItems || maxItems <= 0) return 0;
+    if (startMonth < 1 || startMonth > 12 || endMonth < 1 || endMonth > 12 || startYear < 1 || endYear < 1) return 0;
+    int startMonthKey = startYear * 12 + startMonth;
+    int endMonthKey = endYear * 12 + endMonth;
+    if (startMonthKey > endMonthKey) return 0;
+
+    int count = 0;
+    int cMonth = startMonth, cYear = startYear;
+
+    while (count < maxItems && (cYear * 12 + cMonth) <= endMonthKey) {
+        outItems[count].day = 1;
+        outItems[count].month = cMonth;
+        outItems[count].year = cYear;
+        outItems[count].label = "T" + std::to_string(cMonth);
+        if (startYear != endYear) {
+            std::string yStr = std::to_string(cYear);
+            outItems[count].label += "/" + (yStr.size() >= 2 ? yStr.substr(yStr.size() - 2) : yStr);
+        }
+        outItems[count].revenue = 0.0;
+        outItems[count].completedCount = 0;
+        outItems[count].delayedCount = 0;
+        outItems[count].rescheduledCount = 0;
+        count++;
+
+        if (cMonth == endMonth && cYear == endYear) break;
+
+        cMonth++;
+        if (cMonth > 12) {
+            cMonth = 1;
+            cYear++;
+        }
+    }
+
+    if (!appts || !appts->getHeader() || count == 0) return count;
+
+    DoctorLookupTable docTable;
+    docTable.build(docs);
+    auto *an = appts->getHeader()->next;
+    while (an && an->next) {
+        if (!an->info.isDefault()) {
+            Date ad = an->info.getDateGet();
+            int idx = (ad.getYear() * 12 + ad.getMonth()) - startMonthKey;
+            if (idx >= 0 && idx < count) {
+                accumulateBucket(outItems[idx], an->info, docTable, curDay, curMonth, curYear, curHour, curMin);
+            }
+        }
+        an = an->next;
+    }
+
+    return count;
 }

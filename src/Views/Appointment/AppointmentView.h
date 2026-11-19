@@ -9,9 +9,6 @@
 
 class MainWindow;
 class QCalendarWidget;
-class QTableWidget;
-class QLabel;
-class QPushButton;
 class Appointment;
 
 class AppointmentView : public QObject {
@@ -20,16 +17,26 @@ class AppointmentView : public QObject {
 public:
     explicit AppointmentView(MainWindow *mainWindow, QObject *parent = nullptr);
 
+    QList<Appointment*> getAppointmentsForDate(const QDate &targetDate) const;
+    void highlightCalendarAppointments(QCalendarWidget *cal, int year, int month);
+
+    bool showBookingDialog(const QDate &defaultDate = QDate::currentDate(), const std::string &preselectedPatientId = "");
+
     QWidget *createDashboardWidget(QWidget *parent = nullptr);
     QWidget *createBookingWidget(QWidget *parent = nullptr);
     QWidget *createAppointmentListWidget(QWidget *parent = nullptr);
 
-    bool showBookingDialog(const QDate &defaultDate = QDate::currentDate(), const std::string &preselectedPatientId = "");
-    void showHolidayManagementDialog(QWidget *parent = nullptr);
     void showAppointmentDetailDialog(Appointment *appointment);
     void editAppointmentDialog(const std::string &id);
-    void highlightCalendarAppointments(QCalendarWidget *cal, int year, int month);
-    QList<Appointment*> getAppointmentsForDate(const QDate &targetDate) const;
+    void showRescheduledSummaryDialog(
+        QWidget *parent,
+        const QList<RescheduledResultItem> &items,
+        int totalAffected,
+        const QString &customTitle = ""
+    );
+
+    void showHolidayManagementDialog(QWidget *parent = nullptr);
+
     void reapplyCurrentSort();
     void resetToFirstPage();
 
@@ -37,7 +44,6 @@ private:
     MainWindow *mainWindow = nullptr;
     int listSortColumn = -1;
     bool listSortAscending = false;
-    int listCurrentPage = 0;
 
     bool processHolidayAdditionWithReschedule(
         QWidget *parentDialog,
@@ -45,12 +51,6 @@ private:
         const QList<HolidayEntry> &prospectiveList,
         const std::string &configPath = "Config/Lichnghile.txt"
     );
-
-    void showRescheduledSummaryDialog(
-        QWidget *parent,
-        const QList<RescheduledResultItem> &items,
-        int totalAffected
-    );
 };
 
-#endif // APPOINTMENTVIEW_H
+#endif

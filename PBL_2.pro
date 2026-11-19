@@ -1,4 +1,4 @@
-QT += core gui widgets charts
+QT += core gui widgets
 CONFIG += c++23
 
 TARGET = MngCareBook
@@ -9,7 +9,6 @@ DESTDIR     = $$PWD/bin        # Exe xuất ra bin/
 OBJECTS_DIR = $$PWD/release    # Object files vào release/
 MOC_DIR     = $$PWD/release
 RCC_DIR     = $$PWD/release
-UI_DIR      = $$PWD/release
 
 # --- Include paths ---
 INCLUDEPATH += \

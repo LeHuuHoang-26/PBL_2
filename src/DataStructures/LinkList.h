@@ -8,8 +8,8 @@ class LinkList {
 public:
     struct Node {
         T info;
-        Node *next;
-        Node *prev;
+        Node *next = nullptr;
+        Node *prev = nullptr;
     };
 
 private:
@@ -23,13 +23,14 @@ public:
     LinkList &operator=(const LinkList &) = delete;
     ~LinkList();
 
-    bool insert(const T &info);
-    bool remove(Node *N);
-    int getCount() const;
     Node *getHeader() const;
     Node *getFooter() const;
+    int getCount() const;
+
+    bool insert(const T &info);
+    bool remove(Node *N);
 };
 
 #include "LinkList.cpp"
 
-#endif // LINKLIST_H
+#endif

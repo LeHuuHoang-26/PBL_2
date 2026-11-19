@@ -1,4 +1,3 @@
-#define NOMINMAX
 #include "MainWindow.h"
 #include "AppointmentView.h"
 #include "PatientView.h"
@@ -13,12 +12,12 @@
 #include "DoctorController.h"
 #include "PatientController.h"
 #include "ManagerController.h"
-#include "StatisticController.h"
 #include "AuthController.h"
 #include "libPBL2.h"
-#include <sstream>
 
 #include <QApplication>
+#include <QDateTime>
+#include <QStringList>
 #include <QWidget>
 #include <QStackedWidget>
 #include <QDialog>
@@ -28,7 +27,6 @@
 #include <QPushButton>
 #include <QFrame>
 #include <QIcon>
-#include <QStyle>
 #include <QTimer>
 
 using namespace std;
@@ -37,17 +35,14 @@ namespace {
 
 class CursorLeaveFilter : public QObject {
 public:
-    static CursorLeaveFilter *instance() {
-        static CursorLeaveFilter inst;
-        return &inst;
-    }
+    explicit CursorLeaveFilter(QObject *parent = nullptr) : QObject(parent) {}
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override {
         if (event->type() == QEvent::Leave) {
             if (auto *w = qobject_cast<QWidget*>(obj)) {
                 if (w->cursor().shape() == Qt::PointingHandCursor) {
-                    if (w->parentWidget()) {
-                        w->parentWidget()->setCursor(Qt::ArrowCursor);
+                    if (w->parentWidget() && !w->parentWidget()->testAttribute(Qt::WA_SetCursor)) {
+                        w->parentWidget()->unsetCursor();
                     }
                 }
             }
@@ -56,9 +51,8 @@ protected:
     }
 };
 
-} // namespace
+}
 
-// Đường dẫn tệp cấu hình và dữ liệu chuẩn
 static const string patientPath = "Data/Patient.txt";
 static const string managerPath = "Data/Manager.txt";
 static const string doctorPath = "Data/Doctor/Doctor.txt";
@@ -69,6 +63,467 @@ static const string symptomPath = "Data/Symptom/Symptom.txt";
 static const string specializationPath = "Data/Doctor/Specialization.txt";
 static const string holidayConfigPath = "Config/Lichnghile.txt";
 static const string permissionManagerPath = "Data/PermissionManager.txt";
+
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
+{
+    setCursor(Qt::ArrowCursor);
+    cursorLeaveFilter = new CursorLeaveFilter(this);
+    if (qApp) {
+        qApp->installEventFilter(cursorLeaveFilter);
+    }
+    setStyleSheet(style());
+    setMinimumSize(1120, 720);
+    resize(1360, 850);
+    setWindowTitle("An Tâm · Quản lý phòng khám");
+
+    QIcon appIcon(":/assets/textures/icon_app.ico");
+    if (appIcon.isNull())
+        appIcon = QIcon(":/assets/textures/icon_app.png");
+    if (appIcon.isNull())
+        appIcon = QIcon("assets/textures/icon_app.ico");
+    if (appIcon.isNull())
+        appIcon = QIcon("assets/textures/icon_app.png");
+    if (!appIcon.isNull())
+        setWindowIcon(appIcon);
+
+    appInitialized = initApp();
+}
+
+MainWindow::~MainWindow()
+{
+    if (qApp && cursorLeaveFilter) {
+        qApp->removeEventFilter(cursorLeaveFilter);
+    }
+    delete currentManager;
+    delete managers;
+    delete patients;
+    delete doctors;
+    delete symptoms;
+    delete symptomPatients;
+    delete symptomPatientDetails;
+    delete appointments;
+    delete permissionRecords;
+}
+
+bool MainWindow::initApp()
+{
+
+    DoctorController::clearSpecialtyCache();
+    AppointmentController::clearHolidayCache();
+
+    try {
+        permissionRecords = PermissionManager::loadFromFile(permissionManagerPath);
+    } catch (const FileIOException &) {
+        permissionRecords = new LinkList<PermissionManager>;
+    } catch (const std::exception &e) {
+        permissionRecords = new LinkList<PermissionManager>;
+        UIHelper::showWarning(this, "Cảnh báo phân quyền", QString("Không thể nạp cấu hình phân quyền đầy đủ: %1").arg(e.what()));
+    }
+
+    if (ManagerController::cleanExpiredPermissions(permissionRecords)) {
+        try {
+            PermissionManager::saveToFile(permissionManagerPath, permissionRecords);
+        } catch (const std::exception &e) {
+            UIHelper::showWarning(this, "Lỗi cập nhật quyền hạn", QString("Không thể lưu lại bảng phân quyền sau khi dọn dẹp: %1").arg(e.what()));
+        }
+    }
+
+    try {
+
+        managers = Manager::loadFromFile(managerPath);
+        patients = Patient::loadFromFile(patientPath);
+        doctors = Doctor::loadFromFile(doctorPath);
+        symptoms = Symptom::loadFromFile(symptomPath);
+        symptomPatients = SymptomPatient::loadFromFile(symptomPatientPath);
+        symptomPatientDetails = SymptomPatientDetail::loadFromFile(symptomPatientDetailPath);
+        appointments = Appointment::loadFromFile(appointmentPath);
+        if (appointments) {
+            int synced = AppointmentController::syncExpiredAppointments(appointments);
+            if (synced > 0) {
+                Appointment::saveToFile(appointmentPath, appointments);
+            }
+        }
+    } catch (const FileIOException &e) {
+        UIHelper::showWarning(this, "Lỗi tệp dữ liệu", QString::fromUtf8(e.what()) + "\nVui lòng kiểm tra lại thư mục Data/.");
+        return false;
+    } catch (const DataFormatException &e) {
+        UIHelper::showWarning(this, "Lỗi định dạng dữ liệu", QString::fromUtf8(e.what()));
+        return false;
+    } catch (const MemoryAllocationException &e) {
+        UIHelper::showWarning(this, "Lỗi bộ nhớ", QString::fromUtf8(e.what()));
+        return false;
+    } catch (const AppException &e) {
+        UIHelper::showWarning(this, "Lỗi nạp dữ liệu", QString::fromUtf8(e.what()));
+        return false;
+    } catch (const std::exception &e) {
+        UIHelper::showWarning(this, "Lỗi ngoại lệ hệ thống", QString("Đã xảy ra ngoại lệ: %1").arg(e.what()));
+        return false;
+    }
+
+    bool ok = managers && patients && doctors && symptoms && symptomPatients && symptomPatientDetails && appointments;
+    if (!ok)
+    {
+        UIHelper::showWarning(this, "Lỗi dữ liệu", "Không thể nạp dữ liệu từ thư mục Data/! Vui lòng đảm bảo tệp dữ liệu tồn tại và ứng dụng được khởi chạy từ đúng thư mục.");
+        return false;
+    }
+
+    if (patients) libPBL2::sortPatients(patients, libPBL2::PatientSortBy::ID, false);
+    if (doctors) libPBL2::sortDoctors(doctors, libPBL2::DoctorSortBy::ID, false);
+    if (appointments) libPBL2::sortAppointments(appointments, libPBL2::AppointmentSortBy::ID, false);
+    if (managers) libPBL2::sortManagers(managers, libPBL2::AccountSortBy::ID, false);
+    if (symptomPatients) {
+        libPBL2::qsort(symptomPatients, [](const SymptomPatient &a, const SymptomPatient &b) {
+            return a.getSP_id() < b.getSP_id();
+        });
+    }
+    if (symptomPatientDetails) {
+        libPBL2::qsort(symptomPatientDetails, [](const SymptomPatientDetail &a, const SymptomPatientDetail &b) {
+            if (a.getSP_id() != b.getSP_id()) return a.getSP_id() < b.getSP_id();
+            return a.getS_id() < b.getS_id();
+        });
+    }
+
+    windowStack = new QStackedWidget(this);
+    setCentralWidget(windowStack);
+
+    loginView = new Login(windowStack);
+    windowStack->addWidget(loginView);
+    connect(loginView, &Login::loginClicked, this, &MainWindow::handleLogin);
+
+    showLogin();
+    return true;
+}
+
+void MainWindow::showLogin()
+{
+    setWindowTitle("An Tâm · Đăng nhập");
+    if (loginView)
+    {
+        loginView->clearInputs();
+        loginView->clearMessage();
+    }
+    if (windowStack && loginView)
+    {
+        windowStack->setCurrentWidget(loginView);
+    }
+}
+
+void MainWindow::handleLogin()
+{
+    if (!loginView) return;
+    loginView->clearMessage();
+
+    QString username = loginView->getUsername();
+    QString password = loginView->getPassword();
+
+    QString errorMessage;
+    Manager *manager = nullptr;
+    bool success = AuthController::login(managers, username, password, errorMessage, manager);
+
+    if (success && manager)
+    {
+        delete currentManager;
+        currentManager = new Manager(*manager);
+        currentManagerId = currentManager->getID();
+        m_startedAsTempAdmin = ManagerController::isTemporaryAdmin(currentManager, permissionRecords);
+        m_forceLogoutInProgress = false;
+
+        setupShell();
+        setWindowTitle("An Tâm · Quản lý phòng khám");
+    }
+    else
+    {
+        loginView->showErrorMessage(errorMessage);
+    }
+}
+
+void MainWindow::handleLogout()
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle("Đăng xuất");
+    dialog.setWindowFlags(dialog.windowFlags() & ~Qt::WindowContextHelpButtonHint);
+    dialog.setFixedSize(430, 200);
+    dialog.setStyleSheet(R"(
+        QDialog {
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+        }
+    )");
+
+    auto *rootLayout = new QVBoxLayout(&dialog);
+    rootLayout->setContentsMargins(24, 22, 24, 20);
+    rootLayout->setSpacing(18);
+
+    auto *contentRow = new QHBoxLayout;
+    contentRow->setSpacing(16);
+
+    auto *iconBox = new QLabel("↪");
+    iconBox->setFixedSize(48, 48);
+    iconBox->setAlignment(Qt::AlignCenter);
+    iconBox->setStyleSheet(R"(
+        QLabel {
+            background: #fee2e2;
+            color: #dc2626;
+            font-size: 24px;
+            font-weight: bold;
+            border-radius: 24px;
+        }
+    )");
+    contentRow->addWidget(iconBox, 0, Qt::AlignTop);
+
+    auto *textCol = new QVBoxLayout;
+    textCol->setSpacing(6);
+    auto *titleLabel = new QLabel("Xác nhận đăng xuất");
+    titleLabel->setStyleSheet("font-size: 16px; font-weight: 700; color: #0f172a;");
+
+    auto *descLabel = new QLabel("Bạn có chắc chắn muốn đăng xuất khỏi hệ thống không? Dữ liệu phiên làm việc sẽ được lưu tự động.");
+    descLabel->setStyleSheet("font-size: 13px; color: #64748b;");
+    descLabel->setWordWrap(true);
+
+    textCol->addWidget(titleLabel);
+    textCol->addWidget(descLabel);
+    contentRow->addLayout(textCol, 1);
+    rootLayout->addLayout(contentRow);
+
+    auto *btnRow = new QHBoxLayout;
+    btnRow->setSpacing(10);
+    btnRow->addStretch();
+
+    auto *cancelBtn = new QPushButton("Hủy bỏ");
+    cancelBtn->setAutoDefault(false);
+    cancelBtn->setDefault(false);
+    cancelBtn->setCursor(Qt::PointingHandCursor);
+    cancelBtn->setStyleSheet(R"(
+        QPushButton {
+            background: #f1f5f9;
+            color: #475569;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 8px 18px;
+            min-height: 20px;
+        }
+        QPushButton:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+        }
+    )");
+    connect(cancelBtn, &QPushButton::clicked, &dialog, &QDialog::reject);
+
+    auto *confirmBtn = new QPushButton("Đăng xuất");
+    confirmBtn->setAutoDefault(false);
+    confirmBtn->setDefault(false);
+    confirmBtn->setCursor(Qt::PointingHandCursor);
+    confirmBtn->setStyleSheet(R"(
+        QPushButton {
+            background: #ef4444;
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 8px 20px;
+            min-height: 20px;
+        }
+        QPushButton:hover {
+            background: #dc2626;
+        }
+    )");
+    connect(confirmBtn, &QPushButton::clicked, &dialog, &QDialog::accept);
+
+    btnRow->addWidget(cancelBtn);
+    btnRow->addWidget(confirmBtn);
+    rootLayout->addLayout(btnRow);
+
+    if (dialog.exec() == QDialog::Accepted)
+    {
+        resetTabOrderToId(activeNav);
+        saveAll(SaveScope::All, SaveAction::CloseOrLogout);
+        if (clockTimer) {
+            clockTimer->stop();
+        }
+        delete currentManager;
+        currentManager = nullptr;
+        currentManagerId.clear();
+        m_startedAsTempAdmin = false;
+        m_forceLogoutInProgress = false;
+        showLogin();
+    }
+}
+
+void MainWindow::setPage(int index)
+{
+    if (index != activeNav)
+    {
+        resetTabOrderToId(activeNav);
+    }
+    activeNav = index;
+    if (pages)
+        pages->setCurrentIndex(index);
+    updateNavigation();
+}
+
+void MainWindow::refreshPage(int index)
+{
+    if (!pages)
+        return;
+
+    bool wasCurrent = (pages->currentIndex() == index);
+
+    switch (index)
+    {
+    case 0:
+        if (appointmentView)
+        {
+            QWidget *old = pages->widget(0);
+            pages->removeWidget(old);
+            if (old) old->deleteLater();
+            pages->insertWidget(0, appointmentView->createDashboardWidget(pages));
+            if (wasCurrent) pages->setCurrentIndex(0);
+        }
+        break;
+    case 1:
+        if (appointmentView)
+        {
+            QWidget *old = pages->widget(1);
+            pages->removeWidget(old);
+            if (old) old->deleteLater();
+            pages->insertWidget(1, appointmentView->createBookingWidget(pages));
+            if (wasCurrent) pages->setCurrentIndex(1);
+        }
+        break;
+    case 2:
+        if (patientView)
+            patientView->resetToFirstPage();
+        break;
+    case 3:
+        if (doctorView)
+            doctorView->resetToFirstPage();
+        break;
+    case 4:
+        if (appointmentView)
+        {
+            appointmentView->resetToFirstPage();
+            QWidget *old = pages->widget(4);
+            pages->removeWidget(old);
+            if (old) old->deleteLater();
+            pages->insertWidget(4, appointmentView->createAppointmentListWidget(pages));
+            if (wasCurrent) pages->setCurrentIndex(4);
+        }
+        break;
+    case 5:
+        if (statisticView)
+            statisticView->refresh();
+        break;
+    case 6:
+        if (accountView)
+            accountView->resetToFirstPage();
+        break;
+    }
+}
+
+bool MainWindow::saveAll(SaveScope scope, SaveAction action)
+{
+    bool ok = true;
+    bool warned = false;
+
+    auto saveSymptoms = [&]() {
+        if (symptomPatients)
+        {
+            libPBL2::qsort(symptomPatients, [](const SymptomPatient &a, const SymptomPatient &b) {
+                return a.getSP_id() < b.getSP_id();
+            });
+            ok = SymptomPatient::saveToFile(symptomPatientPath, symptomPatients) && ok;
+        }
+        if (symptomPatientDetails)
+        {
+            libPBL2::qsort(symptomPatientDetails, [](const SymptomPatientDetail &a, const SymptomPatientDetail &b) {
+                if (a.getSP_id() != b.getSP_id()) return a.getSP_id() < b.getSP_id();
+                return a.getS_id() < b.getS_id();
+            });
+            ok = SymptomPatientDetail::saveToFile(symptomPatientDetailPath, symptomPatientDetails) && ok;
+        }
+    };
+
+    try {
+
+        if (scope == SaveScope::All || scope == SaveScope::Patient)
+        {
+            if (patients) libPBL2::sortPatients(patients, libPBL2::PatientSortBy::ID, true);
+            saveSymptoms();
+            ok = Patient::saveToFile(patientPath, patients) && ok;
+
+            if (action == SaveAction::Normal && patientView)
+            {
+                patientView->reapplyCurrentSort();
+            }
+        }
+
+        if (scope == SaveScope::All || scope == SaveScope::Doctor)
+        {
+            if (doctors) libPBL2::sortDoctors(doctors, libPBL2::DoctorSortBy::ID, true);
+            ok = Doctor::saveToFile(doctorPath, doctors) && ok;
+
+            if (action == SaveAction::Normal && doctorView)
+            {
+                doctorView->reapplyCurrentSort();
+            }
+        }
+
+        if (scope == SaveScope::All || scope == SaveScope::Appointment)
+        {
+            if (appointments) {
+                AppointmentController::syncExpiredAppointments(appointments);
+                libPBL2::sortAppointments(appointments, libPBL2::AppointmentSortBy::ID, true);
+            }
+            if (scope == SaveScope::Appointment)
+            {
+                saveSymptoms();
+            }
+            ok = Appointment::saveToFile(appointmentPath, appointments) && ok;
+
+            if (action == SaveAction::Normal && appointmentView)
+            {
+                appointmentView->reapplyCurrentSort();
+            }
+        }
+
+        if (scope == SaveScope::All || scope == SaveScope::Account)
+        {
+            if (managers) libPBL2::sortManagers(managers, libPBL2::AccountSortBy::ID, true);
+            ok = Manager::saveToFile(managerPath, managers) && ok;
+
+            if (permissionRecords) {
+                ok = PermissionManager::saveToFile(permissionManagerPath, permissionRecords) && ok;
+            }
+
+            if (action == SaveAction::Normal && accountView)
+            {
+                accountView->reapplyCurrentSort();
+            }
+        }
+    } catch (const FileIOException &e) {
+        ok = false;
+        warned = true;
+        UIHelper::showWarning(this, "Lỗi ghi tệp dữ liệu", QString::fromUtf8(e.what()));
+    } catch (const AppException &e) {
+        ok = false;
+        warned = true;
+        UIHelper::showWarning(this, "Lỗi hệ thống", QString::fromUtf8(e.what()));
+    } catch (const std::exception &e) {
+        ok = false;
+        warned = true;
+        UIHelper::showWarning(this, "Lỗi ngoại lệ", QString("Đã xảy ra ngoại lệ khi lưu: %1").arg(e.what()));
+    }
+
+    if (!ok && !warned)
+    {
+        UIHelper::showWarning(this, "Lỗi lưu dữ liệu", "Không thể lưu một hoặc nhiều tệp dữ liệu.");
+    }
+    return ok;
+}
 
 Manager *MainWindow::getCurrentManager() const
 {
@@ -131,9 +586,12 @@ void MainWindow::updateUserProfileDisplay()
     {
         sidebarNameLabel->setText(currentName);
     }
+    if (sidebarRoleLabel)
+    {
+        sidebarRoleLabel->setText(curM ? ManagerController::displayRoleName(curM, permissionRecords) : "Quản trị hệ thống");
+    }
 }
 
-// --- KIỂM TRA PHÂN QUYỀN (Ủy thác ManagerController) ---
 bool MainWindow::isRootAdmin() const
 {
     return ManagerController::isRootAdmin(getCurrentManager());
@@ -149,7 +607,6 @@ bool MainWindow::hasPermission(const string &permissionId) const
     return ManagerController::hasPermission(getCurrentManager(), permissionId, permissionRecords);
 }
 
-// --- TIỆN ÍCH DỮ LIỆU (Ủy thác Controllers) ---
 QString MainWindow::specialty(const string &id) const
 {
     return DoctorController::getSpecialty(id, specializationPath);
@@ -256,34 +713,38 @@ void MainWindow::editAppointmentDialog(const string &id)
     }
 }
 
-// --- STYLESHEET TOÀN CỤC ---
+void MainWindow::showRescheduledSummaryDialog(QWidget *parent, const QList<RescheduledResultItem> &items, int totalAffected, const QString &customTitle)
+{
+    if (appointmentView) {
+        appointmentView->showRescheduledSummaryDialog(parent, items, totalAffected, customTitle);
+    }
+}
+
 QString MainWindow::style() const
 {
     return QStringLiteral(R"(
             QWidget { font-family: 'Be Vietnam Pro', 'Segoe UI', sans-serif; font-size: 14px; color: #183044; }
             QMainWindow, QWidget#appRoot { background: #f4f7fb; }
-            QLabel#muted { color: #8091a4; }
-            QLabel#pageTitle { font-size: 26px; font-weight: 750; color: #17334a; }
+            QLabel#pageTitle { font-size: 26px; font-weight: 700; color: #17334a; }
             QLabel#pageSubtitle { font-size: 13.5px; color: #64748b; }
             QFrame#sidebar { background: #102f43; border: 0; }
-            QLabel#brand { color: white; font-size: 20px; font-weight: 750; letter-spacing: 0.5px; }
+            QLabel#brand { color: white; font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
             QLabel#brandSub { color: #9db7c6; font-size: 11px; font-weight: 600; letter-spacing: 1px; }
             QPushButton#nav { color: #bfd0d9; text-align: left; padding: 12px 16px; border: 0; border-radius: 9px; background: transparent; font-size: 14px; font-weight: 500; }
             QPushButton#nav:hover { color: white; background: #1b465d; }
-            QPushButton#nav[active="true"] { color: white; background: #167d79; font-weight: 650; }
-            QPushButton#primary { background: #167d79; color: white; border: 0; border-radius: 9px; padding: 11px 20px; font-weight: 650; font-size: 14px; }
+            QPushButton#nav[active="true"] { color: white; background: #167d79; font-weight: 600; }
+            QPushButton#primary { background: #167d79; color: white; border: 0; border-radius: 9px; padding: 11px 20px; font-weight: 600; font-size: 14px; }
             QPushButton#primary:hover { background: #106d69; }
             QPushButton#secondary { background: white; color: #355166; border: 1px solid #dce5eb; border-radius: 9px; padding: 10px 16px; font-weight: 500; }
-            QPushButton#danger { background: #fff0ef; color: #b94b45; border: 0; border-radius: 8px; padding: 9px 14px; font-weight: 600; }
             QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QDateTimeEdit, QDateEdit { background: white; border: 1px solid #d8e2e9; border-radius: 8px; padding: 9px 12px; min-height: 20px; selection-background-color: #167d79; }
             QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QDateTimeEdit:focus, QDateEdit:focus { border: 1px solid #167d79; }
             QComboBox, QDateEdit, QDateTimeEdit {
-                padding-right: 28px;
+                padding-right: 4px;
             }
-            QComboBox:disabled, QDateEdit:disabled, QDateTimeEdit:disabled {
-                background: #f1f5f9;
-                color: #94a3b8;
-                border-color: #e2e8f0;
+            QLineEdit:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled, QComboBox:disabled, QDateEdit:disabled, QDateTimeEdit:disabled {
+                background: #e2e8f0;
+                color: #475569;
+                border-color: #cbd5e1;
             }
             QComboBox::drop-down, QDateEdit::drop-down, QDateTimeEdit::drop-down {
                 subcontrol-origin: border;
@@ -308,6 +769,19 @@ QString MainWindow::style() const
             QSpinBox, QDoubleSpinBox {
                 padding-right: 30px;
             }
+            QSpinBox:disabled, QDoubleSpinBox:disabled {
+                padding-right: 12px;
+            }
+            QSpinBox::up-button:disabled, QDoubleSpinBox::up-button:disabled,
+            QSpinBox::down-button:disabled, QDoubleSpinBox::down-button:disabled {
+                width: 0px;
+                border: none;
+                background: transparent;
+            }
+            QSpinBox::up-arrow:disabled, QDoubleSpinBox::up-arrow:disabled,
+            QSpinBox::down-arrow:disabled, QDoubleSpinBox::down-arrow:disabled {
+                image: none;
+            }
             QSpinBox::up-button, QDoubleSpinBox::up-button {
                 subcontrol-origin: border;
                 subcontrol-position: top right;
@@ -320,10 +794,6 @@ QString MainWindow::style() const
             QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {
                 background: #0d9488;
             }
-            QSpinBox::up-button:hover QSpinBox::up-arrow,
-            QDoubleSpinBox::up-button:hover QDoubleSpinBox::up-arrow {
-                image: url(:/assets/textures/arrow_up_white.png);
-            }
             QSpinBox::up-button:pressed, QDoubleSpinBox::up-button:pressed {
                 background: #0f766e;
             }
@@ -331,6 +801,9 @@ QString MainWindow::style() const
                 image: url(:/assets/textures/arrow_up_dark.png);
                 width: 9px;
                 height: 9px;
+            }
+            QSpinBox::up-arrow:hover, QDoubleSpinBox::up-arrow:hover {
+                image: url(:/assets/textures/arrow_up_white.png);
             }
             QSpinBox::down-button, QDoubleSpinBox::down-button {
                 subcontrol-origin: border;
@@ -343,10 +816,6 @@ QString MainWindow::style() const
             QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
                 background: #0d9488;
             }
-            QSpinBox::down-button:hover QSpinBox::down-arrow,
-            QDoubleSpinBox::down-button:hover QDoubleSpinBox::down-arrow {
-                image: url(:/assets/textures/arrow_down_white.png);
-            }
             QSpinBox::down-button:pressed, QDoubleSpinBox::down-button:pressed {
                 background: #0f766e;
             }
@@ -354,6 +823,9 @@ QString MainWindow::style() const
                 image: url(:/assets/textures/arrow_down_dark.png);
                 width: 9px;
                 height: 9px;
+            }
+            QSpinBox::down-arrow:hover, QDoubleSpinBox::down-arrow:hover {
+                image: url(:/assets/textures/arrow_down_white.png);
             }
             QComboBox QAbstractItemView {
                 background-color: #ffffff;
@@ -406,23 +878,17 @@ QString MainWindow::style() const
             QTableWidget::item { padding: 4px 8px; font-size: 13.5px; color: #1e293b; border: none; border-bottom: 1px solid #f1f5f9; border-left: none; border-right: none; }
             QTableWidget::item:hover { background-color: #f8fafc; }
             QFrame#card, QFrame#panel { background: white; border: 1px solid #e2e8f0; border-radius: 14px; }
-            QLabel#metricValue { font-size: 32px; font-weight: 800; }
-            QLabel#metricLabel { color: #64748b; font-size: 12px; font-weight: 700; letter-spacing: 0.5px; }
-            QLabel#pill { background: #e6f5f2; color: #14756e; border-radius: 10px; padding: 5px 9px; font-size: 11px; font-weight: 700; }
             QCheckBox { spacing: 9px; }
         )");
 }
 
-void MainWindow::setPage(int index)
+void MainWindow::closeEvent(QCloseEvent *event)
 {
-    if (index != activeNav)
+    if (currentManager != nullptr)
     {
-        resetTabOrderToId(activeNav);
+        saveAll(SaveScope::All, SaveAction::CloseOrLogout);
     }
-    activeNav = index;
-    if (pages)
-        pages->setCurrentIndex(index);
-    updateNavigation();
+    QMainWindow::closeEvent(event);
 }
 
 void MainWindow::updateNavigation()
@@ -440,174 +906,14 @@ void MainWindow::updateNavigation()
     }
 }
 
-// --- MÀN HÌNH ĐĂNG NHẬP ---
-void MainWindow::showLogin()
-{
-    setWindowTitle("An Tâm · Đăng nhập");
-    if (loginView)
-    {
-        loginView->clearInputs();
-        loginView->clearMessage();
-    }
-    if (windowStack && loginView)
-    {
-        windowStack->setCurrentWidget(loginView);
-    }
-}
-
-void MainWindow::handleLogin()
-{
-    if (!loginView) return;
-    loginView->clearMessage();
-
-    QString username = loginView->getUsername();
-    QString password = loginView->getPassword();
-
-    QString errorMessage;
-    Manager *manager = nullptr;
-    bool success = AuthController::login(managers, username, password, errorMessage, manager);
-
-    if (success && manager)
-    {
-        delete currentManager;
-        currentManager = new Manager(*manager);
-        currentManagerId = currentManager->getID();
-        loginView->showSuccessMessage("Đăng nhập thành công!");
-
-        // Khởi dựng Shell làm việc theo phân quyền tài khoản
-        setupShell();
-        if (windowStack && root)
-        {
-            windowStack->addWidget(root);
-            windowStack->setCurrentWidget(root);
-        }
-        setWindowTitle("An Tâm · Quản lý phòng khám");
-        setPage(0);
-    }
-    else
-    {
-        loginView->showErrorMessage(errorMessage);
-    }
-}
-
-void MainWindow::handleLogout()
-{
-    QDialog dialog(this);
-    dialog.setWindowTitle("Đăng xuất");
-    dialog.setWindowFlags(dialog.windowFlags() & ~Qt::WindowContextHelpButtonHint);
-    dialog.setFixedSize(430, 200);
-    dialog.setStyleSheet(R"(
-        QDialog {
-            background-color: #ffffff;
-            border: 1px solid #e2e8f0;
-            border-radius: 14px;
-        }
-    )");
-
-    auto *rootLayout = new QVBoxLayout(&dialog);
-    rootLayout->setContentsMargins(24, 22, 24, 20);
-    rootLayout->setSpacing(18);
-
-    auto *contentRow = new QHBoxLayout;
-    contentRow->setSpacing(16);
-
-    // Icon đăng xuất bo tròn màu đỏ nhạt
-    auto *iconBox = new QLabel("↪");
-    iconBox->setFixedSize(48, 48);
-    iconBox->setAlignment(Qt::AlignCenter);
-    iconBox->setStyleSheet(R"(
-        QLabel {
-            background: #fee2e2;
-            color: #dc2626;
-            font-size: 24px;
-            font-weight: bold;
-            border-radius: 24px;
-        }
-    )");
-    contentRow->addWidget(iconBox, 0, Qt::AlignTop);
-
-    auto *textCol = new QVBoxLayout;
-    textCol->setSpacing(6);
-    auto *titleLabel = new QLabel("Xác nhận đăng xuất");
-    titleLabel->setStyleSheet("font-size: 16px; font-weight: 700; color: #0f172a;");
-
-    auto *descLabel = new QLabel("Bạn có chắc chắn muốn đăng xuất khỏi hệ thống không? Dữ liệu phiên làm việc sẽ được lưu tự động.");
-    descLabel->setStyleSheet("font-size: 13px; color: #64748b; line-height: 1.4;");
-    descLabel->setWordWrap(true);
-
-    textCol->addWidget(titleLabel);
-    textCol->addWidget(descLabel);
-    contentRow->addLayout(textCol, 1);
-    rootLayout->addLayout(contentRow);
-
-    // Nút bấm hành động
-    auto *btnRow = new QHBoxLayout;
-    btnRow->setSpacing(10);
-    btnRow->addStretch();
-
-    auto *cancelBtn = new QPushButton("Hủy bỏ");
-    cancelBtn->setAutoDefault(false);
-    cancelBtn->setDefault(false);
-    cancelBtn->setCursor(Qt::PointingHandCursor);
-    cancelBtn->setStyleSheet(R"(
-        QPushButton {
-            background: #f1f5f9;
-            color: #475569;
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 600;
-            padding: 8px 18px;
-            min-height: 20px;
-        }
-        QPushButton:hover {
-            background: #e2e8f0;
-            color: #0f172a;
-        }
-    )");
-    connect(cancelBtn, &QPushButton::clicked, &dialog, &QDialog::reject);
-
-    auto *confirmBtn = new QPushButton("Đăng xuất");
-    confirmBtn->setAutoDefault(false);
-    confirmBtn->setDefault(false);
-    confirmBtn->setCursor(Qt::PointingHandCursor);
-    confirmBtn->setStyleSheet(R"(
-        QPushButton {
-            background: #ef4444;
-            color: #ffffff;
-            border: none;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 700;
-            padding: 8px 20px;
-            min-height: 20px;
-        }
-        QPushButton:hover {
-            background: #dc2626;
-        }
-    )");
-    connect(confirmBtn, &QPushButton::clicked, &dialog, &QDialog::accept);
-
-    btnRow->addWidget(cancelBtn);
-    btnRow->addWidget(confirmBtn);
-    rootLayout->addLayout(btnRow);
-
-    if (dialog.exec() == QDialog::Accepted)
-    {
-        resetTabOrderToId(activeNav);
-        saveAll(SaveScope::All, SaveAction::CloseOrLogout);
-        delete currentManager;
-        currentManager = nullptr;
-        currentManagerId.clear();
-        showLogin();
-    }
-}
-
-// --- SHELL GIAO DIỆN CHÍNH ---
 void MainWindow::setupShell()
 {
     if (root)
     {
+        clockTimer = nullptr;
+        sidebarAvatarLabel = nullptr;
+        sidebarNameLabel = nullptr;
+        sidebarRoleLabel = nullptr;
         if (windowStack)
             windowStack->removeWidget(root);
         delete root;
@@ -640,7 +946,6 @@ void MainWindow::setupShell()
     side->setContentsMargins(18, 22, 18, 16);
     side->setSpacing(8);
 
-    // Tiêu đề thương hiệu chuẩn ✦ AN TÂM
     auto *brand = new QLabel("✦  AN TÂM");
     brand->setObjectName("brand");
     auto *brandSub = new QLabel("PHÒNG KHÁM ĐA KHOA");
@@ -656,7 +961,8 @@ void MainWindow::setupShell()
         "♡   Bệnh nhân",
         "✚   Bác sĩ",
         "▤   Quản lý lịch khám",
-        "📊   Thống kê"};
+        "📊   Thống kê",
+        "♙   Quản lý tài khoản"};
     for (int i = 0; i < labels.size(); ++i)
     {
         auto *b = UIHelper::button(labels[i], "nav");
@@ -665,23 +971,7 @@ void MainWindow::setupShell()
         {
             if (i != activeNav)
             {
-                resetTabOrderToId(activeNav);
                 setPage(i);
-            }
-        });
-        side->addWidget(b);
-    }
-
-    if (isAdministrator())
-    {
-        auto *b = UIHelper::button("♙   Quản lý tài khoản", "nav");
-        navButtons.push_back(b);
-        connect(b, &QPushButton::clicked, this, [this]
-        {
-            if (6 != activeNav)
-            {
-                resetTabOrderToId(activeNav);
-                setPage(6);
             }
         });
         side->addWidget(b);
@@ -689,7 +979,6 @@ void MainWindow::setupShell()
 
     side->addStretch();
 
-    // Khung tài khoản góc dưới bên trái (nhích lên phía trên thời gian thực)
     QFrame *userCard = new QFrame;
     userCard->setObjectName("userCard");
     userCard->setStyleSheet(R"(
@@ -719,15 +1008,14 @@ void MainWindow::setupShell()
     sidebarNameLabel->setStyleSheet("color: white; font-weight: 700; font-size: 13px;");
     sidebarNameLabel->setWordWrap(true);
 
-    QLabel *roleLabel = new QLabel(curM ? ManagerController::roleName(curM->getRole()) : "Quản trị hệ thống");
-    roleLabel->setStyleSheet("color: #8faec0; font-size: 11px; font-weight: 500;");
+    sidebarRoleLabel = new QLabel(curM ? ManagerController::displayRoleName(curM, permissionRecords) : "Quản trị hệ thống");
+    sidebarRoleLabel->setStyleSheet("color: #8faec0; font-size: 11px; font-weight: 500;");
 
     nameCol->addWidget(sidebarNameLabel);
-    nameCol->addWidget(roleLabel);
+    nameCol->addWidget(sidebarRoleLabel);
     profileRow->addLayout(nameCol, 1);
     userLayout->addLayout(profileRow);
 
-    // Nút Đăng xuất / Lưu dữ liệu
     QPushButton *logout = new QPushButton("↪   Đăng xuất");
     logout->setCursor(Qt::PointingHandCursor);
     logout->setStyleSheet(R"(
@@ -752,7 +1040,6 @@ void MainWindow::setupShell()
 
     side->addSpacing(8);
 
-    // Khung thời gian thực phía dưới account
     QFrame *timeCard = new QFrame;
     timeCard->setObjectName("timeCard");
     timeCard->setStyleSheet(R"(
@@ -773,7 +1060,7 @@ void MainWindow::setupShell()
     clockDot->setStyleSheet("color: #2dd4bf; font-size: 11px; background: transparent; border: none;");
 
     auto *timeLabel = new QLabel;
-    timeLabel->setStyleSheet("color: #f8fafc; font-weight: 750; font-size: 14.5px; font-family: 'Consolas', 'Segoe UI', monospace; letter-spacing: 0.5px; background: transparent; border: none;");
+    timeLabel->setStyleSheet("color: #f8fafc; font-weight: 700; font-size: 14.5px; font-family: 'Consolas', 'Segoe UI', monospace; letter-spacing: 0.5px; background: transparent; border: none;");
 
     timeRow->addWidget(clockDot);
     timeRow->addWidget(timeLabel);
@@ -796,8 +1083,14 @@ void MainWindow::setupShell()
         dateLabel->setText(QStringLiteral("%1, %2").arg(dowStr, now.toString("dd/MM/yyyy")));
     };
 
-    auto *clockTimer = new QTimer(timeCard);
-    connect(clockTimer, &QTimer::timeout, timeCard, updateClock);
+    clockTimer = new QTimer(timeCard);
+    connect(clockTimer, &QTimer::timeout, timeCard, [this, updateClock]() {
+        updateClock();
+        if (m_startedAsTempAdmin && !m_forceLogoutInProgress &&
+            !ManagerController::isTemporaryAdmin(getCurrentManager(), permissionRecords)) {
+            handleTemporaryAdminExpired();
+        }
+    });
     clockTimer->start(1000);
     updateClock();
 
@@ -808,29 +1101,25 @@ void MainWindow::setupShell()
     outer->addWidget(sidebar);
     outer->addWidget(pages, 1);
 
-    // Khởi tạo các Views từ từng module
     appointmentView = new AppointmentView(this, this);
 
-    pages->addWidget(appointmentView->createDashboardWidget(pages)); // index 0: Tổng quan
+    pages->addWidget(appointmentView->createDashboardWidget(pages));
 
-    pages->addWidget(appointmentView->createBookingWidget(pages)); // index 1: Đặt lịch khám
+    pages->addWidget(appointmentView->createBookingWidget(pages));
 
     patientView = new PatientView(this, pages);
-    pages->addWidget(patientView); // index 2: Bệnh nhân
+    pages->addWidget(patientView);
 
     doctorView = new DoctorView(this, pages);
-    pages->addWidget(doctorView); // index 3: Bác sĩ
+    pages->addWidget(doctorView);
 
-    pages->addWidget(appointmentView->createAppointmentListWidget(pages)); // index 4: Quản lý lịch khám
+    pages->addWidget(appointmentView->createAppointmentListWidget(pages));
 
     statisticView = new StatisticView(this, pages);
-    pages->addWidget(statisticView); // index 5: Thống kê
+    pages->addWidget(statisticView);
 
-    if (isAdministrator())
-    {
-        accountView = new AccountView(this, pages);
-        pages->addWidget(accountView); // index 6: Quản lý tài khoản
-    }
+    accountView = new AccountView(this, pages);
+    pages->addWidget(accountView);
 
     if (windowStack)
     {
@@ -842,299 +1131,42 @@ void MainWindow::setupShell()
     setPage(0);
 }
 
-void MainWindow::refreshPage(int index)
+void MainWindow::handleTemporaryAdminExpired()
 {
-    if (!pages)
-        return;
-
-    switch (index)
-    {
-    case 0:
-        if (appointmentView)
-        {
-            QWidget *old = pages->widget(0);
-            pages->removeWidget(old);
-            if (old) old->deleteLater();
-            pages->insertWidget(0, appointmentView->createDashboardWidget(pages));
-        }
-        break;
-    case 1:
-        if (appointmentView)
-        {
-            QWidget *old = pages->widget(1);
-            pages->removeWidget(old);
-            if (old) old->deleteLater();
-            pages->insertWidget(1, appointmentView->createBookingWidget(pages));
-        }
-        break;
-    case 2:
-        if (patientView)
-            patientView->resetToFirstPage();
-        break;
-    case 3:
-        if (doctorView)
-            doctorView->resetToFirstPage();
-        break;
-    case 4:
-        if (appointmentView)
-        {
-            appointmentView->resetToFirstPage();
-            QWidget *old = pages->widget(4);
-            pages->removeWidget(old);
-            if (old) old->deleteLater();
-            pages->insertWidget(4, appointmentView->createAppointmentListWidget(pages));
-        }
-        break;
-    case 5:
-        if (statisticView)
-            statisticView->refresh();
-        break;
-    case 6:
-        if (accountView)
-            accountView->resetToFirstPage();
-        break;
-    }
-}
-
-void MainWindow::closeEvent(QCloseEvent *event)
-{
-    saveAll(SaveScope::All, SaveAction::CloseOrLogout);
-    QMainWindow::closeEvent(event);
-}
-
-void MainWindow::saveAll(SaveScope scope, SaveAction action)
-{
-    bool ok = true;
-
-    try {
-        // 1. Bệnh nhân & Triệu chứng
-        if (scope == SaveScope::All || scope == SaveScope::Patient)
-        {
-            if (patients) libPBL2::sortPatients(patients, libPBL2::PatientSortBy::ID, true);
-            if (symptomPatients)
-            {
-                libPBL2::qsort(symptomPatients, [](const SymptomPatient &a, const SymptomPatient &b) {
-                    return a.getSP_id() < b.getSP_id();
-                });
-                ok = SymptomPatient::saveToFile(symptomPatientPath, symptomPatients) && ok;
-            }
-            if (symptomPatientDetails)
-            {
-                libPBL2::qsort(symptomPatientDetails, [](const SymptomPatientDetail &a, const SymptomPatientDetail &b) {
-                    if (a.getSP_id() != b.getSP_id()) return a.getSP_id() < b.getSP_id();
-                    return a.getS_id() < b.getS_id();
-                });
-                ok = SymptomPatientDetail::saveToFile(symptomPatientDetailPath, symptomPatientDetails) && ok;
-            }
-            ok = Patient::saveToFile(patientPath, patients) && ok;
-
-            if (action == SaveAction::Normal && patientView)
-            {
-                patientView->reapplyCurrentSort();
-            }
-        }
-
-        // 2. Bác sĩ
-        if (scope == SaveScope::All || scope == SaveScope::Doctor)
-        {
-            if (doctors) libPBL2::sortDoctors(doctors, libPBL2::DoctorSortBy::ID, true);
-            ok = Doctor::saveToFile(doctorPath, doctors) && ok;
-
-            if (action == SaveAction::Normal && doctorView)
-            {
-                doctorView->reapplyCurrentSort();
-            }
-        }
-
-        // 3. Lịch hẹn (+ Triệu chứng nếu có)
-        if (scope == SaveScope::All || scope == SaveScope::Appointment)
-        {
-            if (appointments) {
-                AppointmentController::syncExpiredAppointments(appointments);
-                libPBL2::sortAppointments(appointments, libPBL2::AppointmentSortBy::ID, true);
-            }
-            if (symptomPatients && scope == SaveScope::Appointment)
-            {
-                libPBL2::qsort(symptomPatients, [](const SymptomPatient &a, const SymptomPatient &b) {
-                    return a.getSP_id() < b.getSP_id();
-                });
-                ok = SymptomPatient::saveToFile(symptomPatientPath, symptomPatients) && ok;
-            }
-            if (symptomPatientDetails && scope == SaveScope::Appointment)
-            {
-                libPBL2::qsort(symptomPatientDetails, [](const SymptomPatientDetail &a, const SymptomPatientDetail &b) {
-                    if (a.getSP_id() != b.getSP_id()) return a.getSP_id() < b.getSP_id();
-                    return a.getS_id() < b.getS_id();
-                });
-                ok = SymptomPatientDetail::saveToFile(symptomPatientDetailPath, symptomPatientDetails) && ok;
-            }
-            ok = Appointment::saveToFile(appointmentPath, appointments) && ok;
-
-            if (action == SaveAction::Normal && appointmentView)
-            {
-                appointmentView->reapplyCurrentSort();
-            }
-        }
-
-        // 4. Quản lý tài khoản
-        if (scope == SaveScope::All || scope == SaveScope::Account)
-        {
-            if (managers) libPBL2::sortManagers(managers, libPBL2::AccountSortBy::ID, true);
-            ok = Manager::saveToFile(managerPath, managers) && ok;
-
-            if (permissionRecords) {
-                ok = PermissionManager::saveToFile(permissionManagerPath, permissionRecords) && ok;
-            }
-
-            if (action == SaveAction::Normal && accountView)
-            {
-                accountView->reapplyCurrentSort();
-            }
-        }
-    } catch (const FileIOException &e) {
-        ok = false;
-        UIHelper::showWarning(this, "Lỗi ghi tệp dữ liệu", QString::fromUtf8(e.what()));
-    } catch (const AppException &e) {
-        ok = false;
-        UIHelper::showWarning(this, "Lỗi hệ thống", QString::fromUtf8(e.what()));
-    } catch (const std::exception &e) {
-        ok = false;
-        UIHelper::showWarning(this, "Lỗi ngoại lệ", QString("Đã xảy ra ngoại lệ khi lưu: %1").arg(e.what()));
+    if (m_forceLogoutInProgress) return;
+    m_forceLogoutInProgress = true;
+    if (clockTimer) {
+        clockTimer->stop();
     }
 
-    if (!ok)
-    {
-        UIHelper::showWarning(this, "Lỗi lưu dữ liệu", "Không thể lưu một hoặc nhiều tệp dữ liệu.");
-    }
-}
-
-MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
-{
-    setCursor(Qt::ArrowCursor);
-    if (qApp) {
-        qApp->installEventFilter(CursorLeaveFilter::instance());
-    }
-    setStyleSheet(style());
-    setMinimumSize(1120, 720);
-    resize(1360, 850);
-    setWindowTitle("An Tâm · Quản lý phòng khám");
-
-    QIcon appIcon(":/assets/textures/icon_app.ico");
-    if (appIcon.isNull())
-        appIcon = QIcon(":/assets/textures/icon_app.png");
-    if (appIcon.isNull())
-        appIcon = QIcon("assets/textures/icon_app.ico");
-    if (appIcon.isNull())
-        appIcon = QIcon("assets/textures/icon_app.png");
-    if (!appIcon.isNull())
-        setWindowIcon(appIcon);
-
-    appInitialized = initApp();
-}
-
-MainWindow::~MainWindow()
-{
-    delete currentManager;
-    delete managers;
-    delete patients;
-    delete doctors;
-    delete symptoms;
-    delete symptomPatients;
-    delete symptomPatientDetails;
-    delete appointments;
-    delete permissionRecords;
-}
-
-bool MainWindow::initApp()
-{
-    // Đảm bảo cache chuyên khoa và ngày nghỉ được làm mới
-    DoctorController::clearSpecialtyCache();
-    AppointmentController::clearHolidayCache();
-
-    // Nạp dữ liệu phân quyền vào RAM 1 lần duy nhất
-    try {
-        permissionRecords = PermissionManager::loadFromFile(permissionManagerPath);
-    } catch (const FileIOException &) {
-        permissionRecords = new LinkList<PermissionManager>;
-    } catch (const std::exception &e) {
-        permissionRecords = new LinkList<PermissionManager>;
-        UIHelper::showWarning(this, "Cảnh báo phân quyền", QString("Không thể nạp cấu hình phân quyền đầy đủ: %1").arg(e.what()));
-    }
-
-    // Dọn dẹp các quyền đã hết hạn trực tiếp trên bộ nhớ RAM
-    if (ManagerController::cleanExpiredPermissions(permissionRecords)) {
-        try {
-            PermissionManager::saveToFile(permissionManagerPath, permissionRecords);
-        } catch (const std::exception &e) {
-            UIHelper::showWarning(this, "Lỗi cập nhật quyền hạn", QString("Không thể lưu lại bảng phân quyền sau khi dọn dẹp: %1").arg(e.what()));
+    const auto topWidgets = QApplication::topLevelWidgets();
+    for (QWidget *w : topWidgets) {
+        if (auto *dlg = qobject_cast<QDialog*>(w)) {
+            if (dlg->isVisible()) {
+                dlg->reject();
+            }
         }
     }
 
-    try {
-        // Nạp dữ liệu từ các file
-        managers = Manager::loadFromFile(managerPath);
-        patients = Patient::loadFromFile(patientPath);
-        doctors = Doctor::loadFromFile(doctorPath);
-        symptoms = Symptom::loadFromFile(symptomPath);
-        symptomPatients = SymptomPatient::loadFromFile(symptomPatientPath);
-        symptomPatientDetails = SymptomPatientDetail::loadFromFile(symptomPatientDetailPath);
-        appointments = Appointment::loadFromFile(appointmentPath);
-        if (appointments) {
-            int synced = AppointmentController::syncExpiredAppointments(appointments);
-            if (synced > 0) {
-                Appointment::saveToFile(appointmentPath, appointments);
-            }
+    QTimer::singleShot(0, this, [this]() {
+        if (permissionRecords) {
+            ManagerController::cleanExpiredPermissions(permissionRecords);
         }
-    } catch (const FileIOException &e) {
-        UIHelper::showWarning(this, "Lỗi tệp dữ liệu", QString::fromUtf8(e.what()) + "\nVui lòng kiểm tra lại thư mục Data/.");
-        return false;
-    } catch (const DataFormatException &e) {
-        UIHelper::showWarning(this, "Lỗi định dạng dữ liệu", QString::fromUtf8(e.what()));
-        return false;
-    } catch (const MemoryAllocationException &e) {
-        UIHelper::showWarning(this, "Lỗi bộ nhớ", QString::fromUtf8(e.what()));
-        return false;
-    } catch (const AppException &e) {
-        UIHelper::showWarning(this, "Lỗi nạp dữ liệu", QString::fromUtf8(e.what()));
-        return false;
-    } catch (const std::exception &e) {
-        UIHelper::showWarning(this, "Lỗi ngoại lệ hệ thống", QString("Đã xảy ra ngoại lệ: %1").arg(e.what()));
-        return false;
-    }
+        resetTabOrderToId(activeNav);
+        saveAll(SaveScope::All, SaveAction::CloseOrLogout);
 
-    bool ok = managers && patients && doctors && symptoms && symptomPatients && symptomPatientDetails && appointments;
-    if (!ok)
-    {
-        UIHelper::showWarning(this, "Lỗi dữ liệu", "Không thể nạp dữ liệu từ thư mục Data/! Vui lòng đảm bảo tệp dữ liệu tồn tại và ứng dụng được khởi chạy từ đúng thư mục.");
-        return false;
-    }
+        UIHelper::showWarning(
+            this,
+            "Hết hạn quyền Quản trị viên tạm thời",
+            "Quyền Quản trị viên tạm thời (Per_1) của bạn đã hết hạn.\n"
+            "Toàn bộ dữ liệu đã được lưu an toàn. Hệ thống sẽ đăng xuất để cập nhật lại quyền hạn."
+        );
 
-    // Sắp xếp mặc định ban đầu: Bệnh nhân/Bác sĩ/Lịch khám/Tài khoản theo ID giảm dần
-    if (patients) libPBL2::sortPatients(patients, libPBL2::PatientSortBy::ID, false);
-    if (doctors) libPBL2::sortDoctors(doctors, libPBL2::DoctorSortBy::ID, false);
-    if (appointments) libPBL2::sortAppointments(appointments, libPBL2::AppointmentSortBy::ID, false);
-    if (managers) libPBL2::sortManagers(managers, libPBL2::AccountSortBy::ID, false);
-    if (symptomPatients) {
-        libPBL2::qsort(symptomPatients, [](const SymptomPatient &a, const SymptomPatient &b) {
-            return a.getSP_id() < b.getSP_id();
-        });
-    }
-    if (symptomPatientDetails) {
-        libPBL2::qsort(symptomPatientDetails, [](const SymptomPatientDetail &a, const SymptomPatientDetail &b) {
-            if (a.getSP_id() != b.getSP_id()) return a.getSP_id() < b.getSP_id();
-            return a.getS_id() < b.getS_id();
-        });
-    }
-
-
-    // Khởi tạo windowStack và nạp màn hình Login
-    windowStack = new QStackedWidget(this);
-    setCentralWidget(windowStack);
-
-    loginView = new Login(windowStack);
-    windowStack->addWidget(loginView);
-    connect(loginView, &Login::loginClicked, this, &MainWindow::handleLogin);
-
-    showLogin();
-    return true;
+        delete currentManager;
+        currentManager = nullptr;
+        currentManagerId.clear();
+        m_startedAsTempAdmin = false;
+        m_forceLogoutInProgress = false;
+        showLogin();
+    });
 }

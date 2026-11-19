@@ -11,13 +11,13 @@ private:
     std::string description;
 
 public:
-    // Constructors & Destructor
     Permission(std::string perId = "", std::string perName = "", std::string desc = "");
     Permission(const Permission &other);
     Permission &operator=(const Permission &other) = default;
+    Permission(Permission &&other) noexcept = default;
+    Permission &operator=(Permission &&other) noexcept = default;
     ~Permission() = default;
 
-    // Getters & Setters
     std::string getPer_id() const;
     std::string getPer_Name() const;
     std::string getDescription() const;
@@ -26,12 +26,10 @@ public:
     void setPer_Name(const std::string &name);
     void setDescription(const std::string &desc);
 
-    // State Helpers
     bool isDefault() const;
     void setDefault();
 
-    // System Permission Catalog
     static LinkList<Permission>* getSystemCatalog();
 };
 
-#endif // PERMISSION_H
+#endif

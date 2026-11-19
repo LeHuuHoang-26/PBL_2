@@ -1,7 +1,9 @@
 #include "DoctorController.h"
 #include "libPBL2.h"
+#include <QMap>
 #include <fstream>
-#include <sstream>
+
+static QMap<std::string, QList<QPair<QString, QString>>> s_specListCache;
 
 Doctor *DoctorController::findById(LinkList<Doctor> *doctors, const std::string &id) {
     if (id.empty() || !doctors || !doctors->getHeader()) return nullptr;
@@ -14,40 +16,18 @@ Doctor *DoctorController::findById(LinkList<Doctor> *doctors, const std::string 
 }
 
 std::string DoctorController::generateNextId(const LinkList<Doctor> *doctors) {
-    int maxId = 0;
-    if (doctors && doctors->getHeader()) {
-        auto *n = doctors->getHeader()->next;
-        while (n && n->next) {
-            if (!n->info.isDefault()) {
-                std::string id = n->info.getID();
-                if (id.rfind("D_", 0) == 0) {
-                    try {
-                        int val = std::stoi(id.substr(2));
-                        if (val > maxId) maxId = val;
-                    } catch (const std::invalid_argument &) {
-                    } catch (const std::out_of_range &) {}
-                } else if (id.rfind("D", 0) == 0) {
-                    try {
-                        int val = std::stoi(id.substr(1));
-                        if (val > maxId) maxId = val;
-                    } catch (const std::invalid_argument &) {
-                    } catch (const std::out_of_range &) {}
-                }
-            }
-            n = n->next;
-        }
-    }
-    char buf[32];
-    std::snprintf(buf, sizeof(buf), "D_%03d", maxId + 1);
-    return std::string(buf);
+    return libPBL2::generateNextId(doctors, "D_", [](const Doctor &d) { return d.getID(); }, "D");
 }
 
-#include <QMap>
-
-static QMap<std::string, QList<QPair<QString, QString>>> s_specListCache;
-
-void DoctorController::clearSpecialtyCache() {
-    s_specListCache.clear();
+QString DoctorController::getSpecialty(const std::string &spId, const std::string &specPath) {
+    if (spId.empty()) return QStringLiteral("Đa khoa");
+    auto list = getSpecializationList(specPath);
+    for (const auto &item : list) {
+        if (item.second == QString::fromUtf8(spId.c_str())) {
+            return item.first;
+        }
+    }
+    return QStringLiteral("Đa khoa");
 }
 
 QList<QPair<QString, QString>> DoctorController::getSpecializationList(const std::string &specPath) {
@@ -74,13 +54,6 @@ QList<QPair<QString, QString>> DoctorController::getSpecializationList(const std
     return result;
 }
 
-QString DoctorController::getSpecialty(const std::string &id, const std::string &specPath) {
-    if (id.empty()) return QStringLiteral("Đa khoa");
-    auto list = getSpecializationList(specPath);
-    for (const auto &item : list) {
-        if (item.second == QString::fromUtf8(id.c_str())) {
-            return item.first;
-        }
-    }
-    return QStringLiteral("Đa khoa");
+void DoctorController::clearSpecialtyCache() {
+    s_specListCache.clear();
 }

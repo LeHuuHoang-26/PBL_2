@@ -13,6 +13,10 @@ protected:
 
 public:
     Human(std::string id = "", std::string fullName = "", std::string phone = "", bool gender = false, int age = 0);
+    Human(const Human &) = default;
+    Human &operator=(const Human &) = default;
+    Human(Human &&) noexcept = default;
+    Human &operator=(Human &&) noexcept = default;
     virtual ~Human() = default;
 
     std::string getID() const;

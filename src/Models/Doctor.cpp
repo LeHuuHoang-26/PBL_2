@@ -5,9 +5,7 @@
 #include <sstream>
 #include <iomanip>
 
-using namespace std;
-
-Doctor::Doctor(string _id, string _fullName, string _phone, bool _gender, int _age, string _spId, int _state, string _roomId, double _fee, double _rating)
+Doctor::Doctor(std::string _id, std::string _fullName, std::string _phone, bool _gender, int _age, std::string _spId, int _state, std::string _roomId, double _fee, double _rating)
     : Human(_id, _fullName, _phone, _gender, _age), spId(_spId), state(_state), roomId(_roomId), fee(_fee), rating(_rating) {}
 
 bool Doctor::isDefault() const {
@@ -15,69 +13,69 @@ bool Doctor::isDefault() const {
 }
 
 void Doctor::setDefault() {
-    id = "";
-    fullName = "";
-    phone = "";
+    id.clear();
+    fullName.clear();
+    phone.clear();
     gender = true;
     age = 0;
-    spId = "";
+    spId.clear();
     state = 1;
-    roomId = "";
+    roomId.clear();
     fee = 0.0;
     rating = 5.0;
 }
 
-string Doctor::getSpId() const { return spId; }
+std::string Doctor::getSpId() const { return spId; }
 int Doctor::getState() const { return state; }
-string Doctor::getRoomId() const { return roomId; }
+std::string Doctor::getRoomId() const { return roomId; }
 double Doctor::getFee() const { return fee; }
 double Doctor::getRating() const { return rating; }
 
-void Doctor::setSpId(const string &_spId) { this->spId = _spId; }
+void Doctor::setSpId(const std::string &_spId) { this->spId = _spId; }
 void Doctor::setState(int _state) { this->state = _state; }
-void Doctor::setRoomId(const string &_roomId) { this->roomId = _roomId; }
+void Doctor::setRoomId(const std::string &_roomId) { this->roomId = _roomId; }
 void Doctor::setFee(double _fee) { this->fee = _fee; }
 void Doctor::setRating(double _rating) { this->rating = _rating; }
 
-string Doctor::toString() const {
-    ostringstream oss;
+std::string Doctor::toString() const {
+    std::ostringstream oss;
     oss << libPBL2::padRightUtf8(id, 6) << " | "
         << libPBL2::padRightUtf8(fullName, 20) << " | "
         << libPBL2::padRightUtf8(phone, 10) << " | "
         << libPBL2::padRightUtf8(gender ? "1" : "0", 8) << " | "
-        << libPBL2::padRightUtf8(to_string(age), 5) << " | "
+        << libPBL2::padRightUtf8(std::to_string(age), 5) << " | "
         << libPBL2::padRightUtf8(spId, 6) << " | "
-        << libPBL2::padRightUtf8(to_string(state), 7) << " | "
+        << libPBL2::padRightUtf8(std::to_string(state), 7) << " | "
         << libPBL2::padRightUtf8(roomId, 8) << " | "
         << libPBL2::padRightUtf8([&]() {
-            ostringstream fss;
-            fss << fixed << setprecision(1) << fee;
+            std::ostringstream fss;
+            fss << std::fixed << std::setprecision(1) << fee;
             return fss.str();
         }(), 16) << " | "
         << libPBL2::padRightUtf8([&]() {
-            ostringstream rss;
-            rss << fixed << setprecision(1) << rating;
+            std::ostringstream rss;
+            rss << std::fixed << std::setprecision(1) << rating;
             return rss.str();
         }(), 6);
     return oss.str();
 }
 
-Doctor Doctor::loadFromString(const string &str) {
+Doctor Doctor::loadFromString(const std::string &str) {
     if (str.empty()) return Doctor();
-    stringstream ss(str);
-    string id, fullName, phone, genderStr, ageStr;
-    string spId, stateStr, roomId, feeStr, ratingStr;
+    std::stringstream ss(str);
+    std::string id, fullName, phone, genderStr, ageStr;
+    std::string spId, stateStr, roomId, feeStr, ratingStr;
 
-    if (!getline(ss, id, '|') ||
-        !getline(ss, fullName, '|') ||
-        !getline(ss, phone, '|') ||
-        !getline(ss, genderStr, '|') ||
-        !getline(ss, ageStr, '|') ||
-        !getline(ss, spId, '|') ||
-        !getline(ss, stateStr, '|') ||
-        !getline(ss, roomId, '|') ||
-        !getline(ss, feeStr, '|') ||
-        !getline(ss, ratingStr)) {
+    if (!std::getline(ss, id, '|') ||
+        !std::getline(ss, fullName, '|') ||
+        !std::getline(ss, phone, '|') ||
+        !std::getline(ss, genderStr, '|') ||
+        !std::getline(ss, ageStr, '|') ||
+        !std::getline(ss, spId, '|') ||
+        !std::getline(ss, stateStr, '|') ||
+        !std::getline(ss, roomId, '|') ||
+        !std::getline(ss, feeStr, '|') ||
+        !std::getline(ss, ratingStr)) {
         return Doctor();
     }
 
@@ -100,15 +98,15 @@ Doctor Doctor::loadFromString(const string &str) {
     double fee = libPBL2::safeParseDouble(feeStr, "Phí khám", 0.0);
 
     size_t pipePos = ratingStr.find('|');
-    if (pipePos != string::npos) ratingStr = ratingStr.substr(0, pipePos);
+    if (pipePos != std::string::npos) ratingStr = ratingStr.substr(0, pipePos);
     libPBL2::trim(ratingStr);
     double rating = libPBL2::safeParseDouble(ratingStr, "Đánh giá chuyên môn", 5.0);
 
     return Doctor(id, fullName, phone, gender, age, spId, state, roomId, fee, rating);
 }
 
-LinkList<Doctor>* Doctor::loadFromFile(const string &path) {
-    ifstream f(path);
+LinkList<Doctor>* Doctor::loadFromFile(const std::string &path) {
+    std::ifstream f(path);
     if (!f.is_open()) {
         throw FileIOException(path, "Không thể mở tệp để đọc dữ liệu.");
     }
@@ -116,14 +114,14 @@ LinkList<Doctor>* Doctor::loadFromFile(const string &path) {
     LinkList<Doctor> *doctorList = nullptr;
     try {
         doctorList = new LinkList<Doctor>;
-        string tmp;
-        getline(f, tmp); // Bỏ qua tiêu đề
-        getline(f, tmp); // Bỏ qua dòng phân cách
+        std::string tmp;
+        std::getline(f, tmp);
+        std::getline(f, tmp);
 
-        string line;
+        std::string line;
         int lineNo = 2;
-        while (getline(f, line)) {
-            lineNo++;
+        while (std::getline(f, line)) {
+            ++lineNo;
             libPBL2::trim(line);
             if (line.empty()) continue;
             try {
@@ -131,8 +129,12 @@ LinkList<Doctor>* Doctor::loadFromFile(const string &path) {
                 if (!doc.isDefault()) {
                     doctorList->insert(doc);
                 }
-            } catch (const AppException &e) {
+            } catch (const MemoryAllocationException &) {
+                throw;
+            } catch (const DataFormatException &e) {
                 throw DataFormatException(path, lineNo, e.what());
+            } catch (const AppException &) {
+                throw;
             } catch (const std::exception &e) {
                 throw DataFormatException(path, lineNo, e.what());
             }
@@ -147,12 +149,11 @@ LinkList<Doctor>* Doctor::loadFromFile(const string &path) {
     }
 }
 
-bool Doctor::saveToFile(const string &path, const LinkList<Doctor> *list) {
-    if (!list || list->getHeader() == nullptr)
-        return false;
+bool Doctor::saveToFile(const std::string &path, const LinkList<Doctor> *list) {
+    if (!list || !list->getHeader()) return false;
 
-    string tempPath = path + ".tmp";
-    ofstream f(tempPath);
+    const std::string tempPath = path + ".tmp";
+    std::ofstream f(tempPath);
     if (!f.is_open()) {
         throw FileIOException(path, "Không thể mở tệp tạm để ghi dữ liệu.");
     }
@@ -161,15 +162,19 @@ bool Doctor::saveToFile(const string &path, const LinkList<Doctor> *list) {
         f << "D_ID   | D_FullName           | D_Phone    | D_Gender | D_Age | Sp_ID  | D_State | Room_ID  | Consultation_Fee | Rating\n";
         f << "-------+----------------------+------------+----------+-------+--------+---------+----------+------------------+-------\n";
 
-        LinkList<Doctor>::Node *tmp = list->getHeader()->next;
-        while (tmp != nullptr && tmp->next != nullptr) {
+        for (auto *tmp = list->getHeader()->next; tmp && tmp->next; tmp = tmp->next) {
             if (!tmp->info.isDefault()) {
-                f << tmp->info.toString() << "\n";
+                f << tmp->info.toString() << '\n';
             }
-            tmp = tmp->next;
         }
 
+        f.flush();
+        const bool writeOk = f.good();
         f.close();
+        if (!writeOk || f.fail()) {
+            std::remove(tempPath.c_str());
+            throw FileIOException(path, "Lỗi ghi dữ liệu bác sĩ xuống tệp tạm.");
+        }
         libPBL2::safeAtomicCommit(tempPath, path);
         return true;
     } catch (...) {

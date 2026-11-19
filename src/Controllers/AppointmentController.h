@@ -3,7 +3,6 @@
 
 #include "../Models/Appointment.h"
 #include "../DataStructures/LinkList.h"
-#include "../Utils/AppExceptions.h"
 #include <QList>
 #include <QDate>
 #include <QDateTime>
@@ -12,6 +11,7 @@
 
 class Doctor;
 class Patient;
+class Symptom;
 class SymptomPatient;
 class SymptomPatientDetail;
 
@@ -21,10 +21,9 @@ struct HolidayEntry {
 };
 
 struct RescheduledResultItem {
-    QString oldApptId;
-    QString newApptId;
     QString patientName;
     QString doctorName;
+    QString oldDoctorName;
     QString oldDateTime;
     QString newDateTime;
 };
@@ -56,7 +55,9 @@ public:
         const QDateTime &targetDateTime,
         const std::string &excludeApptId = "",
         bool checkHoliday = false,
-        const std::string &configPath = ""
+        const std::string &configPath = "",
+        const LinkList<Doctor> *doctors = nullptr,
+        const LinkList<Patient> *patients = nullptr
     );
     static QString getHolidayNote(const QDate &date, const std::string &configPath);
     static QString getHolidayNoteFromList(const QDate &date, const QList<HolidayEntry> &list);
@@ -70,6 +71,27 @@ public:
         const QList<HolidayEntry> &prospectiveHolidays
     );
 
+    static QList<Appointment*> getAffectedAppointmentsForDoctor(
+        const LinkList<Appointment> *appointments,
+        const std::string &doctorId
+    );
+
+    static int reassignAppointmentsForDoctor(
+        LinkList<Appointment> *appointments,
+        LinkList<SymptomPatient> *symptomPatients,
+        LinkList<SymptomPatientDetail> *symptomPatientDetails,
+        const LinkList<Symptom> *symptoms,
+        const LinkList<Doctor> *doctors,
+        const LinkList<Patient> *patients,
+        const std::string &oldDoctorId,
+        const QList<HolidayEntry> &holidays,
+        QList<RescheduledResultItem> *outResultItems = nullptr,
+        int *outFailedCount = nullptr,
+        QList<std::string> *outInsertedApptIds = nullptr,
+        QList<std::string> *outInsertedSpIds = nullptr,
+        QList<Appointment*> *outModifiedOldAppts = nullptr
+    );
+
     static int rescheduleAppointmentsLinear(
         LinkList<Appointment> *appointments,
         LinkList<SymptomPatient> *symptomPatients,
@@ -78,11 +100,23 @@ public:
         const LinkList<Patient> *patients,
         const QList<Appointment*> &affectedAppointments,
         const QList<HolidayEntry> &prospectiveHolidays,
-        QString &outSummaryReport,
-        QList<RescheduledResultItem> *outResultItems = nullptr
+        QList<RescheduledResultItem> *outResultItems = nullptr,
+        const LinkList<Symptom> *symptoms = nullptr,
+        QList<std::string> *outInsertedApptIds = nullptr,
+        QList<std::string> *outInsertedSpIds = nullptr,
+        QList<Appointment*> *outModifiedOldAppts = nullptr
+    );
+
+    static void rollbackInsertedAppointments(
+        LinkList<Appointment> *appointments,
+        LinkList<SymptomPatient> *symptomPatients,
+        LinkList<SymptomPatientDetail> *symptomPatientDetails,
+        const QList<std::string> &insertedApptIds,
+        const QList<std::string> &insertedSpIds,
+        const QList<Appointment*> &modifiedOldAppts
     );
 
     static int syncExpiredAppointments(LinkList<Appointment> *appointments);
 };
 
-#endif // APPOINTMENTCONTROLLER_H
+#endif

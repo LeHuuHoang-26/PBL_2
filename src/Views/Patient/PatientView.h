@@ -39,8 +39,8 @@ private:
     bool sortAscending = true;
 
     void setupUI();
-    void addPatientDialog();
+    bool addPatientDialog();
     void editPatientDialog(const std::string &id);
 };
 
-#endif // PATIENTVIEW_H
+#endif
