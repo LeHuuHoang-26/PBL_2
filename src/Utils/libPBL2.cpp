@@ -2,19 +2,47 @@
 #define LIBPBL2_CPP
 
 #include "libPBL2.h"
-#include "../Models/Manager.h"
-#include "../Models/Patient.h"
-#include "../Models/Doctor.h"
-#include "../Models/Appointment.h"
-#include "../Controllers/ManagerController.h"
 
 #include <cctype>
+#include <climits>
 #include <stdexcept>
 #include <QString>
 #include <QCollator>
 #include <QLocale>
+#include <QCoreApplication>
 
 namespace libPBL2 {
+
+namespace detail {
+inline QCollator *&cachedViCollatorPtr() {
+    static QCollator *ptr = nullptr;
+    return ptr;
+}
+
+inline void cleanupViCollator() {
+    delete cachedViCollatorPtr();
+    cachedViCollatorPtr() = nullptr;
+}
+
+inline int compareViQString(const QString &a, const QString &b) {
+    if (QCoreApplication::instance()) {
+        QCollator *&ptr = cachedViCollatorPtr();
+        if (!ptr) {
+            ptr = new QCollator(QLocale(QLocale::Vietnamese));
+            ptr->setCaseSensitivity(Qt::CaseInsensitive);
+            qAddPostRoutine(cleanupViCollator);
+        }
+        return ptr->compare(a, b);
+    }
+    QCollator local(QLocale(QLocale::Vietnamese));
+    local.setCaseSensitivity(Qt::CaseInsensitive);
+    return local.compare(a, b);
+}
+
+inline bool isAsciiDigit(char ch) {
+    return ch >= '0' && ch <= '9';
+}
+}
 
 inline void trim(std::string &str) {
     size_t head = str.find_first_not_of(" \t\r\n");
@@ -38,6 +66,107 @@ inline std::string padRightUtf8(const std::string &str, size_t targetWidth) {
     size_t ulen = utf8Length(str);
     if (ulen >= targetWidth) return str;
     return str + std::string(targetWidth - ulen, ' ');
+}
+
+inline bool containsForbiddenStorageChars(const std::string &str) {
+    for (char ch : str) {
+        if (ch == '|' || ch == '\r' || ch == '\n') {
+            return true;
+        }
+    }
+    return false;
+}
+
+inline bool isValidPhone(const std::string &phone) {
+    std::string s = phone;
+    trim(s);
+    if (s.length() != 10 || s[0] != '0') return false;
+    for (char ch : s) {
+        if (!detail::isAsciiDigit(ch)) return false;
+    }
+    return true;
+}
+
+inline bool isValidCccd(const std::string &cccd) {
+    std::string s = cccd;
+    trim(s);
+    if (s.length() != 12 || s[0] != '0') return false;
+    for (char ch : s) {
+        if (!detail::isAsciiDigit(ch)) return false;
+    }
+    return true;
+}
+
+inline std::string extractRoomCode(const std::string &roomStr) {
+    QString r = QString::fromUtf8(roomStr.c_str()).trimmed();
+    if (r.isEmpty()) return "";
+
+    auto stripPrefix = [](QString &str, const QString &prefix) -> bool {
+        if (!str.startsWith(prefix, Qt::CaseInsensitive)) return false;
+        QString rest = str.mid(prefix.length());
+        if (rest.isEmpty()) {
+            str.clear();
+            return true;
+        }
+        QChar first = rest[0];
+        if (first == ' ' || first == '_' || first == '-' || (first >= '0' && first <= '9')) {
+            str = rest.trimmed();
+            while (!str.isEmpty() && (str[0] == '_' || str[0] == '-' || str[0] == ' ')) {
+                str.remove(0, 1);
+            }
+            return true;
+        }
+        return false;
+    };
+
+    if (!stripPrefix(r, QStringLiteral("Phòng"))) {
+        if (!stripPrefix(r, QStringLiteral("Phong"))) {
+            if (!stripPrefix(r, QStringLiteral("Room"))) {
+                stripPrefix(r, QStringLiteral("R"));
+            }
+        }
+    }
+
+    QString collapsed;
+    bool prevSep = false;
+    for (const QChar &ch : r.trimmed()) {
+        if (ch == '_' || ch == ' ') {
+            if (!prevSep && !collapsed.isEmpty()) {
+                collapsed.append(' ');
+                prevSep = true;
+            }
+        } else {
+            collapsed.append(ch);
+            prevSep = false;
+        }
+    }
+    return collapsed.trimmed().toUtf8().toStdString();
+}
+
+inline std::string canonicalRoomKey(const std::string &roomStr) {
+    QString code = QString::fromUtf8(extractRoomCode(roomStr).c_str()).toLower();
+    QString key;
+    for (const QChar &ch : code) {
+        if (ch != ' ' && ch != '_' && ch != '-') {
+            key.append(ch);
+        }
+    }
+    return key.toUtf8().toStdString();
+}
+
+inline std::string formatRoomDisplay(const std::string &roomStr) {
+    std::string code = extractRoomCode(roomStr);
+    if (code.empty()) return "";
+    return "Room " + code;
+}
+
+inline std::string storageRoomId(const std::string &roomStr) {
+    std::string code = extractRoomCode(roomStr);
+    if (code.empty()) return "";
+    for (char &ch : code) {
+        if (ch == ' ') ch = '_';
+    }
+    return "Room_" + code;
 }
 
 inline int safeParseInt(const std::string &str, const std::string &fieldName, int defaultVal) {
@@ -169,17 +298,18 @@ inline std::string extractLastName(const std::string &fullName) {
     return fullName.substr(left + 1, right - left);
 }
 
+inline int compareVietnameseStrings(const std::string &s1, const std::string &s2) {
+    int res = detail::compareViQString(QString::fromUtf8(s1.c_str()), QString::fromUtf8(s2.c_str()));
+    if (res != 0) return (res < 0) ? -1 : 1;
+    return 0;
+}
+
 inline int compareVietnameseNames(const std::string &name1, const std::string &name2) {
-    static const QCollator viCollator = []() {
-        QCollator c(QLocale(QLocale::Vietnamese));
-        c.setCaseSensitivity(Qt::CaseInsensitive);
-        return c;
-    }();
     std::string l1 = extractLastName(name1);
     std::string l2 = extractLastName(name2);
-    int res = viCollator.compare(QString::fromUtf8(l1.c_str()), QString::fromUtf8(l2.c_str()));
+    int res = detail::compareViQString(QString::fromUtf8(l1.c_str()), QString::fromUtf8(l2.c_str()));
     if (res != 0) return (res < 0) ? -1 : 1;
-    res = viCollator.compare(QString::fromUtf8(name1.c_str()), QString::fromUtf8(name2.c_str()));
+    res = detail::compareViQString(QString::fromUtf8(name1.c_str()), QString::fromUtf8(name2.c_str()));
     if (res != 0) return (res < 0) ? -1 : 1;
     return 0;
 }
@@ -197,8 +327,14 @@ inline int extractRoomNumber(const std::string &roomStr) {
     int value = 0;
     bool hasDigits = false;
     for (char ch : roomStr) {
-        if (std::isdigit(static_cast<unsigned char>(ch))) {
-            value = value * 10 + (ch - '0');
+        if (detail::isAsciiDigit(ch)) {
+            int digit = ch - '0';
+            if (value > (INT_MAX - digit) / 10) {
+                value = INT_MAX;
+                hasDigits = true;
+                break;
+            }
+            value = value * 10 + digit;
             hasDigits = true;
         } else if (hasDigits) {
             break;
@@ -216,56 +352,90 @@ void swapVal(T &a, T &b) {
 }
 
 template <typename T, typename Compare>
-typename LinkList<T>::Node* partitionNodes(typename LinkList<T>::Node *left,
-                                            typename LinkList<T>::Node *right,
-                                            Compare comp) {
-    typename LinkList<T>::Node *lead = left;
-    typename LinkList<T>::Node *runner = left;
-    while (runner != right && runner->next != right && runner->next != nullptr) {
-        lead = lead->next;
-        runner = runner->next->next;
-    }
-    if (lead != right) {
-        swapVal(lead->info, right->info);
-    }
+typename LinkList<T>::Node* mergeSortedNodes(typename LinkList<T>::Node *a,
+                                             typename LinkList<T>::Node *b,
+                                             Compare comp) {
+    if (!a) return b;
+    if (!b) return a;
+    typename LinkList<T>::Node *head = nullptr;
+    typename LinkList<T>::Node *tail = nullptr;
 
-    T pivotVal = right->info;
-    typename LinkList<T>::Node *idx = left->prev;
+    auto appendNode = [&](typename LinkList<T>::Node *&src) {
+        typename LinkList<T>::Node *pick = src;
+        src = src->next;
+        pick->next = nullptr;
+        pick->prev = tail;
+        if (tail) {
+            tail->next = pick;
+        } else {
+            head = pick;
+        }
+        tail = pick;
+    };
 
-    for (typename LinkList<T>::Node *it = left; it != right; it = it->next) {
-        if (comp(it->info, pivotVal)) {
-            idx = (idx == left->prev) ? left : idx->next;
-            if (idx != it) {
-                swapVal(idx->info, it->info);
-            }
+    while (a && b) {
+        if (comp(b->info, a->info)) {
+            appendNode(b);
+        } else {
+            appendNode(a);
         }
     }
-    idx = (idx == left->prev) ? left : idx->next;
-    if (idx != right) {
-        swapVal(idx->info, right->info);
+
+    typename LinkList<T>::Node *rest = a ? a : b;
+    if (rest) {
+        rest->prev = tail;
+        if (tail) {
+            tail->next = rest;
+        } else {
+            head = rest;
+        }
     }
-    return idx;
+    if (head) head->prev = nullptr;
+    return head;
 }
 
 template <typename T, typename Compare>
-void qsortNodes(typename LinkList<T>::Node *left, typename LinkList<T>::Node *right, Compare comp) {
-    if (!left || !right || left == right || right->next == left) return;
-    typename LinkList<T>::Node *bound = partitionNodes<T, Compare>(left, right, comp);
-    if (bound != left && bound->prev) {
-        qsortNodes<T, Compare>(left, bound->prev, comp);
+typename LinkList<T>::Node* sortNodeChain(typename LinkList<T>::Node *head, Compare comp) {
+    if (!head || !head->next) return head;
+
+    typename LinkList<T>::Node *slow = head;
+    typename LinkList<T>::Node *fast = head->next;
+    while (fast && fast->next) {
+        slow = slow->next;
+        fast = fast->next->next;
     }
-    if (bound != right && bound->next) {
-        qsortNodes<T, Compare>(bound->next, right, comp);
-    }
+
+    typename LinkList<T>::Node *mid = slow->next;
+    slow->next = nullptr;
+    if (mid) mid->prev = nullptr;
+
+    typename LinkList<T>::Node *leftSorted = sortNodeChain<T, Compare>(head, comp);
+    typename LinkList<T>::Node *rightSorted = sortNodeChain<T, Compare>(mid, comp);
+    return mergeSortedNodes<T, Compare>(leftSorted, rightSorted, comp);
 }
 
 template <typename T, typename Compare>
 void qsort(LinkList<T> &list, Compare comp) {
     if (list.getCount() <= 1 || !list.getHeader() || !list.getFooter()) return;
-    typename LinkList<T>::Node *headNode = list.getHeader()->next;
-    typename LinkList<T>::Node *tailNode = list.getFooter()->prev;
-    if (!headNode || !tailNode || headNode == list.getFooter() || headNode == tailNode) return;
-    qsortNodes<T, Compare>(headNode, tailNode, comp);
+    typename LinkList<T>::Node *header = list.getHeader();
+    typename LinkList<T>::Node *footer = list.getFooter();
+    typename LinkList<T>::Node *headNode = header->next;
+    typename LinkList<T>::Node *tailNode = footer->prev;
+    if (!headNode || !tailNode || headNode == footer || headNode == tailNode) return;
+
+    headNode->prev = nullptr;
+    tailNode->next = nullptr;
+
+    typename LinkList<T>::Node *sortedHead = sortNodeChain<T, Compare>(headNode, comp);
+    typename LinkList<T>::Node *sortedTail = sortedHead;
+    while (sortedTail && sortedTail->next) {
+        sortedTail = sortedTail->next;
+    }
+
+    header->next = sortedHead;
+    sortedHead->prev = header;
+    sortedTail->next = footer;
+    footer->prev = sortedTail;
 }
 
 template <typename T, typename Compare>
@@ -315,125 +485,6 @@ template <typename Container, typename Compare>
 void qsort(Container &c, Compare comp) {
     if (c.size() <= 1) return;
     qsortRandomAccess(c, 0, static_cast<int>(c.size()) - 1, comp);
-}
-
-inline void sortPatients(LinkList<Patient> &list, PatientSortBy criteria, bool ascending) {
-    qsort(list, [criteria, ascending](const Patient &a, const Patient &b) {
-        int cmp = 0;
-        switch (criteria) {
-            case PatientSortBy::ID:
-                cmp = compareNatural(a.getID(), b.getID());
-                break;
-            case PatientSortBy::Name:
-                cmp = compareVietnameseNames(a.getfullName(), b.getfullName());
-                break;
-            case PatientSortBy::Age:
-                if (a.getAge() != b.getAge()) cmp = (a.getAge() < b.getAge()) ? -1 : 1;
-                break;
-            case PatientSortBy::CCCD:
-                cmp = compareNatural(a.getCCCD(), b.getCCCD());
-                break;
-            case PatientSortBy::Phone:
-                cmp = compareNatural(a.getPhone(), b.getPhone());
-                break;
-            case PatientSortBy::Gender:
-                if (a.getGender() != b.getGender()) cmp = a.getGender() ? -1 : 1;
-                break;
-        }
-        if (cmp == 0) cmp = compareNatural(a.getID(), b.getID());
-        return ascending ? (cmp < 0) : (cmp > 0);
-    });
-}
-
-inline void sortPatients(LinkList<Patient> *list, PatientSortBy criteria, bool ascending) {
-    if (list) sortPatients(*list, criteria, ascending);
-}
-
-inline void sortDoctors(LinkList<Doctor> &list, DoctorSortBy criteria, bool ascending) {
-    qsort(list, [criteria, ascending](const Doctor &a, const Doctor &b) {
-        int cmp = 0;
-        switch (criteria) {
-            case DoctorSortBy::ID:
-                cmp = compareNatural(a.getID(), b.getID());
-                break;
-            case DoctorSortBy::Name:
-                cmp = compareVietnameseNames(a.getfullName(), b.getfullName());
-                break;
-            case DoctorSortBy::Rating:
-                if (a.getRating() != b.getRating()) cmp = (a.getRating() < b.getRating()) ? -1 : 1;
-                break;
-            case DoctorSortBy::Fee:
-                if (a.getFee() != b.getFee()) cmp = (a.getFee() < b.getFee()) ? -1 : 1;
-                break;
-            case DoctorSortBy::Specialty:
-                cmp = compareNatural(a.getSpId(), b.getSpId());
-                break;
-            case DoctorSortBy::Room: {
-                int roomA = extractRoomNumber(a.getRoomId());
-                int roomB = extractRoomNumber(b.getRoomId());
-                if (roomA != roomB) {
-                    cmp = (roomA < roomB) ? -1 : 1;
-                } else {
-                    cmp = compareNatural(a.getRoomId(), b.getRoomId());
-                }
-                break;
-            }
-            case DoctorSortBy::State:
-                if (a.getState() != b.getState()) cmp = (a.getState() > b.getState()) ? -1 : 1;
-                break;
-        }
-        if (cmp == 0) cmp = compareNatural(a.getID(), b.getID());
-        return ascending ? (cmp < 0) : (cmp > 0);
-    });
-}
-
-inline void sortDoctors(LinkList<Doctor> *list, DoctorSortBy criteria, bool ascending) {
-    if (list) sortDoctors(*list, criteria, ascending);
-}
-
-inline void sortAppointments(LinkList<Appointment> &list, AppointmentSortBy criteria, bool ascending) {
-    (void)criteria;
-    qsort(list, [ascending](const Appointment &a, const Appointment &b) {
-        int cmp = compareNatural(a.getId(), b.getId());
-        if (cmp == 0) cmp = compareDates(a.getDateGet(), b.getDateGet());
-        return ascending ? (cmp < 0) : (cmp > 0);
-    });
-}
-
-inline void sortAppointments(LinkList<Appointment> *list, AppointmentSortBy criteria, bool ascending) {
-    if (list) sortAppointments(*list, criteria, ascending);
-}
-
-inline void sortManagers(LinkList<Manager> &list, AccountSortBy criteria, bool ascending, const LinkList<PermissionManager> *permissionRecords) {
-    qsort(list, [criteria, ascending, permissionRecords](const Manager &a, const Manager &b) {
-        int cmp = 0;
-        switch (criteria) {
-            case AccountSortBy::ID:
-                cmp = compareNatural(a.getID(), b.getID());
-                break;
-            case AccountSortBy::Username:
-                cmp = compareNatural(a.getUsername(), b.getUsername());
-                break;
-            case AccountSortBy::Name:
-                cmp = compareVietnameseNames(a.getfullName(), b.getfullName());
-                break;
-            case AccountSortBy::Role: {
-                int ra = static_cast<int>(ManagerController::getEffectiveRole(&a, permissionRecords));
-                int rb = static_cast<int>(ManagerController::getEffectiveRole(&b, permissionRecords));
-                if (ra != rb) cmp = (ra < rb) ? -1 : 1;
-                break;
-            }
-            case AccountSortBy::State:
-                if (a.getState() != b.getState()) cmp = (a.getState() < b.getState()) ? -1 : 1;
-                break;
-        }
-        if (cmp == 0) cmp = compareNatural(a.getID(), b.getID());
-        return ascending ? (cmp < 0) : (cmp > 0);
-    });
-}
-
-inline void sortManagers(LinkList<Manager> *list, AccountSortBy criteria, bool ascending, const LinkList<PermissionManager> *permissionRecords) {
-    if (list) sortManagers(*list, criteria, ascending, permissionRecords);
 }
 
 }

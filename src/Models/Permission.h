@@ -20,16 +20,11 @@ public:
 
     std::string getPer_id() const;
     std::string getPer_Name() const;
-    std::string getDescription() const;
-
-    void setPer_id(const std::string &id);
-    void setPer_Name(const std::string &name);
-    void setDescription(const std::string &desc);
 
     bool isDefault() const;
     void setDefault();
 
-    static LinkList<Permission>* getSystemCatalog();
+    static LinkList<Permission>* getSystemCatalog(const std::string &path = "");
 };
 
 #endif

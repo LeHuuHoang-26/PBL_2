@@ -2,23 +2,330 @@
 #include "DoctorController.h"
 #include "PatientController.h"
 #include "libPBL2.h"
-#include "../Models/Doctor.h"
-#include "../Models/Patient.h"
-#include "../Models/Symptom.h"
-#include "../Models/SymptomPatient.h"
-#include "../Models/SymptomPatientDetail.h"
+#include "Doctor.h"
+#include "Patient.h"
+#include "Symptom.h"
+#include "SymptomPatient.h"
+#include "SymptomPatientDetail.h"
 #include <QDateTime>
 #include <QMap>
 #include <QTime>
+#include <cctype>
+#include <cmath>
+#include <cstdio>
 #include <fstream>
 #include <sstream>
-#include <cstdio>
+
+namespace {
+
+constexpr double kPi = 3.14159265358979323846;
+
+long long jdFromDate(int dd, int mm, int yy) {
+    int a = (14 - mm) / 12;
+    int y = yy + 4800 - a;
+    int m = mm + 12 * a - 3;
+    long long jd = dd + (153 * m + 2) / 5 + 365LL * y + y / 4 - y / 100 + y / 400 - 32045;
+    if (jd < 2299161) {
+        jd = dd + (153 * m + 2) / 5 + 365LL * y + y / 4 - 32083;
+    }
+    return jd;
+}
+
+QDate jdToDate(long long jd) {
+    long long a, b, c;
+    if (jd > 2299160) {
+        a = jd + 32044;
+        b = (4 * a + 3) / 146097;
+        c = a - (b * 146097) / 4;
+    } else {
+        b = 0;
+        c = jd + 32082;
+    }
+    long long d = (4 * c + 3) / 1461;
+    long long e = c - (1461 * d) / 4;
+    long long m = (5 * e + 2) / 153;
+    int day = static_cast<int>(e - (153 * m + 2) / 5 + 1);
+    int month = static_cast<int>(m + 3 - 12 * (m / 10));
+    int year = static_cast<int>(b * 100 + d - 4800 + m / 10);
+    return QDate(year, month, day);
+}
+
+long long getNewMoonDay(int k, double timeZone) {
+    double T = k / 1236.85;
+    double T2 = T * T;
+    double T3 = T2 * T;
+    double dr = kPi / 180.0;
+    double Jd1 = 2415020.75933 + 29.53058868 * k + 0.0001178 * T2 - 0.000000155 * T3;
+    Jd1 += 0.00033 * std::sin((166.56 + 132.87 * T - 0.009173 * T2) * dr);
+    double M = 359.2242 + 29.10535608 * k - 0.0000333 * T2 - 0.00000347 * T3;
+    double Mpr = 306.0253 + 385.81691806 * k + 0.0107306 * T2 + 0.00001236 * T3;
+    double F = 21.2964 + 390.67050646 * k - 0.0016528 * T2 - 0.00000239 * T3;
+    double C1 = (0.1734 - 0.000393 * T) * std::sin(M * dr) + 0.0021 * std::sin(2 * dr * M);
+    C1 = C1 - 0.4068 * std::sin(Mpr * dr) + 0.0161 * std::sin(dr * 2 * Mpr);
+    C1 = C1 - 0.0004 * std::sin(dr * 3 * Mpr);
+    C1 = C1 + 0.0104 * std::sin(dr * 2 * F) - 0.0051 * std::sin(dr * (M + Mpr));
+    C1 = C1 - 0.0074 * std::sin(dr * (M - Mpr)) + 0.0004 * std::sin(dr * (2 * F + M));
+    C1 = C1 - 0.0004 * std::sin(dr * (2 * F - M)) - 0.0006 * std::sin(dr * (2 * F + Mpr));
+    C1 = C1 + 0.0010 * std::sin(dr * (2 * F - Mpr)) + 0.0005 * std::sin(dr * (2 * Mpr + M));
+    double deltat;
+    if (T < -11.0) {
+        deltat = 0.001 + 0.000839 * T + 0.0002261 * T2 - 0.00000845 * T3 - 0.000000081 * T * T3;
+    } else {
+        deltat = -0.000278 + 0.000265 * T + 0.000262 * T2;
+    }
+    double JdNew = Jd1 + C1 - deltat;
+    return static_cast<long long>(std::floor(JdNew + 0.5 + timeZone / 24.0));
+}
+
+int getSunLongitude(long long jdn, double timeZone) {
+    double T = (jdn - 2451545.5 - timeZone / 24.0) / 36525.0;
+    double T2 = T * T;
+    double dr = kPi / 180.0;
+    double M = 357.52910 + 35999.05030 * T - 0.0001559 * T2 - 0.00000048 * T * T2;
+    double L0 = 280.46645 + 36000.76983 * T + 0.0003032 * T2;
+    double DL = (1.914600 - 0.004817 * T - 0.000014 * T2) * std::sin(dr * M);
+    DL += (0.019993 - 0.000101 * T) * std::sin(dr * 2 * M) + 0.000290 * std::sin(dr * 3 * M);
+    double L = (L0 + DL) * dr;
+    L -= kPi * 2.0 * std::floor(L / (kPi * 2.0));
+    return static_cast<int>(std::floor(L / kPi * 6.0));
+}
+
+long long getLunarMonth11(int yy, double timeZone) {
+    long long off = jdFromDate(31, 12, yy) - 2415021;
+    int k = static_cast<int>(std::floor(off / 29.530588853));
+    long long nm = getNewMoonDay(k, timeZone);
+    int sunLong = getSunLongitude(nm, timeZone);
+    if (sunLong >= 9) {
+        nm = getNewMoonDay(k - 1, timeZone);
+    }
+    return nm;
+}
+
+int getLeapMonthOffset(long long a11, double timeZone) {
+    int k = static_cast<int>(std::floor((a11 - 2415021.076998695) / 29.530588853 + 0.5));
+    int last = 0;
+    int i = 1;
+    int arc = getSunLongitude(getNewMoonDay(k + i, timeZone), timeZone);
+    do {
+        last = arc;
+        i++;
+        arc = getSunLongitude(getNewMoonDay(k + i, timeZone), timeZone);
+    } while (arc != last && i < 14);
+    return i - 1;
+}
+
+QDate convertLunarToSolarVN(int lunarDay, int lunarMonth, int lunarYear, bool lunarLeap = false) {
+    constexpr double kTimeZoneVN = 7.0;
+    long long a11, b11;
+    if (lunarMonth < 11) {
+        a11 = getLunarMonth11(lunarYear - 1, kTimeZoneVN);
+        b11 = getLunarMonth11(lunarYear, kTimeZoneVN);
+    } else {
+        a11 = getLunarMonth11(lunarYear, kTimeZoneVN);
+        b11 = getLunarMonth11(lunarYear + 1, kTimeZoneVN);
+    }
+    int k = static_cast<int>(std::floor(0.5 + (a11 - 2415021.076998695) / 29.530588853));
+    int off = lunarMonth - 11;
+    if (off < 0) off += 12;
+    if (b11 - a11 > 365) {
+        int leapOff = getLeapMonthOffset(a11, kTimeZoneVN);
+        int leapMonth = leapOff - 2;
+        if (leapMonth < 0) leapMonth += 12;
+        if (lunarLeap && lunarMonth != leapMonth) {
+            return QDate();
+        }
+        if (lunarLeap || off >= leapOff) {
+            off += 1;
+        }
+    }
+    long long monthStart = getNewMoonDay(k + off, kTimeZoneVN);
+    return jdToDate(monthStart + lunarDay - 1);
+}
+
+struct SlotHM { int hour; int minute; };
+constexpr SlotHM kFixedSlots[] = {
+    {7, 0}, {7, 45}, {8, 30}, {9, 15}, {10, 0}, {10, 45},
+    {13, 0}, {13, 45}, {14, 30}, {15, 15}, {16, 0}
+};
+
+struct SpecScoreEntry {
+    std::string spId;
+    int score = 0;
+};
 
 static bool compareAppointmentDates(const Appointment *a, const Appointment *b) {
     if (!a || !b) return (a != nullptr) && (b == nullptr);
     int cmp = libPBL2::compareDates(a->getDateGet(), b->getDateGet());
     if (cmp != 0) return cmp < 0;
     return libPBL2::compareNatural(a->getId(), b->getId()) < 0;
+}
+
+bool parseHolidayDateParts(const QString &rawDate, int &outDay, int &outMonth, int &outYear, bool &outHasYear) {
+    outDay = outMonth = outYear = 0;
+    outHasYear = false;
+    QString trimmed = rawDate.trimmed();
+    QStringList parts = trimmed.split('/');
+    if (parts.size() != 2 && parts.size() != 3) return false;
+    for (const QString &p : parts) {
+        if (p.isEmpty()) return false;
+        for (const QChar &ch : p) {
+            if (ch < '0' || ch > '9') return false;
+        }
+    }
+    bool okD = false, okM = false;
+    outDay = parts[0].toInt(&okD);
+    outMonth = parts[1].toInt(&okM);
+    if (!okD || !okM || outMonth < 1 || outMonth > 12 || outDay < 1) return false;
+    if (parts.size() == 3) {
+        if (parts[2].length() != 4) return false;
+        bool okY = false;
+        outYear = parts[2].toInt(&okY);
+        if (!okY || outYear < AppConstants::MIN_CALENDAR_YEAR || outYear > AppConstants::MAX_CALENDAR_YEAR) return false;
+        if (!QDate::isValid(outYear, outMonth, outDay)) return false;
+        outHasYear = true;
+    } else {
+        if (!QDate::isValid(2024, outMonth, outDay)) return false;
+    }
+    return true;
+}
+
+QList<std::string> buildRankedSpecialtiesForAppointment(
+    const std::string &oldSpId,
+    const std::string &fallbackSpId,
+    const LinkList<SymptomPatientDetail> *symptomPatientDetails,
+    const LinkList<Symptom> *symptoms
+) {
+    QList<std::string> symptomIds;
+    if (!oldSpId.empty() && symptomPatientDetails && symptomPatientDetails->getHeader()) {
+        auto *dn = symptomPatientDetails->getHeader()->next;
+        while (dn && dn->next) {
+            if (dn->info.getSP_id() == oldSpId) {
+                symptomIds.append(dn->info.getS_id());
+            }
+            dn = dn->next;
+        }
+    }
+    return AppointmentController::rankSpecialtiesBySymptoms(symptomIds, symptoms, fallbackSpId);
+}
+
+bool findReplacementDoctorAndSlot(
+    const LinkList<Appointment> *appointments,
+    const LinkList<SymptomPatient> *symptomPatients,
+    const LinkList<Doctor> *doctors,
+    const QList<std::string> &rankedSpecialties,
+    const std::string &excludeDoctorId,
+    const std::string &patientId,
+    const std::string &excludeApptId,
+    const Date &oldDate,
+    bool allowSameDateTime,
+    const QDate &linearStartDate,
+    const QList<HolidayEntry> &holidays,
+    Doctor *&outDoctor,
+    Date &outDate
+) {
+    outDoctor = nullptr;
+    if (!doctors || !doctors->getHeader() || rankedSpecialties.isEmpty()) return false;
+
+    QList<QList<Doctor*>> docsBySpec;
+    bool hasAnyCandidate = false;
+    for (const auto &spId : rankedSpecialties) {
+        QList<Doctor*> specDocs;
+        auto *dn = doctors->getHeader()->next;
+        while (dn && dn->next) {
+            if (!dn->info.isDefault() && dn->info.getState() == 1 &&
+                dn->info.getID() != excludeDoctorId && dn->info.getSpId() == spId) {
+                specDocs.append(&dn->info);
+            }
+            dn = dn->next;
+        }
+        if (specDocs.size() > 1) {
+            libPBL2::qsort(specDocs, [](const Doctor *a, const Doctor *b) {
+                if (a->getRating() != b->getRating()) return a->getRating() > b->getRating();
+                return libPBL2::compareNatural(a->getID(), b->getID()) < 0;
+            });
+        }
+        if (!specDocs.isEmpty()) hasAnyCandidate = true;
+        docsBySpec.append(specDocs);
+    }
+    if (!hasAnyCandidate) return false;
+
+    QDateTime now = QDateTime::currentDateTime();
+    QDate oldQDate(oldDate.getYear(), oldDate.getMonth(), oldDate.getDay());
+    QDateTime oldDT(oldQDate, QTime(oldDate.getHour(), oldDate.getMinute()));
+
+    if (allowSameDateTime && oldDT.isValid() && oldDT > now && !AppointmentController::isHolidayInList(oldQDate, holidays)) {
+        for (const auto &specDocs : docsBySpec) {
+            for (Doctor *cand : specDocs) {
+                if (!AppointmentController::isSlotBooked(appointments, cand->getID(), oldDate, excludeApptId)) {
+                    outDoctor = cand;
+                    outDate = oldDate;
+                    return true;
+                }
+            }
+        }
+    }
+
+    QDate curDate = linearStartDate.isValid() ? linearStartDate : now.date();
+    if (curDate < now.date()) curDate = now.date();
+
+    for (int searchDays = 0; searchDays < 365; ++searchDays, curDate = curDate.addDays(1)) {
+        if (AppointmentController::isHolidayInList(curDate, holidays)) {
+            continue;
+        }
+        for (const auto &slot : kFixedSlots) {
+            QDateTime slotDT(curDate, QTime(slot.hour, slot.minute));
+            if (slotDT <= now) continue;
+            if (oldDT.isValid() && curDate == oldQDate && slotDT <= oldDT) continue;
+
+            Date candidateDate(curDate.day(), curDate.month(), curDate.year(), slot.hour, slot.minute);
+            if (!patientId.empty() && AppointmentController::isPatientSlotBooked(appointments, symptomPatients, patientId, candidateDate, excludeApptId)) {
+                continue;
+            }
+            for (const auto &specDocs : docsBySpec) {
+                for (Doctor *cand : specDocs) {
+                    if (!AppointmentController::isSlotBooked(appointments, cand->getID(), candidateDate, excludeApptId)) {
+                        outDoctor = cand;
+                        outDate = candidateDate;
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
+}
+
+Appointment *AppointmentController::findById(LinkList<Appointment> *appointments, const std::string &id) {
+    if (id.empty() || !appointments || !appointments->getHeader()) return nullptr;
+    auto *n = appointments->getHeader()->next;
+    while (n && n->next) {
+        if (!n->info.isDefault() && n->info.getId() == id) return &n->info;
+        n = n->next;
+    }
+    return nullptr;
+}
+
+void AppointmentController::sortAppointmentsById(LinkList<Appointment> &list, bool ascending) {
+    libPBL2::qsort(list, [ascending](const Appointment &a, const Appointment &b) {
+        int cmp = libPBL2::compareNatural(a.getId(), b.getId());
+        if (cmp == 0) cmp = libPBL2::compareDates(a.getDateGet(), b.getDateGet());
+        return ascending ? (cmp < 0) : (cmp > 0);
+    });
+}
+
+void AppointmentController::sortAppointmentsById(LinkList<Appointment> *list, bool ascending) {
+    if (list) sortAppointmentsById(*list, ascending);
+}
+
+QStringList AppointmentController::getFixedTimeSlots() {
+    QStringList slotsList;
+    slotsList.reserve(static_cast<int>(sizeof(kFixedSlots) / sizeof(kFixedSlots[0])));
+    for (const auto &s : kFixedSlots) {
+        slotsList.append(QString::asprintf("%02d:%02d", s.hour, s.minute));
+    }
+    return slotsList;
 }
 
 void AppointmentController::sortAppointmentsByDate(QList<Appointment*> &list) {
@@ -62,7 +369,7 @@ QList<Appointment*> AppointmentController::getUpcomingAppointments(const LinkLis
             QDateTime appDt(appDay, appTime);
 
             if (appDay >= today && appDay <= today.addDays(1)) {
-                if (appDt.addSecs(20 * 60) >= now && n->info.getState() == 0) {
+                if (appDt.addSecs(AppConstants::APPOINTMENT_GRACE_MINUTES * 60) >= now && n->info.getState() == 0) {
                     list.append(&n->info);
                 }
             }
@@ -97,39 +404,17 @@ std::string AppointmentController::generateNextId(const LinkList<Appointment> *a
 }
 
 QDate AppointmentController::getLunarNewYear(int year) {
-    switch (year) {
-        case 2020: return QDate(2020, 1, 25);
-        case 2021: return QDate(2021, 2, 12);
-        case 2022: return QDate(2022, 2, 1);
-        case 2023: return QDate(2023, 1, 22);
-        case 2024: return QDate(2024, 2, 10);
-        case 2025: return QDate(2025, 1, 29);
-        case 2026: return QDate(2026, 2, 17);
-        case 2027: return QDate(2027, 2, 6);
-        case 2028: return QDate(2028, 1, 26);
-        case 2029: return QDate(2029, 2, 13);
-        case 2030: return QDate(2030, 2, 3);
-        case 2031: return QDate(2031, 1, 23);
-        case 2032: return QDate(2032, 2, 11);
-        case 2033: return QDate(2033, 1, 31);
-        case 2034: return QDate(2034, 2, 19);
-        case 2035: return QDate(2035, 2, 8);
-        case 2036: return QDate(2036, 1, 28);
-        case 2037: return QDate(2037, 2, 15);
-        case 2038: return QDate(2038, 2, 4);
-        case 2039: return QDate(2039, 1, 24);
-        case 2040: return QDate(2040, 2, 12);
-        case 2041: return QDate(2041, 2, 1);
-        case 2042: return QDate(2042, 1, 22);
-        case 2043: return QDate(2043, 2, 10);
-        case 2044: return QDate(2044, 1, 30);
-        case 2045: return QDate(2045, 2, 17);
-        default: break;
-    }
-    return QDate(year, 2, 1);
+    if (year < 1900 || year > 2199) return QDate();
+    return convertLunarToSolarVN(1, 1, year, false);
+}
+
+QDate AppointmentController::getHungKingsDay(int year) {
+    if (year < 1900 || year > 2199) return QDate();
+    return convertLunarToSolarVN(10, 3, year, false);
 }
 
 bool AppointmentController::isTetHoliday(const QDate &date, int holidayDays) {
+    if (!date.isValid()) return false;
     if (holidayDays <= 0) holidayDays = 5;
     for (int y = date.year() - 1; y <= date.year() + 1; ++y) {
         QDate mung1 = getLunarNewYear(y);
@@ -137,6 +422,35 @@ bool AppointmentController::isTetHoliday(const QDate &date, int holidayDays) {
         QDate start = mung1.addDays(-1);
         QDate end = mung1.addDays(-1 + holidayDays - 1);
         if (date >= start && date <= end) {
+            return true;
+        }
+    }
+    return false;
+}
+
+QString AppointmentController::canonicalHolidayKey(const QString &rawDate) {
+    QString s = rawDate.trimmed().toLower();
+    if (s == "tet") return QStringLiteral("tet");
+    if (s == "gioto") return QStringLiteral("gioto");
+    int d = 0, m = 0, y = 0;
+    bool hasY = false;
+    if (parseHolidayDateParts(rawDate, d, m, y, hasY)) {
+        if (hasY) return QStringLiteral("%1/%2/%3").arg(d).arg(m).arg(y);
+        return QStringLiteral("%1/%2").arg(d).arg(m);
+    }
+    return s;
+}
+
+bool AppointmentController::holidaysConflict(const QString &dateA, const QString &dateB) {
+    QString keyA = canonicalHolidayKey(dateA);
+    QString keyB = canonicalHolidayKey(dateB);
+    if (keyA == keyB) return true;
+
+    int dA = 0, mA = 0, yA = 0, dB = 0, mB = 0, yB = 0;
+    bool hasYA = false, hasYB = false;
+    if (parseHolidayDateParts(dateA, dA, mA, yA, hasYA) &&
+        parseHolidayDateParts(dateB, dB, mB, yB, hasYB)) {
+        if (dA == dB && mA == mB && (!hasYA || !hasYB || yA == yB)) {
             return true;
         }
     }
@@ -152,14 +466,14 @@ void AppointmentController::clearHolidayCache() {
 static bool matchHolidayInList(const QDate &date, const QList<HolidayEntry> &list, QString *outNote = nullptr) {
     if (!date.isValid()) return false;
     for (const auto &item : list) {
-        std::string value = item.date.toStdString();
-        std::string rest = item.note.toStdString();
+        std::string value = item.date.toUtf8().toStdString();
+        std::string rest = item.note.toUtf8().toStdString();
         libPBL2::trim(value);
         libPBL2::trim(rest);
 
         std::string lowerVal = value;
-        for (char &c : lowerVal) c = std::tolower(static_cast<unsigned char>(c));
-        if (lowerVal.rfind("tet", 0) == 0) {
+        for (char &c : lowerVal) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        if (lowerVal == "tet") {
             int days = 5;
             if (!rest.empty()) {
                 std::stringstream ss(rest);
@@ -174,31 +488,36 @@ static bool matchHolidayInList(const QDate &date, const QList<HolidayEntry> &lis
             }
             continue;
         }
+        if (lowerVal == "gioto") {
+            QDate gioToDate = AppointmentController::getHungKingsDay(date.year());
+            if (gioToDate.isValid() && date == gioToDate) {
+                if (outNote) {
+                    *outNote = rest.empty()
+                        ? QStringLiteral("Giỗ Tổ Hùng Vương (10/3 Âm lịch)")
+                        : QString::fromUtf8(rest.c_str());
+                }
+                return true;
+            }
+            continue;
+        }
 
-        if (value.find('/') != std::string::npos) {
-            int day = 0, month = 0, year = 0;
-            char slash1 = 0, slash2 = 0;
-            std::stringstream parsed(value);
-            if (parsed >> day >> slash1 >> month && slash1 == '/') {
-                bool match = false;
-                if (parsed >> slash2 >> year && slash2 == '/') {
-                    match = (day == date.day() && month == date.month() && year == date.year());
-                } else {
-                    match = (day == date.day() && month == date.month());
+        int day = 0, month = 0, year = 0;
+        bool hasYear = false;
+        if (parseHolidayDateParts(QString::fromUtf8(value.c_str()), day, month, year, hasYear)) {
+            bool match = hasYear
+                ? (day == date.day() && month == date.month() && year == date.year())
+                : (day == date.day() && month == date.month());
+            if (match) {
+                if (outNote) {
+                    if (!rest.empty()) *outNote = QString::fromUtf8(rest.c_str());
+                    else if (day == 1 && month == 1) *outNote = QStringLiteral("Tết Dương Lịch");
+                    else if (day == 30 && month == 4) *outNote = QStringLiteral("Ngày Giải phóng miền Nam");
+                    else if (day == 1 && month == 5) *outNote = QStringLiteral("Ngày Quốc tế Lao động");
+                    else if (day == 2 && month == 9) *outNote = QStringLiteral("Quốc khánh Việt Nam");
+                    else if (day == 1 && month == 9) *outNote = QStringLiteral("Nghỉ lễ Quốc khánh");
+                    else *outNote = QStringLiteral("Nghỉ lễ");
                 }
-                if (match) {
-                    if (outNote) {
-                        if (!rest.empty()) *outNote = QString::fromUtf8(rest.c_str());
-                        else if (day == 1 && month == 1) *outNote = "Tết Dương Lịch";
-                        else if (day == 10 && month == 3) *outNote = "Giỗ Tổ Hùng Vương";
-                        else if (day == 30 && month == 4) *outNote = "Ngày Giải phóng miền Nam";
-                        else if (day == 1 && month == 5) *outNote = "Ngày Quốc tế Lao động";
-                        else if (day == 2 && month == 9) *outNote = "Quốc khánh Việt Nam";
-                        else if (day == 1 && month == 9) *outNote = "Nghỉ lễ Quốc khánh";
-                        else *outNote = "Nghỉ lễ";
-                    }
-                    return true;
-                }
+                return true;
             }
         }
     }
@@ -291,7 +610,10 @@ void AppointmentController::validateBooking(
             throw ValidationException("Bác sĩ được chọn hiện không còn công tác hoặc đã bị xóa khỏi hệ thống.");
         }
     }
-    if (patients && !patientId.empty()) {
+    if (patients) {
+        if (patientId.empty()) {
+            throw ValidationException("Hồ sơ bệnh nhân không được để trống.");
+        }
         Patient *pat = PatientController::findById(const_cast<LinkList<Patient>*>(patients), patientId);
         if (!pat || pat->getState() == -1) {
             throw ValidationException("Hồ sơ bệnh nhân được chọn không tồn tại hoặc đã ngừng hoạt động.");
@@ -304,7 +626,7 @@ void AppointmentController::validateBooking(
         QString note;
         const auto holidays = loadHolidays(configPath);
         if (matchHolidayInList(targetDateTime.date(), holidays, &note)) {
-            std::string msg = "Phòng khám nghỉ lễ vào ngày " + targetDateTime.date().toString("dd/MM/yyyy").toStdString() + " (" + note.toStdString() + "). Vui lòng chọn ngày khác.";
+            std::string msg = "Phòng khám nghỉ lễ vào ngày " + targetDateTime.date().toString("dd/MM/yyyy").toStdString() + " (" + note.toUtf8().toStdString() + "). Vui lòng chọn ngày khác.";
             throw ValidationException(msg);
         }
     }
@@ -324,7 +646,7 @@ QString AppointmentController::getHolidayNoteFromList(const QDate &date, const Q
     if (matchHolidayInList(date, list, &note)) {
         return note;
     }
-    return "Nghỉ lễ";
+    return QStringLiteral("Nghỉ lễ");
 }
 
 QString AppointmentController::getHolidayNote(const QDate &date, const std::string &configPath) {
@@ -333,8 +655,9 @@ QString AppointmentController::getHolidayNote(const QDate &date, const std::stri
 }
 
 QList<HolidayEntry> AppointmentController::loadHolidays(const std::string &configPath) {
-    if (s_holidayCache.contains(configPath)) {
-        return s_holidayCache[configPath];
+    auto it = s_holidayCache.constFind(configPath);
+    if (it != s_holidayCache.constEnd()) {
+        return it.value();
     }
     QList<HolidayEntry> list;
     std::ifstream file(configPath);
@@ -392,103 +715,42 @@ bool AppointmentController::saveHolidays(const std::string &configPath, const QL
     }
 }
 
-QList<Appointment*> AppointmentController::getAffectedAppointmentsForHoliday(
-    const LinkList<Appointment> *appointments,
-    const QList<HolidayEntry> &currentHolidays,
-    const QList<HolidayEntry> &prospectiveHolidays
-) {
-    QList<Appointment*> affectedList;
-    if (!appointments || !appointments->getHeader()) return affectedList;
-
-    QDate today = QDate::currentDate();
-    QTime nowTime = QTime::currentTime();
-
-    auto *n = appointments->getHeader()->next;
-    while (n && n->next) {
-        if (!n->info.isDefault() && n->info.getState() == 0) {
-            Date d = n->info.getDateGet();
-            QDate apptDate(d.getYear(), d.getMonth(), d.getDay());
-
-            bool isFutureOrToday = false;
-            if (apptDate > today) {
-                isFutureOrToday = true;
-            } else if (apptDate == today) {
-                QTime apptTime(d.getHour(), d.getMinute());
-                if (apptTime > nowTime) {
-                    isFutureOrToday = true;
-                }
-            }
-
-            if (isFutureOrToday) {
-                bool wasHoliday = isHolidayInList(apptDate, currentHolidays);
-                bool willBeHoliday = isHolidayInList(apptDate, prospectiveHolidays);
-
-                if (!wasHoliday && willBeHoliday) {
-                    affectedList.append(&n->info);
-                }
-            }
-        }
-        n = n->next;
-    }
-
-    sortAppointmentsByDate(affectedList);
-    return affectedList;
-}
-
-namespace {
-
-struct SlotHM { int hour; int minute; };
-constexpr SlotHM kFixedSlots[] = {
-    {7, 0}, {7, 45}, {8, 30}, {9, 15}, {10, 0}, {10, 45},
-    {13, 0}, {13, 45}, {14, 30}, {15, 15}, {16, 0}
-};
-
-struct SpecScoreEntry {
-    std::string spId;
-    int score = 0;
-};
-
-QList<std::string> buildRankedSpecialtiesForAppointment(
-    const std::string &oldSpId,
-    const std::string &fallbackSpId,
-    const LinkList<SymptomPatientDetail> *symptomPatientDetails,
-    const LinkList<Symptom> *symptoms
+QList<std::string> AppointmentController::rankSpecialtiesBySymptoms(
+    const QList<std::string> &symptomIds,
+    const LinkList<Symptom> *symptoms,
+    const std::string &fallbackSpId
 ) {
     QList<SpecScoreEntry> scored;
-    if (!oldSpId.empty() && symptomPatientDetails && symptomPatientDetails->getHeader() && symptoms && symptoms->getHeader()) {
-        auto *dn = symptomPatientDetails->getHeader()->next;
-        while (dn && dn->next) {
-            if (dn->info.getSP_id() == oldSpId) {
-                std::string sid = dn->info.getS_id();
-                auto *sn = symptoms->getHeader()->next;
-                while (sn && sn->next) {
-                    if (sn->info.getS_id() == sid) {
-                        std::string sp = sn->info.getSp_id();
-                        int sc = sn->info.getSScore();
-                        if (!sp.empty() && sc > 0) {
-                            int idx = -1;
-                            for (int i = 0; i < scored.size(); ++i) {
-                                if (scored[i].spId == sp) { idx = i; break; }
-                            }
-                            if (idx >= 0) scored[idx].score += sc;
-                            else scored.append({sp, sc});
+    if (!symptomIds.isEmpty() && symptoms && symptoms->getHeader()) {
+        for (const std::string &sid : symptomIds) {
+            if (sid.empty()) continue;
+            auto *sn = symptoms->getHeader()->next;
+            while (sn && sn->next) {
+                if (sn->info.getS_id() == sid) {
+                    std::string sp = sn->info.getSp_id();
+                    int sc = sn->info.getSScore();
+                    if (!sp.empty() && sc > 0) {
+                        int idx = -1;
+                        for (int i = 0; i < scored.size(); ++i) {
+                            if (scored[i].spId == sp) { idx = i; break; }
                         }
-                        break;
+                        if (idx >= 0) scored[idx].score += sc;
+                        else scored.append({sp, sc});
                     }
-                    sn = sn->next;
+                    break;
                 }
+                sn = sn->next;
             }
-            dn = dn->next;
         }
     }
 
     if (scored.size() > 1) {
         libPBL2::qsort(scored, [&fallbackSpId](const SpecScoreEntry &a, const SpecScoreEntry &b) {
             if (a.score != b.score) return a.score > b.score;
-            bool aOrig = (a.spId == fallbackSpId);
-            bool bOrig = (b.spId == fallbackSpId);
+            bool aOrig = (!fallbackSpId.empty() && a.spId == fallbackSpId);
+            bool bOrig = (!fallbackSpId.empty() && b.spId == fallbackSpId);
             if (aOrig != bOrig) return aOrig;
-            return a.spId < b.spId;
+            return libPBL2::compareNatural(a.spId, b.spId) < 0;
         });
     }
 
@@ -502,90 +764,32 @@ QList<std::string> buildRankedSpecialtiesForAppointment(
     return ranked;
 }
 
-bool findReplacementDoctorAndSlot(
+QList<Appointment*> AppointmentController::getAffectedAppointmentsForHoliday(
     const LinkList<Appointment> *appointments,
-    const LinkList<SymptomPatient> *symptomPatients,
-    const LinkList<Doctor> *doctors,
-    const QList<std::string> &rankedSpecialties,
-    const std::string &excludeDoctorId,
-    const std::string &patientId,
-    const std::string &excludeApptId,
-    const Date &oldDate,
-    bool allowSameDateTime,
-    const QDate &linearStartDate,
-    const QList<HolidayEntry> &holidays,
-    Doctor *&outDoctor,
-    Date &outDate
+    const QList<HolidayEntry> &currentHolidays,
+    const QList<HolidayEntry> &prospectiveHolidays
 ) {
-    outDoctor = nullptr;
-    if (!doctors || !doctors->getHeader() || rankedSpecialties.isEmpty()) return false;
+    QList<Appointment*> affectedList;
+    if (!appointments || !appointments->getHeader()) return affectedList;
 
-    QList<QList<Doctor*>> docsBySpec;
-    bool hasAnyCandidate = false;
-    for (const auto &spId : rankedSpecialties) {
-        QList<Doctor*> specDocs;
-        auto *dn = doctors->getHeader()->next;
-        while (dn && dn->next) {
-            if (!dn->info.isDefault() && dn->info.getState() == 1 &&
-                dn->info.getID() != excludeDoctorId && dn->info.getSpId() == spId) {
-                specDocs.append(&dn->info);
-            }
-            dn = dn->next;
-        }
-        if (specDocs.size() > 1) {
-            libPBL2::qsort(specDocs, [](const Doctor *a, const Doctor *b) {
-                if (a->getRating() != b->getRating()) return a->getRating() > b->getRating();
-                return a->getID() < b->getID();
-            });
-        }
-        if (!specDocs.isEmpty()) hasAnyCandidate = true;
-        docsBySpec.append(specDocs);
-    }
-    if (!hasAnyCandidate) return false;
-
-    QDate oldQDate(oldDate.getYear(), oldDate.getMonth(), oldDate.getDay());
-    if (allowSameDateTime && oldQDate.isValid() && !AppointmentController::isHolidayInList(oldQDate, holidays)) {
-        for (const auto &specDocs : docsBySpec) {
-            for (Doctor *cand : specDocs) {
-                if (!AppointmentController::isSlotBooked(appointments, cand->getID(), oldDate, excludeApptId)) {
-                    outDoctor = cand;
-                    outDate = oldDate;
-                    return true;
+    auto *n = appointments->getHeader()->next;
+    while (n && n->next) {
+        if (!n->info.isDefault() && n->info.computeEffectiveStateNow() == 0) {
+            Date d = n->info.getDateGet();
+            QDate apptDate(d.getYear(), d.getMonth(), d.getDay());
+            if (apptDate.isValid()) {
+                bool wasHoliday = isHolidayInList(apptDate, currentHolidays);
+                bool willBeHoliday = isHolidayInList(apptDate, prospectiveHolidays);
+                if (!wasHoliday && willBeHoliday) {
+                    affectedList.append(&n->info);
                 }
             }
         }
+        n = n->next;
     }
 
-    QDateTime now = QDateTime::currentDateTime();
-    QDate curDate = linearStartDate.isValid() ? linearStartDate : QDate::currentDate();
-    if (curDate < now.date()) curDate = now.date();
-
-    for (int searchDays = 0; searchDays < 365; ++searchDays, curDate = curDate.addDays(1)) {
-        if (AppointmentController::isHolidayInList(curDate, holidays)) {
-            continue;
-        }
-        for (const auto &slot : kFixedSlots) {
-            QDateTime slotDT(curDate, QTime(slot.hour, slot.minute));
-            if (slotDT <= now) continue;
-
-            Date candidateDate(curDate.day(), curDate.month(), curDate.year(), slot.hour, slot.minute);
-            if (!patientId.empty() && AppointmentController::isPatientSlotBooked(appointments, symptomPatients, patientId, candidateDate, excludeApptId)) {
-                continue;
-            }
-            for (const auto &specDocs : docsBySpec) {
-                for (Doctor *cand : specDocs) {
-                    if (!AppointmentController::isSlotBooked(appointments, cand->getID(), candidateDate, excludeApptId)) {
-                        outDoctor = cand;
-                        outDate = candidateDate;
-                        return true;
-                    }
-                }
-            }
-        }
-    }
-    return false;
-}
-
+    sortAppointmentsByDate(affectedList);
+    return affectedList;
 }
 
 void AppointmentController::rollbackInsertedAppointments(
@@ -594,10 +798,16 @@ void AppointmentController::rollbackInsertedAppointments(
     LinkList<SymptomPatientDetail> *symptomPatientDetails,
     const QList<std::string> &insertedApptIds,
     const QList<std::string> &insertedSpIds,
-    const QList<Appointment*> &modifiedOldAppts
+    const QList<std::string> &modifiedOldApptIds
 ) {
-    for (Appointment *oldA : modifiedOldAppts) {
-        if (oldA) oldA->setState(0);
+    if (appointments && appointments->getHeader() && !modifiedOldApptIds.isEmpty()) {
+        auto *n = appointments->getHeader()->next;
+        while (n && n->next) {
+            if (modifiedOldApptIds.contains(n->info.getId())) {
+                n->info.setState(0);
+            }
+            n = n->next;
+        }
     }
     if (appointments && appointments->getHeader() && !insertedApptIds.isEmpty()) {
         auto *n = appointments->getHeader()->next;
@@ -638,12 +848,10 @@ QList<Appointment*> AppointmentController::getAffectedAppointmentsForDoctor(
     QList<Appointment*> affected;
     if (!appointments || !appointments->getHeader() || doctorId.empty()) return affected;
 
-    Date now = Date::now();
     auto *n = appointments->getHeader()->next;
     while (n && n->next) {
         if (!n->info.isDefault() && n->info.getDoctorId() == doctorId) {
-            int eff = n->info.computeEffectiveState(now.getDay(), now.getMonth(), now.getYear(), now.getHour(), now.getMinute());
-            if (eff == 0) {
+            if (n->info.computeEffectiveStateNow() == 0) {
                 affected.append(&n->info);
             }
         }
@@ -666,7 +874,7 @@ int AppointmentController::reassignAppointmentsForDoctor(
     int *outFailedCount,
     QList<std::string> *outInsertedApptIds,
     QList<std::string> *outInsertedSpIds,
-    QList<Appointment*> *outModifiedOldAppts
+    QList<std::string> *outModifiedOldApptIds
 ) {
     if (outFailedCount) *outFailedCount = 0;
     if (!appointments || !symptomPatients || !doctors || oldDoctorId.empty()) return 0;
@@ -680,7 +888,7 @@ int AppointmentController::reassignAppointmentsForDoctor(
 
     QList<std::string> insertedApptIds;
     QList<std::string> insertedSpIds;
-    QList<Appointment*> modifiedOldAppts;
+    QList<std::string> modifiedOldApptIds;
     QList<RescheduledResultItem> localResults;
     int failedCount = 0;
 
@@ -724,7 +932,7 @@ int AppointmentController::reassignAppointmentsForDoctor(
         }
 
         oldAppt->setState(-2);
-        modifiedOldAppts.append(oldAppt);
+        modifiedOldApptIds.append(oldAppt->getId());
 
         std::string newSpId = SymptomPatient::generateNextId(symptomPatients);
         symptomPatients->insert(SymptomPatient(newSpId, patientId, newDoc->getSpId(), Date::now()));
@@ -770,7 +978,7 @@ int AppointmentController::reassignAppointmentsForDoctor(
 
     if (failedCount > 0) {
         rollbackInsertedAppointments(appointments, symptomPatients, symptomPatientDetails,
-                                     insertedApptIds, insertedSpIds, modifiedOldAppts);
+                                     insertedApptIds, insertedSpIds, modifiedOldApptIds);
         if (outFailedCount) *outFailedCount = failedCount;
         return 0;
     }
@@ -778,7 +986,7 @@ int AppointmentController::reassignAppointmentsForDoctor(
     if (outResultItems) *outResultItems = localResults;
     if (outInsertedApptIds) *outInsertedApptIds = insertedApptIds;
     if (outInsertedSpIds) *outInsertedSpIds = insertedSpIds;
-    if (outModifiedOldAppts) *outModifiedOldAppts = modifiedOldAppts;
+    if (outModifiedOldApptIds) *outModifiedOldApptIds = modifiedOldApptIds;
     return localResults.size();
 }
 
@@ -794,7 +1002,7 @@ int AppointmentController::rescheduleAppointmentsLinear(
     const LinkList<Symptom> *symptoms,
     QList<std::string> *outInsertedApptIds,
     QList<std::string> *outInsertedSpIds,
-    QList<Appointment*> *outModifiedOldAppts
+    QList<std::string> *outModifiedOldApptIds
 ) {
     if (!appointments || affectedAppointments.isEmpty()) {
         return 0;
@@ -873,7 +1081,7 @@ int AppointmentController::rescheduleAppointmentsLinear(
                 continue;
             }
             oldAppt->setState(-2);
-            if (outModifiedOldAppts) outModifiedOldAppts->append(oldAppt);
+            if (outModifiedOldApptIds) outModifiedOldApptIds->append(oldAppt->getId());
 
             std::string newSpId = SymptomPatient::generateNextId(symptomPatients);
             symptomPatients->insert(SymptomPatient(newSpId, patientId, targetSpec, Date::now()));
@@ -929,13 +1137,11 @@ int AppointmentController::rescheduleAppointmentsLinear(
 
 int AppointmentController::syncExpiredAppointments(LinkList<Appointment> *appointments) {
     if (!appointments || !appointments->getHeader()) return 0;
-    Date now = Date::now();
     int changed = 0;
     auto *n = appointments->getHeader()->next;
     while (n && n->next) {
         if (!n->info.isDefault() && n->info.getState() == 0) {
-            int effState = n->info.computeEffectiveState(now.getDay(), now.getMonth(), now.getYear(), now.getHour(), now.getMinute());
-            if (effState == -1) {
+            if (n->info.computeEffectiveStateNow() == -1) {
                 n->info.setState(-1);
                 changed++;
             }

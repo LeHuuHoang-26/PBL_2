@@ -1,10 +1,12 @@
 #include "Appointment.h"
 #include "libPBL2.h"
-#include "../Utils/AppExceptions.h"
+#include "AppConstants.h"
+#include "AppExceptions.h"
 #include <fstream>
 #include <string>
 #include <cmath>
 #include <cstdio>
+#include <ctime>
 
 Appointment::Appointment(std::string id, std::string symptomPatientId, std::string doctorId, const Date &dateGet, int state, double paidFee)
     : id(id), symptomPatientId(symptomPatientId), doctorId(doctorId), dateGet(dateGet), state(state), paidFee(paidFee) {}
@@ -18,31 +20,37 @@ double Appointment::getPaidFee() const { return paidFee; }
 bool Appointment::hasPaidFee() const { return paidFee >= 0.0; }
 
 void Appointment::setId(const std::string &value) { id = value; }
-void Appointment::setSymptomPatientId(const std::string &value) { symptomPatientId = value; }
-void Appointment::setDoctorId(const std::string &value) { doctorId = value; }
-void Appointment::setDateGet(const Date &value) { dateGet = value; }
 void Appointment::setState(int value) { state = value; }
 void Appointment::setPaidFee(double value) { paidFee = value; }
 
-int Appointment::computeEffectiveState(int curDay, int curMonth, int curYear, int curHour, int curMin) const {
+int Appointment::computeEffectiveState(int curDay, int curMonth, int curYear, int curHour, int curMin, int curSec) const {
     if (state == -2) return -2;
     if (state == 1) return 1;
     if (state == -1) return -1;
 
     Date ad = getDateGet();
+    if (ad.isDefault()) return state;
     if (ad.getYear() < curYear ||
        (ad.getYear() == curYear && ad.getMonth() < curMonth) ||
        (ad.getYear() == curYear && ad.getMonth() == curMonth && ad.getDay() < curDay)) {
         return -1;
     }
     if (ad.getYear() == curYear && ad.getMonth() == curMonth && ad.getDay() == curDay) {
-        int apptMinutes = ad.getHour() * 60 + ad.getMinute();
-        int curMinutes = curHour * 60 + curMin;
-        if (apptMinutes + 20 < curMinutes) {
+        int apptSecs = ad.getHour() * 3600 + ad.getMinute() * 60;
+        int curSecs = curHour * 3600 + curMin * 60 + curSec;
+        if (curSecs > apptSecs + AppConstants::APPOINTMENT_GRACE_MINUTES * 60) {
             return -1;
         }
     }
     return 0;
+}
+
+int Appointment::computeEffectiveStateNow() const {
+    std::time_t t = std::time(nullptr);
+    std::tm *curr = std::localtime(&t);
+    if (!curr) return state;
+    return computeEffectiveState(curr->tm_mday, curr->tm_mon + 1, curr->tm_year + 1900,
+                                 curr->tm_hour, curr->tm_min, curr->tm_sec);
 }
 
 bool Appointment::isDefault() const {

@@ -3,7 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include "libPBL2.h"
-#include "../Utils/AppExceptions.h"
+#include "AppExceptions.h"
 
 Patient::Patient()
     : Human(), CCCD(""), state(1) {}

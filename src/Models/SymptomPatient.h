@@ -29,11 +29,6 @@ public:
     std::string getSp_id() const;
     Date getDate() const;
 
-    void setSP_id(const std::string &SP_id);
-    void setP_id(const std::string &P_id);
-    void setSp_id(const std::string &Sp_id);
-    void setDate(const Date &date);
-
     std::string toString() const;
     static SymptomPatient loadFromString(const std::string &str);
     static LinkList<SymptomPatient>* loadFromFile(const std::string &path);

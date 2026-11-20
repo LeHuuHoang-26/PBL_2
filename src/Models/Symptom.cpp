@@ -2,7 +2,7 @@
 #include <fstream>
 #include <sstream>
 #include "libPBL2.h"
-#include "../Utils/AppExceptions.h"
+#include "AppExceptions.h"
 
 Symptom::Symptom()
     : S_id(""), sName(""), Sp_id(""), sScore(0) {}
@@ -28,11 +28,6 @@ std::string Symptom::getS_id() const { return S_id; }
 std::string Symptom::getSName() const { return sName; }
 std::string Symptom::getSp_id() const { return Sp_id; }
 int Symptom::getSScore() const { return sScore; }
-
-void Symptom::setS_id(const std::string &id) { S_id = id; }
-void Symptom::setSName(const std::string &name) { sName = name; }
-void Symptom::setSp_id(const std::string &spId) { Sp_id = spId; }
-void Symptom::setSScore(int score) { sScore = score; }
 
 std::string Symptom::toString() const {
     return libPBL2::padRightUtf8(S_id, 6) + " | "
@@ -102,41 +97,6 @@ LinkList<Symptom>* Symptom::loadFromFile(const std::string &path) {
     } catch (...) {
         delete symptomList;
         f.close();
-        throw;
-    }
-}
-
-bool Symptom::saveToFile(const std::string &path, const LinkList<Symptom> *list) {
-    if (!list || !list->getHeader()) return false;
-
-    const std::string tempPath = path + ".tmp";
-    std::ofstream f(tempPath);
-    if (!f.is_open()) {
-        throw FileIOException(path, "Không thể mở tệp tạm để ghi dữ liệu.");
-    }
-
-    try {
-        f << "S_ID  | S_Name              | Sp_ID  | S_Score\n";
-        f << "------+---------------------+--------+--------\n";
-
-        for (auto *tmp = list->getHeader()->next; tmp && tmp->next; tmp = tmp->next) {
-            if (!tmp->info.isDefault()) {
-                f << tmp->info.toString() << '\n';
-            }
-        }
-
-        f.flush();
-        const bool writeOk = f.good();
-        f.close();
-        if (!writeOk || f.fail()) {
-            std::remove(tempPath.c_str());
-            throw FileIOException(path, "Lỗi ghi dữ liệu triệu chứng xuống tệp tạm.");
-        }
-        libPBL2::safeAtomicCommit(tempPath, path);
-        return true;
-    } catch (...) {
-        f.close();
-        std::remove(tempPath.c_str());
         throw;
     }
 }

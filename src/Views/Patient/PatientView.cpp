@@ -1,10 +1,12 @@
 #include "PatientView.h"
 #include "libPBL2.h"
 #include "MainWindow.h"
+#include "PatientController.h"
 #include "UIHelper.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QDateTime>
 #include <QDialog>
 #include <QSpinBox>
 #include <QComboBox>
@@ -12,27 +14,25 @@
 #include <QHeaderView>
 #include <QFrame>
 #include <QTimer>
+#include <functional>
+#include <memory>
 
 namespace {
-libPBL2::PatientSortBy patientSortByColumn(int col) {
+PatientSortBy patientSortByColumn(int col) {
     switch (col) {
-        case 0: return libPBL2::PatientSortBy::Name;
-        case 1: return libPBL2::PatientSortBy::Phone;
-        case 2: return libPBL2::PatientSortBy::CCCD;
-        case 3: return libPBL2::PatientSortBy::Age;
-        case 4: return libPBL2::PatientSortBy::Gender;
-        default: return libPBL2::PatientSortBy::ID;
+        case 0: return PatientSortBy::Name;
+        case 1: return PatientSortBy::Phone;
+        case 2: return PatientSortBy::CCCD;
+        case 3: return PatientSortBy::Age;
+        case 4: return PatientSortBy::Gender;
+        default: return PatientSortBy::ID;
     }
 }
 }
 
 PatientView::PatientView(MainWindow *mainWindow, QWidget *parent)
     : QWidget(parent), mainWindow(mainWindow) {
-    if (mainWindow && mainWindow->getPatients()) {
-        libPBL2::sortPatients(mainWindow->getPatients(), libPBL2::PatientSortBy::ID, false);
-    }
     setupUI();
-    refresh(false);
 }
 
 void PatientView::refresh(bool preserveScroll) {
@@ -125,28 +125,27 @@ void PatientView::refresh(bool preserveScroll) {
         item4->setTextAlignment(Qt::AlignCenter);
         table->setItem(r, 4, item4);
 
-        auto action = UIHelper::createActionCell(UIHelper::trashIcon(), "Xóa hồ sơ bệnh nhân");
+        auto action = UIHelper::createActionCell(UIHelper::trashIcon(), "Xóa hồ sơ bệnh nhân", table);
         if (mainWindow && !mainWindow->hasPermission("Per_3")) {
             action.second->setToolTip("Bạn không có quyền xóa hồ sơ bệnh nhân (Yêu cầu quyền Per_3)");
         }
-        connect(action.second, &QPushButton::clicked, this, [this, p]() {
+        connect(action.second, &QPushButton::clicked, this, [this, pid = p->getID()]() {
             if (!mainWindow) return;
             if (!mainWindow->hasPermission("Per_3")) {
                 UIHelper::showWarning(this, "Không có quyền", "Bạn không có quyền thực hiện xóa hồ sơ bệnh nhân.");
                 return;
             }
-            std::string pid = p->getID();
-            QString name = UIHelper::qs(p->getfullName());
+            Patient *targetPat = mainWindow->findPatient(pid);
+            if (!targetPat) return;
+            QString name = UIHelper::qs(targetPat->getfullName());
 
             auto *appointments = mainWindow->getAppointments();
             int upcomingCount = 0;
             if (appointments) {
-                Date now = Date::now();
                 auto *an = appointments->getHeader()->next;
                 while (an && an->next) {
                     if (mainWindow->getPatientIdForAppointment(an->info) == pid) {
-                        int effState = an->info.computeEffectiveState(now.getDay(), now.getMonth(), now.getYear(), now.getHour(), now.getMinute());
-                        if (effState == 0) {
+                        if (an->info.computeEffectiveStateNow() == 0) {
                             upcomingCount++;
                         }
                     }
@@ -165,25 +164,20 @@ void PatientView::refresh(bool preserveScroll) {
                 return;
             }
 
-            Patient *targetPat = mainWindow->findPatient(pid);
+            targetPat = mainWindow->findPatient(pid);
             if (!targetPat) return;
             int oldState = targetPat->getState();
             targetPat->setState(-1);
 
-            try {
-                if (!mainWindow->saveAll(SaveScope::Patient, SaveAction::Normal)) {
-                    targetPat->setState(oldState);
-                    return;
-                }
-                refresh(true);
-                mainWindow->refreshPage(0);
-            } catch (const AppException &e) {
-                targetPat->setState(oldState);
-                UIHelper::showWarning(this, "Lỗi lưu dữ liệu", QString::fromUtf8(e.what()));
-            } catch (const std::exception &e) {
-                targetPat->setState(oldState);
-                UIHelper::showWarning(this, "Lỗi hệ thống", QString("Đã xảy ra ngoại lệ: %1").arg(e.what()));
+            if (!mainWindow->saveAll(SaveScope::Patient, SaveAction::Normal)) {
+                if (Patient *rbPat = mainWindow->findPatient(pid)) rbPat->setState(oldState);
+                return;
             }
+            refresh(true);
+            mainWindow->refreshPage(4);
+            mainWindow->refreshPage(0);
+            mainWindow->refreshPage(1);
+            mainWindow->refreshPage(5);
         });
 
         table->setCellWidget(r, 5, action.first);
@@ -205,7 +199,7 @@ void PatientView::resetToFirstPage() {
     sortColumn = -1;
     sortAscending = false;
     if (mainWindow && mainWindow->getPatients()) {
-        libPBL2::sortPatients(mainWindow->getPatients(), libPBL2::PatientSortBy::ID, false);
+        PatientController::sortPatients(mainWindow->getPatients(), PatientSortBy::ID, false);
     }
     refresh(false);
 }
@@ -213,10 +207,10 @@ void PatientView::resetToFirstPage() {
 void PatientView::reapplyCurrentSort() {
     if (!mainWindow || !mainWindow->getPatients()) return;
     if (sortColumn < 0 || sortColumn >= 5) {
-        libPBL2::sortPatients(mainWindow->getPatients(), libPBL2::PatientSortBy::ID, false);
+        PatientController::sortPatients(mainWindow->getPatients(), PatientSortBy::ID, false);
         return;
     }
-    libPBL2::sortPatients(mainWindow->getPatients(), patientSortByColumn(sortColumn), sortAscending);
+    PatientController::sortPatients(mainWindow->getPatients(), patientSortByColumn(sortColumn), sortAscending);
 }
 
 void PatientView::showEvent(QShowEvent *event) {
@@ -254,7 +248,7 @@ void PatientView::setupUI() {
         addBtn->hide();
     }
 
-    table = UIHelper::table({"HỌ VÀ TÊN", "ĐIỆN THOẠI", "CCCD", "TUỔI", "GIỚI TÍNH", ""});
+    table = UIHelper::table({"HỌ VÀ TÊN", "ĐIỆN THOẠI", "CCCD", "TUỔI", "GIỚI TÍNH", ""}, this);
     table->setWordWrap(false);
     table->setTextElideMode(Qt::ElideRight);
     table->verticalHeader()->setDefaultSectionSize(48);
@@ -277,7 +271,7 @@ void PatientView::setupUI() {
             sortAscending = true;
         }
         if (mainWindow && mainWindow->getPatients()) {
-            libPBL2::sortPatients(mainWindow->getPatients(), patientSortByColumn(logicalIndex), sortAscending);
+            PatientController::sortPatients(mainWindow->getPatients(), patientSortByColumn(logicalIndex), sortAscending);
             currentPage = 0;
             refresh(false);
         }
@@ -326,8 +320,10 @@ void PatientView::setupUI() {
         if (addPatientDialog()) {
             refresh(false);
             if (mainWindow) {
+                mainWindow->refreshPage(4);
                 mainWindow->refreshPage(0);
                 mainWindow->refreshPage(1);
+                mainWindow->refreshPage(5);
             }
         }
     });
@@ -346,6 +342,10 @@ void PatientView::setupUI() {
 
 bool PatientView::addPatientDialog() {
     if (!mainWindow) return false;
+    if (!mainWindow->hasPermission("Per_3")) {
+        UIHelper::showWarning(this, "Không có quyền", "Bạn không có quyền thêm hồ sơ bệnh nhân mới.");
+        return false;
+    }
 
     QDialog dialog(this);
     dialog.setWindowTitle("Thêm bệnh nhân mới");
@@ -452,6 +452,11 @@ bool PatientView::addPatientDialog() {
 
         if (nameStr.isEmpty() || phoneStr.isEmpty() || cccdStr.isEmpty()) {
             UIHelper::showWarning(&dialog, "Thiếu thông tin", "Vui lòng nhập đủ họ tên, điện thoại và CCCD.");
+            return;
+        }
+        if (libPBL2::containsForbiddenStorageChars(UIHelper::ss(nameStr))) {
+            UIHelper::showWarning(&dialog, "Ký tự không hợp lệ", "Họ và tên bệnh nhân không được chứa ký tự '|' hoặc ký tự xuống dòng.");
+            name->setFocus();
             return;
         }
 
@@ -663,13 +668,24 @@ void PatientView::editPatientDialog(const std::string &id) {
         saveBtn->setFixedHeight(36);
         saveBtn->setStyleSheet("QPushButton { background: #0d9488; color: #ffffff; border: none; border-radius: 8px; padding: 7px 18px; font-weight: 700; font-size: 12.5px; } QPushButton:hover { background: #0f766e; }");
 
-        connect(saveBtn, &QPushButton::clicked, &dialog, [this, &dialog, patient, name, phone, cccd, age, gender]() {
+        connect(saveBtn, &QPushButton::clicked, &dialog, [this, &dialog, patId = id, name, phone, cccd, age, gender]() {
+            Patient *patient = mainWindow ? mainWindow->findPatient(patId) : nullptr;
+            if (!patient) {
+                UIHelper::showWarning(&dialog, "Không tìm thấy", "Hồ sơ bệnh nhân không còn tồn tại trong hệ thống.");
+                dialog.reject();
+                return;
+            }
             QString nameStr = name->text().trimmed();
             QString phoneStr = phone->text().trimmed();
             QString cccdStr = cccd->text().trimmed();
 
             if (nameStr.isEmpty() || phoneStr.isEmpty() || cccdStr.isEmpty()) {
                 UIHelper::showWarning(&dialog, "Thiếu thông tin", "Vui lòng nhập đủ họ tên, điện thoại và CCCD.");
+                return;
+            }
+            if (libPBL2::containsForbiddenStorageChars(UIHelper::ss(nameStr))) {
+                UIHelper::showWarning(&dialog, "Ký tự không hợp lệ", "Họ và tên bệnh nhân không được chứa ký tự '|' hoặc ký tự xuống dòng.");
+                name->setFocus();
                 return;
             }
 
@@ -689,7 +705,7 @@ void PatientView::editPatientDialog(const std::string &id) {
             if (patients) {
                 auto *n = patients->getHeader()->next;
                 while (n && n->next) {
-                    if (&n->info != patient && n->info.getState() != -1 && (n->info.getPhone() == UIHelper::ss(phoneStr) || n->info.getCCCD() == UIHelper::ss(cccdStr))) {
+                    if (n->info.getID() != patId && n->info.getState() != -1 && (n->info.getPhone() == UIHelper::ss(phoneStr) || n->info.getCCCD() == UIHelper::ss(cccdStr))) {
                         UIHelper::showWarning(&dialog, "Trùng hồ sơ", "Số điện thoại hoặc CCCD đã tồn tại trên một bệnh nhân khác.");
                         return;
                     }
@@ -705,12 +721,14 @@ void PatientView::editPatientDialog(const std::string &id) {
             patient->setGender(gender->currentIndex() == 0);
 
             if (!mainWindow->saveAll(SaveScope::Patient, SaveAction::Normal)) {
-                *patient = oldSnapshot;
+                if (Patient *rbPat = mainWindow->findPatient(patId)) *rbPat = oldSnapshot;
                 return;
             }
             if (mainWindow) {
+                mainWindow->refreshPage(4);
                 mainWindow->refreshPage(0);
                 mainWindow->refreshPage(1);
+                mainWindow->refreshPage(5);
             }
             UIHelper::showSuccess(&dialog, "Thành công", "Cập nhật thông tin bệnh nhân thành công.");
             dialog.accept();
@@ -750,7 +768,7 @@ void PatientView::editPatientDialog(const std::string &id) {
     searchHist->setStyleSheet("background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 7px 12px; font-size: 12.5px; color: #0f172a;");
     filterBar->addWidget(searchHist, 1);
 
-    auto *quickBookBtn = new QPushButton("＋  Đặt lịch khám mới");
+    auto *quickBookBtn = new QPushButton("＋  Đặt lịch khám mới", rightCard);
     quickBookBtn->setAutoDefault(false);
     quickBookBtn->setDefault(false);
     quickBookBtn->setCursor(Qt::PointingHandCursor);
@@ -770,6 +788,7 @@ void PatientView::editPatientDialog(const std::string &id) {
         }
     )");
     filterBar->addWidget(quickBookBtn);
+    quickBookBtn->setVisible(mainWindow && mainWindow->hasPermission("Per_4"));
     rightCardLayout->addLayout(filterBar);
 
     auto *histTable = new QTableWidget;
@@ -933,10 +952,9 @@ void PatientView::editPatientDialog(const std::string &id) {
     auto reloadHistoryPtr = std::make_shared<std::function<void()>>();
     auto reloadHistory = [reloadHistoryPtr]() { if (*reloadHistoryPtr) (*reloadHistoryPtr)(); };
 
-    *reloadHistoryPtr = [this, patient, histTable, emptyWidget, searchHist, countLabel, viewState, prevPageBtn, pageInfoLabel, nextPageBtn, PAGE_SIZE]() {
+    *reloadHistoryPtr = [this, pId = id, histTable, emptyWidget, searchHist, countLabel, viewState, prevPageBtn, pageInfoLabel, nextPageBtn, PAGE_SIZE]() {
         if (!mainWindow || !mainWindow->getAppointments()) return;
 
-        std::string pId = patient->getID();
         QList<Appointment*> allAppts;
 
         int totalCount = 0;
@@ -973,9 +991,13 @@ void PatientView::editPatientDialog(const std::string &id) {
             filtered.append(a);
         }
 
+        QDateTime nowDt = QDateTime::currentDateTime();
+        int curD = nowDt.date().day(), curM = nowDt.date().month(), curY = nowDt.date().year();
+        int curH = nowDt.time().hour(), curMin = nowDt.time().minute(), curSec = nowDt.time().second();
+
         int col = viewState->sortCol;
         bool asc = viewState->sortAsc;
-        libPBL2::qsort(filtered, [this, col, asc](const Appointment *a, const Appointment *b) -> bool {
+        libPBL2::qsort(filtered, [this, col, asc, curD, curM, curY, curH, curMin, curSec](const Appointment *a, const Appointment *b) -> bool {
             if (!a || !b) return false;
             int cmp = 0;
             switch (col) {
@@ -1003,13 +1025,12 @@ void PatientView::editPatientDialog(const std::string &id) {
                 case 3: {
                     QString sa = mainWindow->getSymptomNamesForAppointment(*a);
                     QString sb = mainWindow->getSymptomNamesForAppointment(*b);
-                    cmp = QString::compare(sa, sb, Qt::CaseInsensitive);
+                    cmp = libPBL2::compareVietnameseStrings(UIHelper::ss(sa), UIHelper::ss(sb));
                     break;
                 }
                 case 4: {
-                    Date now = Date::now();
-                    int sa = a->computeEffectiveState(now.getDay(), now.getMonth(), now.getYear(), now.getHour(), now.getMinute());
-                    int sb = b->computeEffectiveState(now.getDay(), now.getMonth(), now.getYear(), now.getHour(), now.getMinute());
+                    int sa = a->computeEffectiveState(curD, curM, curY, curH, curMin, curSec);
+                    int sb = b->computeEffectiveState(curD, curM, curY, curH, curMin, curSec);
                     cmp = (sa < sb) ? -1 : ((sa > sb) ? 1 : 0);
                     break;
                 }
@@ -1041,7 +1062,11 @@ void PatientView::editPatientDialog(const std::string &id) {
 
         int startIndex = viewState->currentPage * PAGE_SIZE;
         int endIndex = qMin(startIndex + PAGE_SIZE, totalFiltered);
-        countLabel->setText(QStringLiteral("Đang hiển thị %1 - %2 / Tổng %3 ca khám").arg(startIndex + 1).arg(endIndex).arg(totalCount));
+        if (totalFiltered == totalCount) {
+            countLabel->setText(QStringLiteral("Đang hiển thị %1 - %2 / Tổng %3 ca khám").arg(startIndex + 1).arg(endIndex).arg(totalFiltered));
+        } else {
+            countLabel->setText(QStringLiteral("Đang hiển thị %1 - %2 / %3 kết quả (Tổng %4 ca)").arg(startIndex + 1).arg(endIndex).arg(totalFiltered).arg(totalCount));
+        }
 
         emptyWidget->hide();
         histTable->show();
@@ -1072,16 +1097,11 @@ void PatientView::editPatientDialog(const std::string &id) {
             histTable->setItem(r, 2, roomItem);
 
             QString symText = mainWindow->getSymptomNamesForAppointment(*a);
-            if (symText.isEmpty()) symText = "Chưa ghi nhận";
             auto *symItem = new QTableWidgetItem(symText);
             symItem->setTextAlignment(Qt::AlignCenter);
             histTable->setItem(r, 3, symItem);
 
-            int st = a->getState();
-            if (st == 0) {
-                Date now = Date::now();
-                st = a->computeEffectiveState(now.getDay(), now.getMonth(), now.getYear(), now.getHour(), now.getMinute());
-            }
+            int st = a->computeEffectiveState(curD, curM, curY, curH, curMin, curSec);
             QString badgeText = "● Chưa khám";
             QString badgeStyle = "QLabel { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; border-radius: 10px; font-size: 11px; font-weight: 700; padding: 3px 8px; }";
             if (st == 1) {
@@ -1144,9 +1164,13 @@ void PatientView::editPatientDialog(const std::string &id) {
         }
     });
 
-    connect(quickBookBtn, &QPushButton::clicked, &dialog, [this, reloadHistory, patient]() {
-        if (mainWindow && patient) {
-            mainWindow->showBookingDialog(QDate::currentDate(), patient->getID());
+    connect(quickBookBtn, &QPushButton::clicked, &dialog, [this, &dialog, reloadHistory, patId = id]() {
+        if (!mainWindow) return;
+        if (!mainWindow->hasPermission("Per_4")) {
+            UIHelper::showWarning(&dialog, "Không có quyền", "Bạn không có quyền đặt lịch khám mới (Yêu cầu quyền Per_4).");
+            return;
+        }
+        if (mainWindow->showBookingDialog(QDate::currentDate(), patId)) {
             reloadHistory();
         }
     });

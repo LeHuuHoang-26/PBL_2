@@ -20,12 +20,8 @@ public:
 };
 
 class FileIOException : public AppException {
-private:
-    std::string filePath;
-
 public:
     FileIOException(const std::string &path, const std::string &detail);
-    const std::string& getFilePath() const;
 };
 
 class DataFormatException : public AppException {

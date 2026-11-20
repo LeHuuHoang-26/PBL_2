@@ -1,10 +1,11 @@
 #ifndef STATISTICCONTROLLER_H
 #define STATISTICCONTROLLER_H
 
-#include "../Models/Patient.h"
-#include "../Models/Doctor.h"
-#include "../Models/Appointment.h"
-#include "../DataStructures/LinkList.h"
+#include "Patient.h"
+#include "Doctor.h"
+#include "Appointment.h"
+#include "SymptomPatient.h"
+#include "LinkList.h"
 #include <string>
 
 struct DoctorLeaderboardItem {
@@ -39,10 +40,27 @@ public:
     static int appointmentCount(const LinkList<Appointment> *items);
     static int pendingAppointmentCount(const LinkList<Appointment> *items);
 
-    static void appointmentStatusCounts(const LinkList<Appointment> *appts, int &completed, int &pending, int &delayed, int &rescheduled, int currentDay, int currentMonth, int currentYear, int currentHour, int currentMinute);
+    static void appointmentStatusCounts(
+        const LinkList<Appointment> *appts,
+        int &completed, int &pending, int &delayed, int &rescheduled,
+        int currentDay, int currentMonth, int currentYear, int currentHour, int currentMinute,
+        int currentSecond = 0,
+        int startDay = 0, int startMonth = 0, int startYear = 0,
+        int endDay = 0, int endMonth = 0, int endYear = 0
+    );
 
     static void patientGenderCounts(const LinkList<Patient> *patients, int &male, int &female);
     static void patientAgeDistribution(const LinkList<Patient> *patients, int &under18, int &from18to45, int &from46to60, int &over60);
+
+    static void patientDemographicsInRange(
+        const LinkList<Patient> *patients,
+        const LinkList<Appointment> *appts,
+        const LinkList<SymptomPatient> *symptomPatients,
+        int startDay, int startMonth, int startYear,
+        int endDay, int endMonth, int endYear,
+        int &male, int &female,
+        int &under18, int &from18to45, int &from46to60, int &over60
+    );
 
     static int getTopDoctors(
         const LinkList<Appointment> *appts,
@@ -52,7 +70,15 @@ public:
         int startDay = 0, int startMonth = 0, int startYear = 0,
         int endDay = 0, int endMonth = 0, int endYear = 0
     );
-    static int getSpecialtyDemand(const LinkList<Appointment> *appts, const LinkList<Doctor> *docs, SpecialtyDemandItem outList[], int maxCount);
+
+    static int getSpecialtyDemand(
+        const LinkList<Appointment> *appts,
+        const LinkList<Doctor> *docs,
+        SpecialtyDemandItem outList[],
+        int maxCount,
+        int startDay = 0, int startMonth = 0, int startYear = 0,
+        int endDay = 0, int endMonth = 0, int endYear = 0
+    );
 
     static int getTimeSeriesDaily(
         const LinkList<Appointment> *appts,
@@ -60,16 +86,18 @@ public:
         int startDay, int startMonth, int startYear,
         int endDay, int endMonth, int endYear,
         int curDay, int curMonth, int curYear, int curHour, int curMin,
-        TimeSeriesItem outItems[], int maxItems
+        TimeSeriesItem outItems[], int maxItems,
+        int curSec = 0
     );
 
     static int getTimeSeriesMonthlyRange(
         const LinkList<Appointment> *appts,
         const LinkList<Doctor> *docs,
-        int startMonth, int startYear,
-        int endMonth, int endYear,
+        int startDay, int startMonth, int startYear,
+        int endDay, int endMonth, int endYear,
         int curDay, int curMonth, int curYear, int curHour, int curMin,
-        TimeSeriesItem outItems[], int maxItems
+        TimeSeriesItem outItems[], int maxItems,
+        int curSec = 0
     );
 };
 

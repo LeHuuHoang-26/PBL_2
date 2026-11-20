@@ -27,44 +27,17 @@ bool Date::isDefault() const {
     return (day == 0 && month == 0 && year == 0);
 }
 
-bool Date::isLeapYear(int yearVar) const {
-    int y = (yearVar == 0) ? year : yearVar;
-    return (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0);
-}
-
-int Date::posofdayinmonth(int monthVar) const {
-    int m = (monthVar == 0) ? month : monthVar;
-    if (m < 1 || m > 12) return 0;
-    const int dayinmonth_list[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-    if (m == 2 && isLeapYear()) return 29;
-    return dayinmonth_list[m];
-}
-
-Date Date::operator-(const int &value) {
-    if (value <= 0) return *this;
-    Date tmp = *this;
-    int remaining = value;
-    while (remaining > 0) {
-        if (tmp.day > remaining) {
-            tmp.day -= remaining;
-            remaining = 0;
-        } else {
-            remaining -= tmp.day;
-            tmp.month--;
-            if (tmp.month < 1) {
-                tmp.month = 12;
-                tmp.year--;
-                if (tmp.year < 1) {
-                    tmp.year = 1;
-                    tmp.month = 1;
-                    tmp.day = 1;
-                    return tmp;
-                }
-            }
-            tmp.day = tmp.posofdayinmonth(tmp.month);
-        }
+namespace {
+bool isValidCalendarDateTime(int d, int m, int y, int hh, int mm) {
+    if (y < 1 || y > 9999 || m < 1 || m > 12 || d < 1) return false;
+    if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return false;
+    static const int kDaysInMonth[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    int maxDay = kDaysInMonth[m];
+    if (m == 2 && ((y % 4 == 0 && y % 100 != 0) || (y % 400 == 0))) {
+        maxDay = 29;
     }
-    return tmp;
+    return d <= maxDay;
+}
 }
 
 std::string Date::toString() const {
@@ -86,16 +59,26 @@ Date Date::loadFromString(const std::string &str) {
     if (str.find('-') != std::string::npos) {
         if (iss >> y >> sep1 >> m >> sep2 >> d && sep1 == '-' && sep2 == '-') {
             if (iss >> hh >> timeSep >> mm && timeSep == ':') {
-                return Date(d, m, y, hh, mm);
+                if (isValidCalendarDateTime(d, m, y, hh, mm)) {
+                    return Date(d, m, y, hh, mm);
+                }
+                return Date(0, 0, 0, 0, 0);
             }
-            return Date(d, m, y, 0, 0);
+            if (isValidCalendarDateTime(d, m, y, 0, 0)) {
+                return Date(d, m, y, 0, 0);
+            }
         }
     } else if (str.find('/') != std::string::npos) {
         if (iss >> d >> sep1 >> m >> sep2 >> y && sep1 == '/' && sep2 == '/') {
             if (iss >> hh >> timeSep >> mm && timeSep == ':') {
-                return Date(d, m, y, hh, mm);
+                if (isValidCalendarDateTime(d, m, y, hh, mm)) {
+                    return Date(d, m, y, hh, mm);
+                }
+                return Date(0, 0, 0, 0, 0);
             }
-            return Date(d, m, y, 0, 0);
+            if (isValidCalendarDateTime(d, m, y, 0, 0)) {
+                return Date(d, m, y, 0, 0);
+            }
         }
     }
     return Date(0, 0, 0, 0, 0);

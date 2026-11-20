@@ -1,10 +1,9 @@
 #include "PermissionManager.h"
 #include "libPBL2.h"
-#include "../Utils/AppExceptions.h"
+#include "AppExceptions.h"
+#include <ctime>
 #include <fstream>
 #include <sstream>
-#include <QDateTime>
-#include <QString>
 
 PermissionManager::PermissionManager()
     : MA_id(""), Per_id(""), Expires_At("") {}
@@ -18,10 +17,6 @@ PermissionManager::PermissionManager(const PermissionManager &other)
 std::string PermissionManager::getMA_id() const { return MA_id; }
 std::string PermissionManager::getPer_id() const { return Per_id; }
 std::string PermissionManager::getExpiresAt() const { return Expires_At; }
-
-void PermissionManager::setMA_id(const std::string &maId) { MA_id = maId; }
-void PermissionManager::setPer_id(const std::string &perId) { Per_id = perId; }
-void PermissionManager::setExpiresAt(const std::string &expiresAt) { Expires_At = expiresAt; }
 
 bool PermissionManager::isDefault() const {
     return MA_id.empty() && Per_id.empty();
@@ -39,13 +34,47 @@ bool PermissionManager::isTemporary() const {
 
 bool PermissionManager::isExpired() const {
     if (Expires_At.empty()) return false;
-    auto qStr = QString::fromUtf8(Expires_At.c_str());
-    auto parsed = QDateTime::fromString(qStr, Qt::ISODate);
-    if (!parsed.isValid()) {
-        parsed = QDateTime::fromString(qStr, "yyyy-MM-dd HH:mm:ss");
+    int y = 0, m = 0, d = 0, hh = 0, mm = 0, ss = 0;
+    char sep1 = '\0', sep2 = '\0', dtSep = '\0', t1 = '\0', t2 = '\0';
+    std::istringstream iss(Expires_At);
+    if (!(iss >> y >> sep1 >> m >> sep2 >> d) || sep1 != '-' || sep2 != '-') {
+        return true;
     }
-    if (!parsed.isValid()) return true;
-    return parsed <= QDateTime::currentDateTime();
+    if (y < 1900 || y > 9999 || m < 1 || m > 12 || d < 1) {
+        return true;
+    }
+    static const int kDaysInMonth[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    int maxDay = kDaysInMonth[m];
+    if (m == 2 && ((y % 4 == 0 && y % 100 != 0) || (y % 400 == 0))) {
+        maxDay = 29;
+    }
+    if (d > maxDay) return true;
+
+    if (iss.peek() == 'T' || iss.peek() == ' ') {
+        iss.get(dtSep);
+        if (!(iss >> hh >> t1 >> mm) || t1 != ':') return true;
+        if (iss.peek() == ':') {
+            iss.get(t2);
+            if (!(iss >> ss)) return true;
+        }
+    }
+    if (hh < 0 || hh > 23 || mm < 0 || mm > 59 || ss < 0 || ss > 59) {
+        return true;
+    }
+
+    std::tm tmVal{};
+    tmVal.tm_year = y - 1900;
+    tmVal.tm_mon = m - 1;
+    tmVal.tm_mday = d;
+    tmVal.tm_hour = hh;
+    tmVal.tm_min = mm;
+    tmVal.tm_sec = ss;
+    tmVal.tm_isdst = -1;
+    std::time_t expTime = std::mktime(&tmVal);
+    if (expTime == static_cast<std::time_t>(-1)) {
+        return true;
+    }
+    return expTime <= std::time(nullptr);
 }
 
 std::string PermissionManager::toString() const {

@@ -1,7 +1,6 @@
 #include "Manager.h"
-#include "../Controllers/ManagerController.h"
 #include "libPBL2.h"
-#include "../Utils/AppExceptions.h"
+#include "AppExceptions.h"
 #include <fstream>
 #include <sstream>
 

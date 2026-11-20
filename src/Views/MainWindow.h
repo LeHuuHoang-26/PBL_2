@@ -92,7 +92,7 @@ public:
     void editAppointmentDialog(const std::string &id);
     void showRescheduledSummaryDialog(QWidget *parent, const QList<struct RescheduledResultItem> &items, int totalAffected, const QString &customTitle = "");
 
-    QString style() const;
+    QString appStyleSheet() const;
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -127,12 +127,13 @@ private:
     QLabel *sidebarNameLabel = nullptr;
     QLabel *sidebarRoleLabel = nullptr;
     QTimer *clockTimer = nullptr;
-    QObject *cursorLeaveFilter = nullptr;
     bool appInitialized = false;
     bool m_startedAsTempAdmin = false;
     bool m_forceLogoutInProgress = false;
 
     void updateNavigation();
+    void teardownShell();
+    void clearDataLists();
     void setupShell();
     void handleTemporaryAdminExpired();
 };

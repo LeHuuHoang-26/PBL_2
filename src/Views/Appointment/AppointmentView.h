@@ -4,12 +4,13 @@
 #include <QWidget>
 #include <QDate>
 #include <QList>
+#include <memory>
 #include <string>
-#include "../../Controllers/AppointmentController.h"
+#include "AppointmentController.h"
+#include "AppConstants.h"
 
 class MainWindow;
 class QCalendarWidget;
-class Appointment;
 
 class AppointmentView : public QObject {
     Q_OBJECT
@@ -26,6 +27,7 @@ public:
     QWidget *createBookingWidget(QWidget *parent = nullptr);
     QWidget *createAppointmentListWidget(QWidget *parent = nullptr);
 
+    bool showAppointmentDetailDialog(const std::string &appointmentId);
     void showAppointmentDetailDialog(Appointment *appointment);
     void editAppointmentDialog(const std::string &id);
     void showRescheduledSummaryDialog(
@@ -37,19 +39,19 @@ public:
 
     void showHolidayManagementDialog(QWidget *parent = nullptr);
 
-    void reapplyCurrentSort();
     void resetToFirstPage();
 
 private:
     MainWindow *mainWindow = nullptr;
     int listSortColumn = -1;
     bool listSortAscending = false;
+    std::weak_ptr<int> listCurrentPagePtr;
 
     bool processHolidayAdditionWithReschedule(
         QWidget *parentDialog,
         const QList<HolidayEntry> &curList,
         const QList<HolidayEntry> &prospectiveList,
-        const std::string &configPath = "Config/Lichnghile.txt"
+        const std::string &configPath = AppConstants::Paths::HOLIDAYS
     );
 };
 

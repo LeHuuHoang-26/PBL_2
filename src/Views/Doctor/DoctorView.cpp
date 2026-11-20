@@ -1,4 +1,5 @@
 #include "DoctorView.h"
+#include "AppConstants.h"
 #include "libPBL2.h"
 #include "MainWindow.h"
 #include "AppointmentController.h"
@@ -7,6 +8,7 @@
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QDateTime>
 #include <QDialog>
 #include <QComboBox>
 #include <QSpinBox>
@@ -20,29 +22,16 @@
 #include <memory>
 
 namespace {
-libPBL2::DoctorSortBy doctorSortByColumn(int col) {
+DoctorSortBy doctorSortByColumn(int col) {
     switch (col) {
-        case 0: return libPBL2::DoctorSortBy::Name;
-        case 1: return libPBL2::DoctorSortBy::Specialty;
-        case 2: return libPBL2::DoctorSortBy::Room;
-        case 3: return libPBL2::DoctorSortBy::Fee;
-        case 4: return libPBL2::DoctorSortBy::Rating;
-        case 5: return libPBL2::DoctorSortBy::State;
-        default: return libPBL2::DoctorSortBy::ID;
+        case 0: return DoctorSortBy::Name;
+        case 1: return DoctorSortBy::Specialty;
+        case 2: return DoctorSortBy::Room;
+        case 3: return DoctorSortBy::Fee;
+        case 4: return DoctorSortBy::Rating;
+        case 5: return DoctorSortBy::State;
+        default: return DoctorSortBy::ID;
     }
-}
-
-QString canonicalRoomKey(const QString &raw) {
-    QString r = raw.trimmed().toLower();
-    if (r.startsWith("room_")) r = r.mid(5);
-    else if (r.startsWith("room ")) r = r.mid(5);
-    else if (r.startsWith("room")) r = r.mid(4);
-    else if (r.startsWith(QStringLiteral("phòng "))) r = r.mid(6);
-    else if (r.startsWith(QStringLiteral("phòng_"))) r = r.mid(6);
-    else if (r.startsWith(QStringLiteral("phong "))) r = r.mid(6);
-    r.remove(' ');
-    r.remove('_');
-    return r;
 }
 
 bool hasCrossSpecialtyRoomConflict(
@@ -52,12 +41,12 @@ bool hasCrossSpecialtyRoomConflict(
     const QString &roomStr,
     QString &outConflictDoctor
 ) {
-    QString key = canonicalRoomKey(roomStr);
-    if (key.isEmpty() || !doctors || !doctors->getHeader()) return false;
+    std::string key = libPBL2::canonicalRoomKey(UIHelper::ss(roomStr));
+    if (key.empty() || !doctors || !doctors->getHeader()) return false;
     auto *dn = doctors->getHeader()->next;
     while (dn && dn->next) {
         if (!dn->info.isDefault() && dn->info.getState() != -1 && dn->info.getID() != excludeDocId) {
-            if (canonicalRoomKey(UIHelper::qs(dn->info.getRoomId())) == key && dn->info.getSpId() != spId) {
+            if (libPBL2::canonicalRoomKey(dn->info.getRoomId()) == key && dn->info.getSpId() != spId) {
                 outConflictDoctor = UIHelper::qs(dn->info.getfullName());
                 return true;
             }
@@ -70,11 +59,7 @@ bool hasCrossSpecialtyRoomConflict(
 
 DoctorView::DoctorView(MainWindow *mainWindow, QWidget *parent)
     : QWidget(parent), mainWindow(mainWindow) {
-    if (mainWindow && mainWindow->getDoctors()) {
-        libPBL2::sortDoctors(mainWindow->getDoctors(), libPBL2::DoctorSortBy::ID, false);
-    }
     setupUI();
-    refresh(false);
 }
 
 void DoctorView::refresh(bool preserveScroll) {
@@ -105,11 +90,16 @@ void DoctorView::refresh(bool preserveScroll) {
         }
         QString name = UIHelper::qs(n->info.getfullName());
         QString spec = mainWindow->specialty(n->info.getSpId());
-        QString room = UIHelper::formatRoom(UIHelper::qs(n->info.getRoomId()));
+        QString rawRoom = UIHelper::qs(n->info.getRoomId());
+        QString room = UIHelper::formatRoom(rawRoom);
+        QString roomKey = UIHelper::qs(libPBL2::canonicalRoomKey(n->info.getRoomId()));
+        QString qRoomKey = UIHelper::qs(libPBL2::canonicalRoomKey(UIHelper::ss(q)));
         QString id = UIHelper::qs(n->info.getID());
         QString phone = UIHelper::qs(n->info.getPhone());
 
-        if (q.isEmpty() || name.toLower().contains(q) || spec.toLower().contains(q) || room.toLower().contains(q) || id.toLower().contains(q) || phone.contains(q)) {
+        bool matchRoom = room.toLower().contains(q) || rawRoom.toLower().contains(q) ||
+                         (!qRoomKey.isEmpty() && roomKey.contains(qRoomKey));
+        if (q.isEmpty() || name.toLower().contains(q) || spec.toLower().contains(q) || matchRoom || id.toLower().contains(q) || phone.contains(q)) {
             matched.append(&n->info);
             if (n->info.getState() == 1) {
                 activeCount++;
@@ -181,18 +171,19 @@ void DoctorView::refresh(bool preserveScroll) {
         item5->setForeground(working ? QColor("#059669") : QColor("#dc2626"));
         table->setItem(r, 5, item5);
 
-        auto action = UIHelper::createActionCell(UIHelper::trashIcon(), "Xóa bác sĩ");
+        auto action = UIHelper::createActionCell(UIHelper::trashIcon(), "Xóa bác sĩ", table);
         if (mainWindow && !mainWindow->hasPermission("Per_2")) {
             action.second->setToolTip("Bạn không có quyền xóa bác sĩ (Yêu cầu quyền Per_2)");
         }
-        connect(action.second, &QPushButton::clicked, this, [this, d]() {
+        connect(action.second, &QPushButton::clicked, this, [this, did = d->getID()]() {
             if (!mainWindow) return;
             if (!mainWindow->hasPermission("Per_2")) {
                 UIHelper::showWarning(this, "Không có quyền", "Bạn không có quyền thực hiện xóa bác sĩ.");
                 return;
             }
-            QString name = UIHelper::qs(d->getfullName());
-            std::string did = d->getID();
+            Doctor *targetDoc = mainWindow->findDoctor(did);
+            if (!targetDoc) return;
+            QString name = UIHelper::qs(targetDoc->getfullName());
 
             auto affected = AppointmentController::getAffectedAppointmentsForDoctor(mainWindow->getAppointments(), did);
             if (!affected.isEmpty()) {
@@ -213,7 +204,7 @@ void DoctorView::refresh(bool preserveScroll) {
                 }
             }
 
-            Doctor *targetDoc = mainWindow->findDoctor(did);
+            targetDoc = mainWindow->findDoctor(did);
             if (!targetDoc) return;
             int oldState = targetDoc->getState();
             targetDoc->setState(-1);
@@ -221,69 +212,63 @@ void DoctorView::refresh(bool preserveScroll) {
             QList<RescheduledResultItem> resultItems;
             QList<std::string> insertedApptIds;
             QList<std::string> insertedSpIds;
-            QList<Appointment*> modifiedOldAppts;
+            QList<std::string> modifiedOldApptIds;
             int failedCount = 0;
 
-            if (!affected.isEmpty()) {
-                auto holidays = AppointmentController::loadHolidays("Config/Lichnghile.txt");
-                AppointmentController::reassignAppointmentsForDoctor(
-                    mainWindow->getAppointments(),
-                    mainWindow->getSymptomPatients(),
-                    mainWindow->getSymptomPatientDetails(),
-                    mainWindow->getSymptoms(),
-                    mainWindow->getDoctors(),
-                    mainWindow->getPatients(),
-                    did,
-                    holidays,
-                    &resultItems,
-                    &failedCount,
-                    &insertedApptIds,
-                    &insertedSpIds,
-                    &modifiedOldAppts
-                );
-                if (failedCount > 0) {
-                    targetDoc->setState(oldState);
-                    UIHelper::showWarning(this, "Không thể xóa bác sĩ",
-                        QStringLiteral("Không thể xóa bác sĩ \"%1\" vì có %2 lịch hẹn chưa tìm được bác sĩ thay thế thuộc các chuyên khoa phù hợp.\nVui lòng bổ sung bác sĩ hoặc xử lý thủ công các lịch hẹn này trước.")
-                            .arg(name).arg(failedCount));
-                    return;
-                }
-            }
-
             try {
+                if (!affected.isEmpty()) {
+                    auto holidays = AppointmentController::loadHolidays(AppConstants::Paths::HOLIDAYS);
+                    AppointmentController::reassignAppointmentsForDoctor(
+                        mainWindow->getAppointments(),
+                        mainWindow->getSymptomPatients(),
+                        mainWindow->getSymptomPatientDetails(),
+                        mainWindow->getSymptoms(),
+                        mainWindow->getDoctors(),
+                        mainWindow->getPatients(),
+                        did,
+                        holidays,
+                        &resultItems,
+                        &failedCount,
+                        &insertedApptIds,
+                        &insertedSpIds,
+                        &modifiedOldApptIds
+                    );
+                    if (failedCount > 0) {
+                        targetDoc->setState(oldState);
+                        UIHelper::showWarning(this, "Không thể xóa bác sĩ",
+                            QStringLiteral("Không thể xóa bác sĩ \"%1\" vì có %2 lịch hẹn chưa tìm được bác sĩ thay thế thuộc các chuyên khoa phù hợp.\nVui lòng bổ sung bác sĩ hoặc xử lý thủ công các lịch hẹn này trước.")
+                                .arg(name).arg(failedCount));
+                        return;
+                    }
+                }
+
                 SaveScope scope = affected.isEmpty() ? SaveScope::Doctor : SaveScope::All;
                 if (!mainWindow->saveAll(scope, SaveAction::Normal)) {
-                    targetDoc->setState(oldState);
+                    if (Doctor *rbDoc = mainWindow->findDoctor(did)) rbDoc->setState(oldState);
                     if (!affected.isEmpty()) {
                         AppointmentController::rollbackInsertedAppointments(
                             mainWindow->getAppointments(),
                             mainWindow->getSymptomPatients(),
                             mainWindow->getSymptomPatientDetails(),
-                            insertedApptIds, insertedSpIds, modifiedOldAppts
+                            insertedApptIds, insertedSpIds, modifiedOldApptIds
                         );
                     }
                     return;
                 }
                 refresh(true);
+                mainWindow->refreshPage(4);
                 mainWindow->refreshPage(0);
                 mainWindow->refreshPage(1);
+                mainWindow->refreshPage(5);
                 if (!affected.isEmpty()) {
-                    mainWindow->refreshPage(4);
-                    mainWindow->refreshPage(5);
                     mainWindow->showRescheduledSummaryDialog(this, resultItems, affected.size(), "Kết quả chuyển bác sĩ khi xóa hồ sơ");
                 }
-            } catch (const AppException &e) {
-                targetDoc->setState(oldState);
-                AppointmentController::rollbackInsertedAppointments(
-                    mainWindow->getAppointments(), mainWindow->getSymptomPatients(), mainWindow->getSymptomPatientDetails(),
-                    insertedApptIds, insertedSpIds, modifiedOldAppts);
-                UIHelper::showWarning(this, "Lỗi lưu dữ liệu", QString::fromUtf8(e.what()));
             } catch (const std::exception &e) {
-                targetDoc->setState(oldState);
+                if (Doctor *rbDoc = mainWindow->findDoctor(did)) rbDoc->setState(oldState);
                 AppointmentController::rollbackInsertedAppointments(
                     mainWindow->getAppointments(), mainWindow->getSymptomPatients(), mainWindow->getSymptomPatientDetails(),
-                    insertedApptIds, insertedSpIds, modifiedOldAppts);
-                UIHelper::showWarning(this, "Lỗi hệ thống", QString("Đã xảy ra ngoại lệ: %1").arg(e.what()));
+                    insertedApptIds, insertedSpIds, modifiedOldApptIds);
+                UIHelper::showWarning(this, "Lỗi hệ thống", QString("Không thể xóa bác sĩ: %1").arg(QString::fromUtf8(e.what())));
             }
         });
 
@@ -305,7 +290,7 @@ void DoctorView::resetToFirstPage() {
     sortColumn = -1;
     sortAscending = false;
     if (mainWindow && mainWindow->getDoctors()) {
-        libPBL2::sortDoctors(mainWindow->getDoctors(), libPBL2::DoctorSortBy::ID, false);
+        DoctorController::sortDoctors(mainWindow->getDoctors(), DoctorSortBy::ID, false);
     }
     currentPage = 0;
     refresh(false);
@@ -314,10 +299,10 @@ void DoctorView::resetToFirstPage() {
 void DoctorView::reapplyCurrentSort() {
     if (!mainWindow || !mainWindow->getDoctors()) return;
     if (sortColumn < 0 || sortColumn >= 6) {
-        libPBL2::sortDoctors(mainWindow->getDoctors(), libPBL2::DoctorSortBy::ID, false);
+        DoctorController::sortDoctors(mainWindow->getDoctors(), DoctorSortBy::ID, false);
         return;
     }
-    libPBL2::sortDoctors(mainWindow->getDoctors(), doctorSortByColumn(sortColumn), sortAscending);
+    DoctorController::sortDoctors(mainWindow->getDoctors(), doctorSortByColumn(sortColumn), sortAscending);
 }
 
 void DoctorView::showEvent(QShowEvent *event) {
@@ -350,7 +335,7 @@ void DoctorView::setupUI() {
     actions->addWidget(addBtn);
     layout->addLayout(actions);
 
-    table = UIHelper::table({"BÁC SĨ", "CHUYÊN KHOA", "PHÒNG", "PHÍ KHÁM", "ĐÁNH GIÁ", "TRẠNG THÁI", ""});
+    table = UIHelper::table({"BÁC SĨ", "CHUYÊN KHOA", "PHÒNG", "PHÍ KHÁM", "ĐÁNH GIÁ", "TRẠNG THÁI", ""}, this);
     table->setWordWrap(false);
     table->setTextElideMode(Qt::ElideRight);
     table->verticalHeader()->setDefaultSectionSize(48);
@@ -374,7 +359,7 @@ void DoctorView::setupUI() {
             sortAscending = true;
         }
         if (mainWindow && mainWindow->getDoctors()) {
-            libPBL2::sortDoctors(mainWindow->getDoctors(), doctorSortByColumn(logicalIndex), sortAscending);
+            DoctorController::sortDoctors(mainWindow->getDoctors(), doctorSortByColumn(logicalIndex), sortAscending);
             currentPage = 0;
             refresh(false);
         }
@@ -424,8 +409,10 @@ void DoctorView::setupUI() {
             if (addDoctorDialog()) {
                 refresh(false);
                 if (mainWindow) {
+                    mainWindow->refreshPage(4);
                     mainWindow->refreshPage(0);
                     mainWindow->refreshPage(1);
+                    mainWindow->refreshPage(5);
                 }
             }
         });
@@ -540,7 +527,7 @@ bool DoctorView::addDoctorDialog() {
     auto *row3 = new QHBoxLayout;
     row3->setSpacing(14);
     auto *specialtyBox = new QComboBox;
-    auto specList = DoctorController::getSpecializationList("Data/Doctor/Specialization.txt");
+    auto specList = DoctorController::getSpecializationList(AppConstants::Paths::SPECIALIZATION);
     for (const auto &item : specList) {
         specialtyBox->addItem(item.first, item.second);
     }
@@ -563,6 +550,7 @@ bool DoctorView::addDoctorDialog() {
 
     auto *rating = new QDoubleSpinBox;
     rating->setRange(0, 5);
+    rating->setDecimals(1);
     rating->setSingleStep(0.1);
     rating->setValue(5.0);
     rating->setSuffix(" ★");
@@ -602,6 +590,11 @@ bool DoctorView::addDoctorDialog() {
             UIHelper::showWarning(&dialog, "Thiếu thông tin", "Vui lòng nhập đầy đủ họ tên và số điện thoại.");
             return;
         }
+        if (libPBL2::containsForbiddenStorageChars(UIHelper::ss(nameStr)) ||
+            libPBL2::containsForbiddenStorageChars(UIHelper::ss(roomStr))) {
+            UIHelper::showWarning(&dialog, "Ký tự không hợp lệ", "Họ tên và phòng khám không được chứa ký tự '|' hoặc ký tự xuống dòng.");
+            return;
+        }
         if (!UIHelper::isValidPhone(phoneStr)) {
             UIHelper::showWarning(&dialog, "Số điện thoại không hợp lệ", "Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng số 0 (Ví dụ: 0912345678).");
             phone->setFocus();
@@ -623,8 +616,9 @@ bool DoctorView::addDoctorDialog() {
             UIHelper::showWarning(&dialog, "Thiếu thông tin", "Vui lòng chọn chuyên khoa hợp lệ cho bác sĩ.");
             return;
         }
-        if (roomStr.isEmpty()) {
-            UIHelper::showWarning(&dialog, "Thiếu thông tin", "Vui lòng nhập phòng khám cho bác sĩ.");
+        std::string normalizedRoomId = libPBL2::storageRoomId(UIHelper::ss(roomStr));
+        if (normalizedRoomId.empty()) {
+            UIHelper::showWarning(&dialog, "Phòng khám không hợp lệ", "Vui lòng nhập số hoặc tên phòng khám hợp lệ (Ví dụ: Room 101).");
             room->setFocus();
             return;
         }
@@ -632,7 +626,7 @@ bool DoctorView::addDoctorDialog() {
         if (hasCrossSpecialtyRoomConflict(mainWindow->getDoctors(), "", UIHelper::ss(spData), roomStr, conflictDoc)) {
             UIHelper::showWarning(&dialog, "Trùng phòng khám khác chuyên khoa",
                 QStringLiteral("Phòng \"%1\" hiện đang được sử dụng bởi BS. %2 thuộc chuyên khoa khác. Vui lòng chọn phòng khác.")
-                    .arg(roomStr, conflictDoc));
+                    .arg(UIHelper::formatRoom(roomStr), conflictDoc));
             room->setFocus();
             return;
         }
@@ -650,7 +644,7 @@ bool DoctorView::addDoctorDialog() {
             age->value(),
             UIHelper::ss(spData),
             state->currentIndex() == 0 ? 1 : 0,
-            UIHelper::ss(roomStr),
+            normalizedRoomId,
             fee->value(),
             rating->value()
         );
@@ -818,7 +812,7 @@ void DoctorView::editDoctorDialog(const std::string &id) {
     auto *rowSpecState = new QHBoxLayout;
     rowSpecState->setSpacing(10);
     auto *specialtyBox = new QComboBox;
-    auto specList = DoctorController::getSpecializationList("Data/Doctor/Specialization.txt");
+    auto specList = DoctorController::getSpecializationList(AppConstants::Paths::SPECIALIZATION);
     for (const auto &item : specList) {
         specialtyBox->addItem(item.first, item.second);
     }
@@ -849,6 +843,7 @@ void DoctorView::editDoctorDialog(const std::string &id) {
 
     auto *rating = new QDoubleSpinBox;
     rating->setRange(0, 5);
+    rating->setDecimals(1);
     rating->setSingleStep(0.1);
     rating->setValue(doctor->getRating());
     rating->setSuffix(" ★");
@@ -881,11 +876,23 @@ void DoctorView::editDoctorDialog(const std::string &id) {
         saveBtn->setFixedHeight(36);
         saveBtn->setStyleSheet("QPushButton { background: #0d9488; color: #ffffff; border: none; border-radius: 8px; padding: 7px 18px; font-weight: 700; font-size: 12.5px; } QPushButton:hover { background: #0f766e; }");
 
-        connect(saveBtn, &QPushButton::clicked, &dialog, [this, &dialog, doctor, name, phone, room, fee, rating, age, gender, specialtyBox, state]() {
+        connect(saveBtn, &QPushButton::clicked, &dialog, [this, &dialog, docId = id, name, phone, room, fee, rating, age, gender, specialtyBox, state]() {
+            Doctor *doctor = mainWindow ? mainWindow->findDoctor(docId) : nullptr;
+            if (!doctor) {
+                UIHelper::showWarning(&dialog, "Không tìm thấy", "Hồ sơ bác sĩ không còn tồn tại trong hệ thống.");
+                dialog.reject();
+                return;
+            }
             QString nameStr = name->text().trimmed();
             QString phoneStr = phone->text().trimmed();
+            QString roomStr = room->text().trimmed();
             if (nameStr.isEmpty() || phoneStr.isEmpty()) {
                 UIHelper::showWarning(&dialog, "Thiếu thông tin", "Vui lòng nhập họ tên và điện thoại.");
+                return;
+            }
+            if (libPBL2::containsForbiddenStorageChars(UIHelper::ss(nameStr)) ||
+                libPBL2::containsForbiddenStorageChars(UIHelper::ss(roomStr))) {
+                UIHelper::showWarning(&dialog, "Ký tự không hợp lệ", "Họ tên và phòng khám không được chứa ký tự '|' hoặc ký tự xuống dòng.");
                 return;
             }
             if (!UIHelper::isValidPhone(phoneStr)) {
@@ -896,7 +903,7 @@ void DoctorView::editDoctorDialog(const std::string &id) {
             if (mainWindow && mainWindow->getDoctors()) {
                 auto *dn = mainWindow->getDoctors()->getHeader()->next;
                 while (dn && dn->next) {
-                    if (dn->info.getID() != doctor->getID() && dn->info.getState() != -1 && dn->info.getPhone() == UIHelper::ss(phoneStr)) {
+                    if (dn->info.getID() != docId && dn->info.getState() != -1 && dn->info.getPhone() == UIHelper::ss(phoneStr)) {
                         UIHelper::showWarning(&dialog, "Trùng thông tin", "Số điện thoại này đã được sử dụng bởi một bác sĩ khác.");
                         phone->setFocus();
                         return;
@@ -909,17 +916,17 @@ void DoctorView::editDoctorDialog(const std::string &id) {
                 UIHelper::showWarning(&dialog, "Thiếu thông tin", "Vui lòng chọn chuyên khoa hợp lệ cho bác sĩ.");
                 return;
             }
-            QString roomStr = room->text().trimmed();
-            if (roomStr.isEmpty()) {
-                UIHelper::showWarning(&dialog, "Thiếu thông tin", "Vui lòng nhập phòng khám cho bác sĩ.");
+            std::string normalizedRoomId = libPBL2::storageRoomId(UIHelper::ss(roomStr));
+            if (normalizedRoomId.empty()) {
+                UIHelper::showWarning(&dialog, "Phòng khám không hợp lệ", "Vui lòng nhập số hoặc tên phòng khám hợp lệ (Ví dụ: Room 101).");
                 room->setFocus();
                 return;
             }
             QString conflictDoc;
-            if (hasCrossSpecialtyRoomConflict(mainWindow->getDoctors(), doctor->getID(), UIHelper::ss(spData), roomStr, conflictDoc)) {
+            if (hasCrossSpecialtyRoomConflict(mainWindow->getDoctors(), docId, UIHelper::ss(spData), roomStr, conflictDoc)) {
                 UIHelper::showWarning(&dialog, "Trùng phòng khám khác chuyên khoa",
                     QStringLiteral("Phòng \"%1\" hiện đang được sử dụng bởi BS. %2 thuộc chuyên khoa khác. Vui lòng chọn phòng khác.")
-                        .arg(roomStr, conflictDoc));
+                        .arg(UIHelper::formatRoom(roomStr), conflictDoc));
                 room->setFocus();
                 return;
             }
@@ -936,7 +943,7 @@ void DoctorView::editDoctorDialog(const std::string &id) {
             bool needsReassign = isDeactivating || isChangingSpec;
             QList<Appointment*> affected;
             if (needsReassign) {
-                affected = AppointmentController::getAffectedAppointmentsForDoctor(mainWindow->getAppointments(), doctor->getID());
+                affected = AppointmentController::getAffectedAppointmentsForDoctor(mainWindow->getAppointments(), docId);
                 if (!affected.isEmpty()) {
                     QString actionDesc = (isDeactivating && isChangingSpec)
                         ? QStringLiteral("chuyển sang trạng thái \"Tạm ngưng\" và đổi chuyên khoa")
@@ -962,74 +969,79 @@ void DoctorView::editDoctorDialog(const std::string &id) {
             QList<RescheduledResultItem> resultItems;
             QList<std::string> insertedApptIds;
             QList<std::string> insertedSpIds;
-            QList<Appointment*> modifiedOldAppts;
+            QList<std::string> modifiedOldApptIds;
             int failedCount = 0;
 
-            if (needsReassign && !affected.isEmpty()) {
-                auto holidays = AppointmentController::loadHolidays("Config/Lichnghile.txt");
-                AppointmentController::reassignAppointmentsForDoctor(
-                    mainWindow->getAppointments(),
-                    mainWindow->getSymptomPatients(),
-                    mainWindow->getSymptomPatientDetails(),
-                    mainWindow->getSymptoms(),
-                    mainWindow->getDoctors(),
-                    mainWindow->getPatients(),
-                    doctor->getID(),
-                    holidays,
-                    &resultItems,
-                    &failedCount,
-                    &insertedApptIds,
-                    &insertedSpIds,
-                    &modifiedOldAppts
-                );
-                if (failedCount > 0) {
-                    QString failTitle = isDeactivating ? QStringLiteral("Không thể tạm ngưng bác sĩ")
-                                                       : QStringLiteral("Không thể đổi chuyên khoa bác sĩ");
-                    UIHelper::showWarning(&dialog, failTitle,
-                        QStringLiteral("Không thể thực hiện thay đổi vì có %1 lịch hẹn không tìm được bác sĩ thay thế thuộc các chuyên khoa phù hợp.")
-                            .arg(failedCount));
-                    return;
-                }
-            }
-
-            doctor->setfullName(UIHelper::ss(nameStr));
-            doctor->setPhone(UIHelper::ss(phoneStr));
-            doctor->setAge(age->value());
-            doctor->setGender(gender->currentIndex() == 0);
-            doctor->setSpId(newSpId);
-            doctor->setRoomId(UIHelper::ss(roomStr));
-            doctor->setFee(fee->value());
-            doctor->setRating(rating->value());
-            doctor->setState(newState);
-
-            SaveScope scope = (needsReassign && !affected.isEmpty()) ? SaveScope::All : SaveScope::Doctor;
-            if (!mainWindow->saveAll(scope, SaveAction::Normal)) {
-                *doctor = oldSnapshot;
+            try {
                 if (needsReassign && !affected.isEmpty()) {
-                    AppointmentController::rollbackInsertedAppointments(
+                    auto holidays = AppointmentController::loadHolidays(AppConstants::Paths::HOLIDAYS);
+                    AppointmentController::reassignAppointmentsForDoctor(
                         mainWindow->getAppointments(),
                         mainWindow->getSymptomPatients(),
                         mainWindow->getSymptomPatientDetails(),
-                        insertedApptIds, insertedSpIds, modifiedOldAppts
+                        mainWindow->getSymptoms(),
+                        mainWindow->getDoctors(),
+                        mainWindow->getPatients(),
+                        docId,
+                        holidays,
+                        &resultItems,
+                        &failedCount,
+                        &insertedApptIds,
+                        &insertedSpIds,
+                        &modifiedOldApptIds
                     );
+                    if (failedCount > 0) {
+                        QString failTitle = isDeactivating ? QStringLiteral("Không thể tạm ngưng bác sĩ")
+                                                           : QStringLiteral("Không thể đổi chuyên khoa bác sĩ");
+                        UIHelper::showWarning(&dialog, failTitle,
+                            QStringLiteral("Không thể thực hiện thay đổi vì có %1 lịch hẹn không tìm được bác sĩ thay thế thuộc các chuyên khoa phù hợp.")
+                                .arg(failedCount));
+                        return;
+                    }
                 }
-                return;
-            }
-            if (needsReassign && !affected.isEmpty()) {
-                mainWindow->refreshPage(0);
-                mainWindow->refreshPage(1);
+
+                doctor->setfullName(UIHelper::ss(nameStr));
+                doctor->setPhone(UIHelper::ss(phoneStr));
+                doctor->setAge(age->value());
+                doctor->setGender(gender->currentIndex() == 0);
+                doctor->setSpId(newSpId);
+                doctor->setRoomId(normalizedRoomId);
+                doctor->setFee(fee->value());
+                doctor->setRating(rating->value());
+                doctor->setState(newState);
+
+                SaveScope scope = (needsReassign && !affected.isEmpty()) ? SaveScope::All : SaveScope::Doctor;
+                if (!mainWindow->saveAll(scope, SaveAction::Normal)) {
+                    if (Doctor *rbDoc = mainWindow->findDoctor(docId)) *rbDoc = oldSnapshot;
+                    if (needsReassign && !affected.isEmpty()) {
+                        AppointmentController::rollbackInsertedAppointments(
+                            mainWindow->getAppointments(),
+                            mainWindow->getSymptomPatients(),
+                            mainWindow->getSymptomPatientDetails(),
+                            insertedApptIds, insertedSpIds, modifiedOldApptIds
+                        );
+                    }
+                    return;
+                }
                 mainWindow->refreshPage(4);
-                mainWindow->refreshPage(5);
-                QString summaryTitle = isDeactivating
-                    ? QStringLiteral("Kết quả chuyển bác sĩ khi tạm ngưng")
-                    : QStringLiteral("Kết quả chuyển bác sĩ khi đổi chuyên khoa");
-                mainWindow->showRescheduledSummaryDialog(&dialog, resultItems, affected.size(), summaryTitle);
-            } else if (mainWindow) {
                 mainWindow->refreshPage(0);
                 mainWindow->refreshPage(1);
+                mainWindow->refreshPage(5);
+                if (needsReassign && !affected.isEmpty()) {
+                    QString summaryTitle = isDeactivating
+                        ? QStringLiteral("Kết quả chuyển bác sĩ khi tạm ngưng")
+                        : QStringLiteral("Kết quả chuyển bác sĩ khi đổi chuyên khoa");
+                    mainWindow->showRescheduledSummaryDialog(&dialog, resultItems, affected.size(), summaryTitle);
+                }
+                UIHelper::showSuccess(&dialog, "Thành công", "Cập nhật thông tin bác sĩ thành công.");
+                dialog.accept();
+            } catch (const std::exception &e) {
+                if (Doctor *rbDoc = mainWindow->findDoctor(docId)) *rbDoc = oldSnapshot;
+                AppointmentController::rollbackInsertedAppointments(
+                    mainWindow->getAppointments(), mainWindow->getSymptomPatients(), mainWindow->getSymptomPatientDetails(),
+                    insertedApptIds, insertedSpIds, modifiedOldApptIds);
+                UIHelper::showWarning(&dialog, "Lỗi hệ thống", QString("Không thể lưu thông tin bác sĩ: %1").arg(QString::fromUtf8(e.what())));
             }
-            UIHelper::showSuccess(&dialog, "Thành công", "Cập nhật thông tin bác sĩ thành công.");
-            dialog.accept();
         });
 
         leftBtnBox->addWidget(cancelBtn);
@@ -1228,10 +1240,9 @@ void DoctorView::editDoctorDialog(const std::string &id) {
     auto reloadHistoryPtr = std::make_shared<std::function<void()>>();
     auto reloadHistory = [reloadHistoryPtr]() { if (*reloadHistoryPtr) (*reloadHistoryPtr)(); };
 
-    *reloadHistoryPtr = [this, doctor, histTable, emptyWidget, searchHist, countLabel, viewState, prevPageBtn, pageInfoLabel, nextPageBtn, PAGE_SIZE]() {
+    *reloadHistoryPtr = [this, docId = id, histTable, emptyWidget, searchHist, countLabel, viewState, prevPageBtn, pageInfoLabel, nextPageBtn, PAGE_SIZE]() {
         if (!mainWindow || !mainWindow->getAppointments()) return;
 
-        std::string docId = doctor->getID();
         QList<Appointment*> allAppts;
 
         int totalCount = 0;
@@ -1266,9 +1277,13 @@ void DoctorView::editDoctorDialog(const std::string &id) {
             filtered.append(a);
         }
 
+        QDateTime nowDt = QDateTime::currentDateTime();
+        int curD = nowDt.date().day(), curM = nowDt.date().month(), curY = nowDt.date().year();
+        int curH = nowDt.time().hour(), curMin = nowDt.time().minute(), curSec = nowDt.time().second();
+
         int col = viewState->sortCol;
         bool asc = viewState->sortAsc;
-        libPBL2::qsort(filtered, [this, col, asc](const Appointment *a, const Appointment *b) -> bool {
+        libPBL2::qsort(filtered, [this, col, asc, curD, curM, curY, curH, curMin, curSec](const Appointment *a, const Appointment *b) -> bool {
             if (!a || !b) return false;
             int cmp = 0;
             switch (col) {
@@ -1290,13 +1305,12 @@ void DoctorView::editDoctorDialog(const std::string &id) {
                 case 3: {
                     QString sa = mainWindow ? mainWindow->getSymptomNamesForAppointment(*a) : "";
                     QString sb = mainWindow ? mainWindow->getSymptomNamesForAppointment(*b) : "";
-                    cmp = QString::compare(sa, sb, Qt::CaseInsensitive);
+                    cmp = libPBL2::compareVietnameseStrings(UIHelper::ss(sa), UIHelper::ss(sb));
                     break;
                 }
                 case 4: {
-                    Date now = Date::now();
-                    int sa = a->computeEffectiveState(now.getDay(), now.getMonth(), now.getYear(), now.getHour(), now.getMinute());
-                    int sb = b->computeEffectiveState(now.getDay(), now.getMonth(), now.getYear(), now.getHour(), now.getMinute());
+                    int sa = a->computeEffectiveState(curD, curM, curY, curH, curMin, curSec);
+                    int sb = b->computeEffectiveState(curD, curM, curY, curH, curMin, curSec);
                     cmp = (sa < sb) ? -1 : ((sa > sb) ? 1 : 0);
                     break;
                 }
@@ -1328,7 +1342,11 @@ void DoctorView::editDoctorDialog(const std::string &id) {
 
         int startIndex = viewState->currentPage * PAGE_SIZE;
         int endIndex = qMin(startIndex + PAGE_SIZE, totalFiltered);
-        countLabel->setText(QStringLiteral("Đang hiển thị %1 - %2 / Tổng %3 ca khám").arg(startIndex + 1).arg(endIndex).arg(totalCount));
+        if (totalFiltered == totalCount) {
+            countLabel->setText(QStringLiteral("Đang hiển thị %1 - %2 / Tổng %3 ca khám").arg(startIndex + 1).arg(endIndex).arg(totalFiltered));
+        } else {
+            countLabel->setText(QStringLiteral("Đang hiển thị %1 - %2 / %3 kết quả (Tổng %4 ca)").arg(startIndex + 1).arg(endIndex).arg(totalFiltered).arg(totalCount));
+        }
 
         emptyWidget->hide();
         histTable->show();
@@ -1359,16 +1377,11 @@ void DoctorView::editDoctorDialog(const std::string &id) {
             histTable->setItem(r, 2, phoneItem);
 
             QString symText = mainWindow->getSymptomNamesForAppointment(*a);
-            if (symText.isEmpty()) symText = "Chưa ghi nhận";
             auto *symItem = new QTableWidgetItem(symText);
             symItem->setTextAlignment(Qt::AlignCenter);
             histTable->setItem(r, 3, symItem);
 
-            int st = a->getState();
-            if (st == 0) {
-                Date now = Date::now();
-                st = a->computeEffectiveState(now.getDay(), now.getMonth(), now.getYear(), now.getHour(), now.getMinute());
-            }
+            int st = a->computeEffectiveState(curD, curM, curY, curH, curMin, curSec);
             QString badgeText = "● Chưa khám";
             QString badgeStyle = "QLabel { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; border-radius: 10px; font-size: 11px; font-weight: 700; padding: 3px 8px; }";
             if (st == 1) {

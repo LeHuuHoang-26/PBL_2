@@ -81,6 +81,8 @@ Makefile
 .rcc/
 .uic/
 /build*/
+debug/
+release/
 
 # Test and capture artifacts
 login_render_*.png

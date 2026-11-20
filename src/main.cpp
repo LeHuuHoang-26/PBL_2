@@ -2,7 +2,7 @@
 #include <QFontDatabase>
 #include <QIcon>
 #include <QDir>
-#include "Views/MainWindow.h"
+#include "MainWindow.h"
 
 int main(int argc, char *argv[]) {
     QCoreApplication::setApplicationName("Phòng khám Đa khoa An Tâm");

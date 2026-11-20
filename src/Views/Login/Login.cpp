@@ -11,29 +11,30 @@
 #include <QPainterPath>
 #include <QGraphicsDropShadowEffect>
 #include <QFile>
-#include <QResizeEvent>
 
 static QIcon createUserIcon() {
     int size = 56;
     QPixmap pix(size, size);
     pix.fill(Qt::transparent);
-    QPainter p(&pix);
-    p.setRenderHint(QPainter::Antialiasing);
-    p.scale(2.0, 2.0);
+    {
+        QPainter p(&pix);
+        p.setRenderHint(QPainter::Antialiasing);
+        p.scale(2.0, 2.0);
 
-    QColor iconColor("#0D9488");
-    p.setPen(Qt::NoPen);
-    p.setBrush(iconColor);
+        QColor iconColor("#0D9488");
+        p.setPen(Qt::NoPen);
+        p.setBrush(iconColor);
 
-    p.drawEllipse(QPointF(14.0, 8.5), 5.0, 5.0);
+        p.drawEllipse(QPointF(14.0, 8.5), 5.0, 5.0);
 
-    QPainterPath body;
-    body.moveTo(4.5, 23.5);
-    body.quadTo(4.5, 16.5, 10.0, 15.5);
-    body.lineTo(18.0, 15.5);
-    body.quadTo(23.5, 16.5, 23.5, 23.5);
-    body.closeSubpath();
-    p.drawPath(body);
+        QPainterPath body;
+        body.moveTo(4.5, 23.5);
+        body.quadTo(4.5, 16.5, 10.0, 15.5);
+        body.lineTo(18.0, 15.5);
+        body.quadTo(23.5, 16.5, 23.5, 23.5);
+        body.closeSubpath();
+        p.drawPath(body);
+    }
 
     pix.setDevicePixelRatio(2.0);
     return QIcon(pix);
@@ -43,30 +44,32 @@ static QIcon createLockIcon() {
     int size = 56;
     QPixmap pix(size, size);
     pix.fill(Qt::transparent);
-    QPainter p(&pix);
-    p.setRenderHint(QPainter::Antialiasing);
-    p.scale(2.0, 2.0);
+    {
+        QPainter p(&pix);
+        p.setRenderHint(QPainter::Antialiasing);
+        p.scale(2.0, 2.0);
 
-    QColor iconColor("#0D9488");
+        QColor iconColor("#0D9488");
 
-    QPen shacklePen(iconColor, 2.4);
-    shacklePen.setCapStyle(Qt::RoundCap);
-    p.setPen(shacklePen);
-    p.setBrush(Qt::NoBrush);
-    QPainterPath shackle;
-    shackle.moveTo(9.0, 12.0);
-    shackle.lineTo(9.0, 8.0);
-    shackle.arcTo(9.0, 3.8, 10.0, 8.4, 180, -180);
-    shackle.lineTo(19.0, 12.0);
-    p.drawPath(shackle);
+        QPen shacklePen(iconColor, 2.4);
+        shacklePen.setCapStyle(Qt::RoundCap);
+        p.setPen(shacklePen);
+        p.setBrush(Qt::NoBrush);
+        QPainterPath shackle;
+        shackle.moveTo(9.0, 12.0);
+        shackle.lineTo(9.0, 8.0);
+        shackle.arcTo(9.0, 3.8, 10.0, 8.4, 180, -180);
+        shackle.lineTo(19.0, 12.0);
+        p.drawPath(shackle);
 
-    p.setPen(Qt::NoPen);
-    p.setBrush(iconColor);
-    p.drawRoundedRect(QRectF(4.5, 11.5, 19.0, 12.0), 3.0, 3.0);
+        p.setPen(Qt::NoPen);
+        p.setBrush(iconColor);
+        p.drawRoundedRect(QRectF(4.5, 11.5, 19.0, 12.0), 3.0, 3.0);
 
-    p.setBrush(QColor("#FFFFFF"));
-    p.drawEllipse(QPointF(14.0, 15.8), 1.6, 1.6);
-    p.drawRect(QRectF(13.2, 15.8, 1.6, 3.0));
+        p.setBrush(QColor("#FFFFFF"));
+        p.drawEllipse(QPointF(14.0, 15.8), 1.6, 1.6);
+        p.drawRect(QRectF(13.2, 15.8, 1.6, 3.0));
+    }
 
     pix.setDevicePixelRatio(2.0);
     return QIcon(pix);
@@ -388,10 +391,7 @@ void Login::setupUI() {
     formLayout->setContentsMargins(0, 0, 0, 0);
     formLayout->setSpacing(0);
 
-    QLabel *lblTitle = new QLabel("Sign in to account", formContainer);
-    QFont titleFont("Be Vietnam Pro", 22, QFont::Bold);
-    titleFont.setStyleStrategy(QFont::PreferAntialias);
-    lblTitle->setFont(titleFont);
+    QLabel *lblTitle = new QLabel("Đăng nhập tài khoản", formContainer);
     lblTitle->setStyleSheet("font-family: 'Be Vietnam Pro', 'Segoe UI', sans-serif; color: #0F172A; font-size: 28px; font-weight: 700; letter-spacing: -0.4px;");
 
     QWidget *titleAccent = new QWidget(formContainer);
@@ -428,12 +428,12 @@ void Login::setupUI() {
         edit->setPalette(pal);
     };
 
-    QLabel *lblUser = new QLabel("Username", formContainer);
+    QLabel *lblUser = new QLabel("Tên đăng nhập", formContainer);
     lblUser->setStyleSheet("color: #334155; font-size: 13.5px; font-weight: 700; margin-bottom: 6px;");
     formLayout->addWidget(lblUser);
 
     m_txtUsername = new QLineEdit(formContainer);
-    m_txtUsername->setPlaceholderText("Nhập Username");
+    m_txtUsername->setPlaceholderText("Nhập tên đăng nhập");
     m_txtUsername->setStyleSheet(inputStyle);
     applyPlaceholderColor(m_txtUsername);
     m_txtUsername->addAction(createUserIcon(), QLineEdit::LeadingPosition);
@@ -441,7 +441,7 @@ void Login::setupUI() {
 
     formLayout->addSpacing(18);
 
-    QLabel *lblPass = new QLabel("Password", formContainer);
+    QLabel *lblPass = new QLabel("Mật khẩu", formContainer);
     lblPass->setStyleSheet("color: #334155; font-size: 13.5px; font-weight: 700; margin-bottom: 6px;");
     formLayout->addWidget(lblPass);
 
@@ -463,12 +463,9 @@ void Login::setupUI() {
 
     formLayout->addSpacing(22);
 
-    m_btnLogin = new QPushButton("Sign in", formContainer);
+    m_btnLogin = new QPushButton("Đăng nhập", formContainer);
     m_btnLogin->setObjectName("btnLogin");
     m_btnLogin->setCursor(Qt::PointingHandCursor);
-    QFont btnFont("Be Vietnam Pro", 11, QFont::DemiBold);
-    btnFont.setStyleStrategy(QFont::PreferAntialias);
-    m_btnLogin->setFont(btnFont);
     m_btnLogin->setStyleSheet(
         "QPushButton#btnLogin {"
         "   font-family: 'Be Vietnam Pro', 'Segoe UI', sans-serif;"
@@ -486,10 +483,6 @@ void Login::setupUI() {
         "}"
         "QPushButton#btnLogin:pressed {"
         "   background: #134E4A;"
-        "}"
-        "QPushButton#btnLogin:disabled {"
-        "   background-color: #CBD5E1;"
-        "   color: #94A3B8;"
         "}"
     );
 
@@ -518,7 +511,7 @@ void Login::setupUI() {
     QHBoxLayout *footerLayout = new QHBoxLayout();
     footerLayout->setContentsMargins(0, 10, 0, 0);
 
-    QLabel *lblCopy = new QLabel("© 2026 Nhà Khám An Tâm. Hệ thống Quản lý Đặt lịch Khám bệnh.", m_cardWidget);
+    QLabel *lblCopy = new QLabel("© 2026 Phòng Khám An Tâm. Hệ thống Quản lý Đặt lịch Khám bệnh.", m_cardWidget);
     lblCopy->setStyleSheet("color: #94A3B8; font-size: 11.5px;");
 
     QLabel *lblSupport = new QLabel("Hỗ trợ kỹ thuật: antam@support.vn", m_cardWidget);
@@ -574,6 +567,13 @@ void Login::updateIllustrationScale() {
 
     int physW = qRound(targetW * dpr);
     int physH = qRound(targetH * dpr);
+    if (physW <= 0 || physH <= 0) return;
+
+    QSize physSize(physW, physH);
+    if (physSize == m_lastIllustrationPhysSize && !m_lblIllustration->pixmap().isNull()) {
+        return;
+    }
+    m_lastIllustrationPhysSize = physSize;
 
     QPixmap scaledPix = m_originalIllustration.scaled(physW, physH, Qt::KeepAspectRatio, Qt::SmoothTransformation);
     scaledPix.setDevicePixelRatio(dpr);

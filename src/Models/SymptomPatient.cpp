@@ -3,7 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include "libPBL2.h"
-#include "../Utils/AppExceptions.h"
+#include "AppExceptions.h"
 
 SymptomPatient::SymptomPatient()
     : SP_id(""), P_id(""), Sp_id(""), date(0, 0, 0, 0, 0) {}
@@ -29,11 +29,6 @@ std::string SymptomPatient::getSP_id() const { return SP_id; }
 std::string SymptomPatient::getP_id() const { return P_id; }
 std::string SymptomPatient::getSp_id() const { return Sp_id; }
 Date SymptomPatient::getDate() const { return date; }
-
-void SymptomPatient::setSP_id(const std::string &value) { SP_id = value; }
-void SymptomPatient::setP_id(const std::string &value) { P_id = value; }
-void SymptomPatient::setSp_id(const std::string &value) { Sp_id = value; }
-void SymptomPatient::setDate(const Date &value) { date = value; }
 
 std::string SymptomPatient::toString() const {
     return libPBL2::padRightUtf8(SP_id, 6) + " | "

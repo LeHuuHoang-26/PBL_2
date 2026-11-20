@@ -33,10 +33,6 @@ public:
 
     bool isDefault() const;
 
-    bool isLeapYear(int y = 0) const;
-    int posofdayinmonth(int m = 0) const;
-    Date operator-(const int &value);
-
     std::string toString() const;
     static Date loadFromString(const std::string &str);
     static Date now();

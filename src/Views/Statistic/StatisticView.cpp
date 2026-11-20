@@ -2,6 +2,7 @@
 #include "MainWindow.h"
 #include "StatisticController.h"
 #include "UIHelper.h"
+#include "AppConstants.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -25,10 +26,48 @@
 #include <QMouseEvent>
 #include <QShowEvent>
 #include <QSignalBlocker>
+#include <algorithm>
 #include <cmath>
+#include <exception>
 #include <memory>
+#include <utility>
 
 namespace {
+
+void computeLargestRemainderPercentages(const int *counts, int n, int *outPct) {
+    int total = 0;
+    for (int i = 0; i < n; ++i) {
+        outPct[i] = 0;
+        if (counts[i] > 0) total += counts[i];
+    }
+    if (total <= 0) return;
+
+    double remainders[8] = {0.0};
+    int sumPct = 0;
+    for (int i = 0; i < n; ++i) {
+        double exact = (counts[i] > 0) ? (counts[i] * 100.0 / total) : 0.0;
+        int floored = static_cast<int>(std::floor(exact));
+        outPct[i] = floored;
+        remainders[i] = exact - floored;
+        sumPct += floored;
+    }
+
+    int rem = 100 - sumPct;
+    while (rem > 0) {
+        int bestIdx = -1;
+        double bestRem = -1.0;
+        for (int i = 0; i < n; ++i) {
+            if (counts[i] > 0 && remainders[i] > bestRem) {
+                bestRem = remainders[i];
+                bestIdx = i;
+            }
+        }
+        if (bestIdx < 0) break;
+        outPct[bestIdx]++;
+        remainders[bestIdx] = -1.0;
+        rem--;
+    }
+}
 
 class LinearStatusBar : public QWidget {
 public:
@@ -66,20 +105,29 @@ protected:
         clipPath.addRoundedRect(QRectF(rect()), 9, 9);
         painter.setClipPath(clipPath);
 
-        double w = width();
-        double x = 0.0;
-
-        auto drawSegment = [&](int count, const QColor &color) {
-            if (count <= 0) return;
-            double segW = (static_cast<double>(count) / total) * w;
-            painter.fillRect(QRectF(x, 0, segW, height()), color);
-            x += segW;
+        const int counts[4] = {completed, pending, delayed, rescheduled};
+        const QColor colors[4] = {
+            QColor("#0d9488"), // Đã khám
+            QColor("#f59e0b"), // Chưa khám
+            QColor("#ea580c"), // Trễ hẹn
+            QColor("#64748b")  // Đã dời lịch
         };
 
-        drawSegment(completed, QColor("#0d9488"));
-        drawSegment(pending, QColor("#ea580c"));
-        drawSegment(delayed, QColor("#f59e0b"));
-        drawSegment(rescheduled, QColor("#64748b"));
+        int lastNonZero = -1;
+        for (int i = 0; i < 4; ++i) {
+            if (counts[i] > 0) lastNonZero = i;
+        }
+
+        double w = width();
+        double x = 0.0;
+        for (int i = 0; i < 4; ++i) {
+            if (counts[i] <= 0) continue;
+            double segW = (i == lastNonZero)
+                ? (w - x)
+                : (static_cast<double>(counts[i]) / total) * w;
+            painter.fillRect(QRectF(x, 0, segW, height()), colors[i]);
+            x += segW;
+        }
     }
 };
 
@@ -129,14 +177,25 @@ protected:
             QColor("#8b5cf6")
         };
 
+        int lastNonZero = -1;
+        for (int i = 0; i < 4; ++i) {
+            if (counts[i] > 0) lastNonZero = i;
+        }
+
+        const int fullCircle = 360 * 16;
         int startAngle = 90 * 16;
+        int usedSpan = 0;
         for (int i = 0; i < 4; ++i) {
             if (counts[i] <= 0) continue;
-            int spanAngle = static_cast<int>(- (static_cast<double>(counts[i]) / total) * 360.0 * 16.0);
+            int spanMag = (i == lastNonZero)
+                ? (fullCircle - usedSpan)
+                : qRound((static_cast<double>(counts[i]) / total) * fullCircle);
+            int spanAngle = -spanMag;
             painter.setBrush(colors[i]);
             painter.setPen(Qt::NoPen);
             painter.drawPie(outerRect, startAngle, spanAngle);
             startAngle += spanAngle;
+            usedSpan += spanMag;
         }
 
         painter.setBrush(QColor("#ffffff"));
@@ -174,12 +233,15 @@ protected:
     void mouseMoveEvent(QMouseEvent *event) override {
         if (points.isEmpty()) return;
         int n = points.size();
-        int left = 75, right = 30;
+        const int left = 75, right = 30, top = 25, bottom = 40;
         int plotW = width() - left - right;
-        if (plotW <= 0) return;
+        int plotH = height() - top - bottom;
+        if (plotW <= 0 || plotH <= 0) return;
 
         double mouseX = event->position().x();
-        if (mouseX < left - 15 || mouseX > left + plotW + 15) {
+        double mouseY = event->position().y();
+        if (mouseX < left - 15 || mouseX > left + plotW + 15 ||
+            mouseY < top - 8 || mouseY > top + plotH + 8) {
             if (hoveredIndex != -1) {
                 hoveredIndex = -1;
                 update();
@@ -190,10 +252,7 @@ protected:
         double stepX = (n > 1) ? static_cast<double>(plotW) / (n - 1) : 0.0;
         int closest = -1;
         if (stepX > 0.0) {
-            int approx = qRound((mouseX - left) / stepX);
-            if (approx >= 0 && approx < n) {
-                closest = approx;
-            }
+            closest = qBound(0, qRound((mouseX - left) / stepX), n - 1);
         } else if (n == 1) {
             closest = 0;
         }
@@ -232,9 +291,7 @@ protected:
         for (const auto &p : points) {
             if (p.value > maxVal) maxVal = p.value;
         }
-
         maxVal = std::ceil(maxVal / 100000.0) * 100000.0;
-        if (maxVal <= 0.0) maxVal = 100000.0;
 
         painter.setFont(QFont("Segoe UI", 8.5));
         for (int i = 0; i <= 4; ++i) {
@@ -246,7 +303,9 @@ protected:
 
             painter.setPen(QColor("#64748b"));
             QString yStr;
-            if (val >= 1000000.0) {
+            if (val >= 1000000000.0) {
+                yStr = QString::number(val / 1000000000.0, 'f', 2) + " Tỷ";
+            } else if (val >= 1000000.0) {
                 yStr = QString::number(val / 1000000.0, 'f', 1) + " Tr";
             } else if (val >= 1000.0) {
                 yStr = QString::number(val / 1000.0, 'f', 0) + " k";
@@ -292,21 +351,16 @@ protected:
             painter.drawLine(screenPts[i], screenPts[i + 1]);
         }
 
-        int labelStep = 1;
-        if (n > 100) labelStep = 30;
-        else if (n > 35) labelStep = 7;
-        else if (n > 15) labelStep = 3;
-        else if (n > 8) labelStep = 2;
-        else labelStep = 1;
+        int maxLabels = qMax(2, plotW / 58);
+        int labelStep = qMax(1, (n + maxLabels - 1) / maxLabels);
 
         for (int i = 0; i < n; ++i) {
-
             bool isLast = (i == n - 1);
             bool isStep = (i % labelStep == 0);
-            if (isStep || (isLast && (n - 1) % labelStep >= labelStep / 2)) {
+            if (isStep || (isLast && (n - 1) % labelStep >= qMax(1, labelStep / 2))) {
                 painter.setFont(QFont("Segoe UI", 8.5));
                 painter.setPen(QColor("#64748b"));
-                painter.drawText(QRect(static_cast<int>(screenPts[i].x()) - 25, top + plotH + 8, 50, 18), Qt::AlignCenter, points[i].label);
+                painter.drawText(QRect(static_cast<int>(screenPts[i].x()) - 28, top + plotH + 8, 56, 18), Qt::AlignCenter, points[i].label);
             }
 
             if (n <= 35) {
@@ -317,12 +371,10 @@ protected:
                 painter.setPen(QPen(QColor("#0d9488"), 1.5));
                 painter.setBrush(QColor("#ffffff"));
                 painter.drawEllipse(screenPts[i], 2.2, 2.2);
-            } else {
-                if (isStep || isLast) {
-                    painter.setPen(QPen(QColor("#0d9488"), 1.5));
-                    painter.setBrush(QColor("#ffffff"));
-                    painter.drawEllipse(screenPts[i], 2.0, 2.0);
-                }
+            } else if (isStep || isLast) {
+                painter.setPen(QPen(QColor("#0d9488"), 1.5));
+                painter.setBrush(QColor("#ffffff"));
+                painter.drawEllipse(screenPts[i], 2.0, 2.0);
             }
         }
 
@@ -338,11 +390,14 @@ protected:
             int tipW = fm.horizontalAdvance(tipText) + 16;
             int tipH = 24;
             int tipX = static_cast<int>(pt.x()) - tipW / 2;
-            int tipY = qMax(4, static_cast<int>(pt.y()) - tipH - 8);
+            int tipY = static_cast<int>(pt.y()) - tipH - 10;
+            if (tipY < top) {
+                tipY = qMin(top + plotH - tipH - 2, static_cast<int>(pt.y()) + 12);
+            }
             if (tipX < left) tipX = left;
             if (tipX + tipW > w - right) tipX = w - right - tipW;
 
-            painter.setBrush(QColor("#0f172a"));
+            painter.setBrush(QColor(15, 23, 42, 235));
             painter.setPen(Qt::NoPen);
             painter.drawRoundedRect(QRect(tipX, tipY, tipW, tipH), 6, 6);
 
@@ -379,12 +434,15 @@ protected:
     void mouseMoveEvent(QMouseEvent *event) override {
         if (points.isEmpty()) return;
         int n = points.size();
-        int left = 55, right = 30;
+        const int left = 55, right = 30, top = 35, bottom = 40;
         int plotW = width() - left - right;
-        if (plotW <= 0) return;
+        int plotH = height() - top - bottom;
+        if (plotW <= 0 || plotH <= 0) return;
 
         double mouseX = event->position().x();
-        if (mouseX < left - 15 || mouseX > left + plotW + 15) {
+        double mouseY = event->position().y();
+        if (mouseX < left - 15 || mouseX > left + plotW + 15 ||
+            mouseY < top || mouseY > top + plotH + 8) {
             if (hoveredIndex != -1) {
                 hoveredIndex = -1;
                 update();
@@ -395,10 +453,7 @@ protected:
         double stepX = (n > 1) ? static_cast<double>(plotW) / (n - 1) : 0.0;
         int closest = -1;
         if (stepX > 0.0) {
-            int approx = qRound((mouseX - left) / stepX);
-            if (approx >= 0 && approx < n) {
-                closest = approx;
-            }
+            closest = qBound(0, qRound((mouseX - left) / stepX), n - 1);
         } else if (n == 1) {
             closest = 0;
         }
@@ -479,18 +534,14 @@ protected:
 
         int curLegRight = legRight;
         drawLegendItem("Đã dời lịch", QColor("#64748b"), curLegRight);
-        drawLegendItem("Trễ hẹn", QColor("#f59e0b"), curLegRight);
+        drawLegendItem("Trễ hẹn", QColor("#ea580c"), curLegRight);
         drawLegendItem("Đã khám", QColor("#0d9488"), curLegRight);
 
         int n = points.size();
         double stepX = (n > 1) ? static_cast<double>(plotW) / (n - 1) : 0.0;
 
-        int labelStep = 1;
-        if (n > 100) labelStep = 30;
-        else if (n > 35) labelStep = 7;
-        else if (n > 15) labelStep = 3;
-        else if (n > 8) labelStep = 2;
-        else labelStep = 1;
+        int maxLabels = qMax(2, plotW / 58);
+        int labelStep = qMax(1, (n + maxLabels - 1) / maxLabels);
 
         QVector<QPointF> ptsComp, ptsDelay, ptsResched;
         for (int i = 0; i < n; ++i) {
@@ -533,16 +584,16 @@ protected:
         };
 
         drawSeriesLine(ptsResched, QColor("#64748b"));
-        drawSeriesLine(ptsDelay, QColor("#f59e0b"));
+        drawSeriesLine(ptsDelay, QColor("#ea580c"));
         drawSeriesLine(ptsComp, QColor("#0d9488"));
 
         for (int i = 0; i < n; ++i) {
             bool isLast = (i == n - 1);
             bool isStep = (i % labelStep == 0);
-            if (isStep || (isLast && (n - 1) % labelStep >= labelStep / 2)) {
+            if (isStep || (isLast && (n - 1) % labelStep >= qMax(1, labelStep / 2))) {
                 painter.setFont(QFont("Segoe UI", 8.5));
                 painter.setPen(QColor("#64748b"));
-                painter.drawText(QRect(static_cast<int>(ptsComp[i].x()) - 25, top + plotH + 8, 50, 18), Qt::AlignCenter, points[i].label);
+                painter.drawText(QRect(static_cast<int>(ptsComp[i].x()) - 28, top + plotH + 8, 56, 18), Qt::AlignCenter, points[i].label);
             }
         }
 
@@ -557,7 +608,7 @@ protected:
             painter.setBrush(QColor("#ffffff"));
             painter.drawEllipse(ptsResched[hoveredIndex], 4.5, 4.5);
 
-            painter.setPen(QPen(QColor("#f59e0b"), 2));
+            painter.setPen(QPen(QColor("#ea580c"), 2));
             painter.setBrush(QColor("#ffffff"));
             painter.drawEllipse(ptsDelay[hoveredIndex], 4.5, 4.5);
 
@@ -571,11 +622,11 @@ protected:
             int tipW = fm.horizontalAdvance(tipText) + 16;
             int tipH = 24;
             int tipX = static_cast<int>(px) - tipW / 2;
-            int tipY = qMax(4, top - 18);
+            int tipY = top + 4;
             if (tipX < left) tipX = left;
             if (tipX + tipW > w - right) tipX = w - right - tipW;
 
-            painter.setBrush(QColor("#0f172a"));
+            painter.setBrush(QColor(15, 23, 42, 230));
             painter.setPen(Qt::NoPen);
             painter.drawRoundedRect(QRect(tipX, tipY, tipW, tipH), 6, 6);
 
@@ -609,10 +660,31 @@ public:
     QVBoxLayout *contentBox = nullptr;
 
     bool eventFilter(QObject *obj, QEvent *ev) override {
-        if (obj == txtYear && ev->type() == QEvent::FocusIn) {
-            QTimer::singleShot(0, txtYear, &QLineEdit::selectAll);
+        if (obj == txtYear) {
+            if (ev->type() == QEvent::FocusIn) {
+                QTimer::singleShot(0, txtYear, &QLineEdit::selectAll);
+            } else if (ev->type() == QEvent::FocusOut) {
+                commitYearInput();
+            }
         }
         return QDialog::eventFilter(obj, ev);
+    }
+
+    void commitYearInput() {
+        if (!txtYear) return;
+        bool ok = false;
+        int y = txtYear->text().trimmed().toInt(&ok);
+        if (ok && y >= AppConstants::MIN_CALENDAR_YEAR && y <= AppConstants::MAX_CALENDAR_YEAR) {
+            if (y != selectedYear) {
+                changeYear(y);
+            } else {
+                QSignalBlocker blocker(txtYear);
+                txtYear->setText(QString::number(selectedYear));
+            }
+        } else {
+            QSignalBlocker blocker(txtYear);
+            txtYear->setText(QString::number(selectedYear));
+        }
     }
 
     PeriodSelectionDialog(PeriodType type, const QDate &initDate, QWidget *parent = nullptr)
@@ -631,16 +703,23 @@ public:
             setFixedSize(340, 215);
         }
 
-        selectedYear = initDate.year();
+        QDate safeDate = initDate.isValid() ? initDate : QDate::currentDate();
+        if (pType == Week) {
+            // Use the Thursday of the week so cross-year Week 1 stays anchored in its target year.
+            QDate anchorThursday = safeDate.addDays(4 - safeDate.dayOfWeek());
+            selectedYear = qBound(AppConstants::MIN_CALENDAR_YEAR, anchorThursday.year(), AppConstants::MAX_CALENDAR_YEAR);
+        } else {
+            selectedYear = qBound(AppConstants::MIN_CALENDAR_YEAR, safeDate.year(), AppConstants::MAX_CALENDAR_YEAR);
+        }
         originYear = selectedYear;
-        selectedMonth = initDate.month();
+        selectedMonth = safeDate.month();
         selectedQuarter = (selectedMonth - 1) / 3 + 1;
 
         if (pType == Week) {
             calculateWeeks();
             selectedWeekIndex = 0;
             for (int i = 0; i < weeksList.size(); ++i) {
-                if (initDate >= weeksList[i].first && initDate <= weeksList[i].second) {
+                if (safeDate >= weeksList[i].first && safeDate <= weeksList[i].second) {
                     selectedWeekIndex = i;
                     break;
                 }
@@ -686,7 +765,7 @@ public:
     }
 
     void changeYear(int newYear) {
-        if (newYear < 2000 || newYear > 2099 || newYear == selectedYear) return;
+        if (newYear < AppConstants::MIN_CALENDAR_YEAR || newYear > AppConstants::MAX_CALENDAR_YEAR || newYear == selectedYear) return;
         selectedYear = newYear;
         if (txtYear) {
             QSignalBlocker blocker(txtYear);
@@ -727,6 +806,8 @@ public:
         yearNav->setSpacing(6);
 
         auto *btnPrevYear = new QPushButton("‹");
+        btnPrevYear->setAutoDefault(false);
+        btnPrevYear->setDefault(false);
         btnPrevYear->setFixedSize(28, 28);
         btnPrevYear->setCursor(Qt::PointingHandCursor);
         btnPrevYear->setStyleSheet(
@@ -745,7 +826,7 @@ public:
         txtYear->setFixedSize(58, 28);
         txtYear->setAlignment(Qt::AlignCenter);
         txtYear->setMaxLength(4);
-        txtYear->setValidator(new QIntValidator(2000, 2099, txtYear));
+        txtYear->setValidator(new QIntValidator(AppConstants::MIN_CALENDAR_YEAR, AppConstants::MAX_CALENDAR_YEAR, txtYear));
         txtYear->setStyleSheet(
             "QLineEdit { "
             "    background-color: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 8px; "
@@ -758,6 +839,8 @@ public:
         txtYear->installEventFilter(this);
 
         auto *btnNextYear = new QPushButton("›");
+        btnNextYear->setAutoDefault(false);
+        btnNextYear->setDefault(false);
         btnNextYear->setFixedSize(28, 28);
         btnNextYear->setCursor(Qt::PointingHandCursor);
         btnNextYear->setStyleSheet(
@@ -786,16 +869,7 @@ public:
             changeYear(selectedYear + 1);
         });
         connect(txtYear, &QLineEdit::editingFinished, this, [this]() {
-            bool ok = false;
-            int y = txtYear->text().toInt(&ok);
-            if (ok && y >= 2000 && y <= 2099) {
-                if (y != selectedYear) {
-                    changeYear(y);
-                }
-            } else {
-                QSignalBlocker blocker(txtYear);
-                txtYear->setText(QString::number(selectedYear));
-            }
+            commitYearInput();
         });
 
         contentBox = new QVBoxLayout;
@@ -809,6 +883,8 @@ public:
         footH->setSpacing(10);
 
         auto *btnCancel = new QPushButton("Hủy bỏ");
+        btnCancel->setAutoDefault(false);
+        btnCancel->setDefault(false);
         btnCancel->setFixedHeight(34);
         btnCancel->setCursor(Qt::PointingHandCursor);
         btnCancel->setStyleSheet(
@@ -820,6 +896,8 @@ public:
         );
 
         btnConfirm = new QPushButton("Xác nhận");
+        btnConfirm->setAutoDefault(false);
+        btnConfirm->setDefault(false);
         btnConfirm->setFixedHeight(34);
         btnConfirm->setCursor(Qt::PointingHandCursor);
         updateConfirmButtonState();
@@ -831,6 +909,8 @@ public:
 
         connect(btnCancel, &QPushButton::clicked, this, &QDialog::reject);
         connect(btnConfirm, &QPushButton::clicked, this, [this]() {
+            commitYearInput();
+            if (!btnConfirm->isEnabled()) return;
             calculateResultBounds();
             accept();
         });
@@ -838,22 +918,16 @@ public:
 
     void calculateWeeks() {
         weeksList.clear();
+        selectedYear = qBound(AppConstants::MIN_CALENDAR_YEAR, selectedYear, AppConstants::MAX_CALENDAR_YEAR);
         QDate jan1(selectedYear, 1, 1);
+        if (!jan1.isValid()) return;
         int dow = jan1.dayOfWeek();
-
         QDate wStart = jan1.addDays(-(dow - 1));
 
-        while (true) {
+        for (int guard = 0; guard < 55 && wStart.year() <= selectedYear; ++guard) {
             QDate wEnd = wStart.addDays(6);
             weeksList.append(qMakePair(wStart, wEnd));
             wStart = wStart.addDays(7);
-
-            if (wEnd.year() >= selectedYear && wEnd.month() == 12 && wEnd.day() >= 31) {
-                break;
-            }
-            if (wStart.year() > selectedYear) {
-                break;
-            }
         }
     }
 
@@ -904,6 +978,8 @@ public:
                 bool isSel = (i == selectedWeekIndex);
 
                 auto *btnW = new QPushButton;
+                btnW->setAutoDefault(false);
+                btnW->setDefault(false);
                 btnW->setFixedHeight(44);
                 btnW->setCursor(Qt::PointingHandCursor);
 
@@ -980,6 +1056,8 @@ public:
 
             for (int m = 1; m <= 12; ++m) {
                 auto *btnM = new QPushButton;
+                btnM->setAutoDefault(false);
+                btnM->setDefault(false);
                 btnM->setFixedHeight(46);
                 btnM->setCursor(Qt::PointingHandCursor);
                 bool isSel = (m == selectedMonth);
@@ -1043,6 +1121,8 @@ public:
 
             for (int q = 1; q <= 4; ++q) {
                 auto *btnQ = new QPushButton;
+                btnQ->setAutoDefault(false);
+                btnQ->setDefault(false);
                 btnQ->setFixedHeight(54);
                 btnQ->setCursor(Qt::PointingHandCursor);
                 bool isSel = (q == selectedQuarter);
@@ -1122,6 +1202,8 @@ public:
     }
 
     void calculateResultBounds() {
+        const QDate minBound(AppConstants::MIN_CALENDAR_YEAR, 1, 1);
+        const QDate maxBound(AppConstants::MAX_CALENDAR_YEAR, 12, 31);
         if (pType == Week) {
             if (weeksList.isEmpty()) calculateWeeks();
             if (selectedWeekIndex >= 0 && selectedWeekIndex < weeksList.size()) {
@@ -1131,6 +1213,8 @@ public:
                 resultStart = weeksList[0].first;
                 resultEnd = weeksList[0].second;
             }
+            if (resultStart < minBound) resultStart = minBound;
+            if (resultEnd > maxBound) resultEnd = maxBound;
         } else if (pType == Month) {
             int m = (selectedMonth >= 1 && selectedMonth <= 12) ? selectedMonth : 1;
             resultStart = QDate(selectedYear, m, 1);
@@ -1156,11 +1240,63 @@ public:
     QLineEdit *txtMonth = nullptr;
     QLineEdit *txtYear = nullptr;
 
+    void syncInputs() {
+        if (txtMonth) {
+            QSignalBlocker b(txtMonth);
+            txtMonth->setText(QString::number(chosenDate.month()));
+        }
+        if (txtYear) {
+            QSignalBlocker b(txtYear);
+            txtYear->setText(QString::number(chosenDate.year()));
+        }
+    }
+
+    void commitMonthInput() {
+        if (!txtMonth) return;
+        bool ok = false;
+        int m = txtMonth->text().trimmed().toInt(&ok);
+        if (ok && m >= 1 && m <= 12) {
+            int y = chosenDate.year();
+            int maxD = QDate(y, m, 1).daysInMonth();
+            int day = qMin(chosenDate.day(), maxD);
+            chosenDate = QDate(y, m, day);
+            if (calendar) {
+                QSignalBlocker sb(calendar);
+                calendar->setSelectedDate(chosenDate);
+                calendar->setCurrentPage(y, m);
+            }
+        }
+        syncInputs();
+    }
+
+    void commitYearInput() {
+        if (!txtYear) return;
+        bool ok = false;
+        int y = txtYear->text().trimmed().toInt(&ok);
+        if (ok && y >= AppConstants::MIN_CALENDAR_YEAR && y <= AppConstants::MAX_CALENDAR_YEAR) {
+            int m = chosenDate.month();
+            int maxD = QDate(y, m, 1).daysInMonth();
+            int day = qMin(chosenDate.day(), maxD);
+            chosenDate = QDate(y, m, day);
+            if (calendar) {
+                QSignalBlocker sb(calendar);
+                calendar->setSelectedDate(chosenDate);
+                calendar->setCurrentPage(y, m);
+            }
+        }
+        syncInputs();
+    }
+
     bool eventFilter(QObject *obj, QEvent *ev) override {
-        if ((obj == txtMonth || obj == txtYear) && ev->type() == QEvent::FocusIn) {
-            auto *le = qobject_cast<QLineEdit*>(obj);
-            if (le) {
-                QTimer::singleShot(0, le, &QLineEdit::selectAll);
+        if (obj == txtMonth || obj == txtYear) {
+            if (ev->type() == QEvent::FocusIn) {
+                auto *le = qobject_cast<QLineEdit*>(obj);
+                if (le) {
+                    QTimer::singleShot(0, le, &QLineEdit::selectAll);
+                }
+            } else if (ev->type() == QEvent::FocusOut) {
+                if (obj == txtMonth) commitMonthInput();
+                else commitYearInput();
             }
         }
         return QDialog::eventFilter(obj, ev);
@@ -1173,6 +1309,11 @@ public:
         setModal(true);
         setStyleSheet("QDialog { background-color: #ffffff; border-radius: 14px; font-family: 'Segoe UI'; }");
 
+        const QDate minBound(AppConstants::MIN_CALENDAR_YEAR, 1, 1);
+        const QDate maxBound(AppConstants::MAX_CALENDAR_YEAR, 12, 31);
+        if (chosenDate < minBound) chosenDate = minBound;
+        if (chosenDate > maxBound) chosenDate = maxBound;
+
         auto *root = new QVBoxLayout(this);
         root->setContentsMargins(16, 14, 16, 14);
         root->setSpacing(8);
@@ -1181,6 +1322,8 @@ public:
         navH->setSpacing(4);
 
         auto *btnPrevM = new QPushButton("‹");
+        btnPrevM->setAutoDefault(false);
+        btnPrevM->setDefault(false);
         btnPrevM->setFixedSize(28, 28);
         btnPrevM->setCursor(Qt::PointingHandCursor);
         btnPrevM->setStyleSheet(
@@ -1216,11 +1359,13 @@ public:
         txtYear->setFixedSize(48, 26);
         txtYear->setAlignment(Qt::AlignCenter);
         txtYear->setMaxLength(4);
-        txtYear->setValidator(new QIntValidator(2000, 2099, txtYear));
+        txtYear->setValidator(new QIntValidator(AppConstants::MIN_CALENDAR_YEAR, AppConstants::MAX_CALENDAR_YEAR, txtYear));
         txtYear->setStyleSheet(flatInputStyle);
         txtYear->installEventFilter(this);
 
         auto *btnNextM = new QPushButton("›");
+        btnNextM->setAutoDefault(false);
+        btnNextM->setDefault(false);
         btnNextM->setFixedSize(28, 28);
         btnNextM->setCursor(Qt::PointingHandCursor);
         btnNextM->setStyleSheet(
@@ -1247,80 +1392,62 @@ public:
 
         calendar = new QCalendarWidget(this);
         calendar->setGridVisible(false);
-        calendar->setDateRange(QDate(2000, 1, 1), QDate(2099, 12, 31));
+        calendar->setDateRange(minBound, maxBound);
         calendar->setSelectedDate(chosenDate);
         UIHelper::applyCalendarStyle(calendar);
         calendar->setNavigationBarVisible(false);
         calendar->setMinimumHeight(220);
         root->addWidget(calendar, 1);
 
-        auto syncInputs = [this]() {
-            if (txtMonth) {
-                QSignalBlocker b(txtMonth);
-                txtMonth->setText(QString::number(chosenDate.month()));
+        connect(calendar, &QCalendarWidget::selectionChanged, this, [this]() {
+            QDate d = calendar->selectedDate();
+            if (d.isValid()) {
+                chosenDate = d;
+                syncInputs();
             }
-            if (txtYear) {
-                QSignalBlocker b(txtYear);
-                txtYear->setText(QString::number(chosenDate.year()));
-            }
-        };
-
-        connect(calendar, &QCalendarWidget::clicked, this, [this, syncInputs](const QDate &d) {
-            chosenDate = d;
-            syncInputs();
         });
 
-        connect(btnPrevM, &QPushButton::clicked, this, [this, syncInputs]() {
+        connect(calendar, &QCalendarWidget::clicked, this, [this](const QDate &d) {
+            if (d.isValid()) {
+                chosenDate = d;
+                syncInputs();
+            }
+        });
+
+        connect(btnPrevM, &QPushButton::clicked, this, [this]() {
             QDate d = chosenDate.addMonths(-1);
-            if (d.year() >= 2000) {
+            if (d.year() >= AppConstants::MIN_CALENDAR_YEAR) {
                 chosenDate = d;
-                calendar->setSelectedDate(chosenDate);
-                calendar->setCurrentPage(chosenDate.year(), chosenDate.month());
+                {
+                    QSignalBlocker sb(calendar);
+                    calendar->setSelectedDate(chosenDate);
+                    calendar->setCurrentPage(chosenDate.year(), chosenDate.month());
+                }
                 syncInputs();
             }
         });
 
-        connect(btnNextM, &QPushButton::clicked, this, [this, syncInputs]() {
+        connect(btnNextM, &QPushButton::clicked, this, [this]() {
             QDate d = chosenDate.addMonths(1);
-            if (d.year() <= 2099) {
+            if (d.year() <= AppConstants::MAX_CALENDAR_YEAR) {
                 chosenDate = d;
-                calendar->setSelectedDate(chosenDate);
-                calendar->setCurrentPage(chosenDate.year(), chosenDate.month());
+                {
+                    QSignalBlocker sb(calendar);
+                    calendar->setSelectedDate(chosenDate);
+                    calendar->setCurrentPage(chosenDate.year(), chosenDate.month());
+                }
                 syncInputs();
             }
         });
 
-        connect(txtMonth, &QLineEdit::editingFinished, this, [this, syncInputs]() {
-            bool ok = false;
-            int m = txtMonth->text().toInt(&ok);
-            if (ok && m >= 1 && m <= 12) {
-                int y = chosenDate.year();
-                int maxD = QDate(y, m, 1).daysInMonth();
-                int day = qMin(chosenDate.day(), maxD);
-                chosenDate = QDate(y, m, day);
-                calendar->setSelectedDate(chosenDate);
-                calendar->setCurrentPage(y, m);
-            }
-            syncInputs();
-        });
-
-        connect(txtYear, &QLineEdit::editingFinished, this, [this, syncInputs]() {
-            bool ok = false;
-            int y = txtYear->text().toInt(&ok);
-            if (ok && y >= 2000 && y <= 2099) {
-                int m = chosenDate.month();
-                int maxD = QDate(y, m, 1).daysInMonth();
-                int day = qMin(chosenDate.day(), maxD);
-                chosenDate = QDate(y, m, day);
-                calendar->setSelectedDate(chosenDate);
-                calendar->setCurrentPage(y, m);
-            }
-            syncInputs();
-        });
+        connect(txtMonth, &QLineEdit::editingFinished, this, [this]() { commitMonthInput(); });
+        connect(txtYear, &QLineEdit::editingFinished, this, [this]() { commitYearInput(); });
 
         auto *footH = new QHBoxLayout;
         footH->setSpacing(10);
         auto *btnCancel = new QPushButton("Hủy");
+        btnCancel->setAutoDefault(false);
+        btnCancel->setDefault(false);
         btnCancel->setFixedHeight(34);
         btnCancel->setCursor(Qt::PointingHandCursor);
         btnCancel->setStyleSheet(
@@ -1332,6 +1459,8 @@ public:
         );
 
         auto *btnOk = new QPushButton("Xác nhận");
+        btnOk->setAutoDefault(false);
+        btnOk->setDefault(false);
         btnOk->setFixedHeight(34);
         btnOk->setCursor(Qt::PointingHandCursor);
         btnOk->setStyleSheet(
@@ -1348,9 +1477,35 @@ public:
         root->addLayout(footH);
 
         connect(btnCancel, &QPushButton::clicked, this, &QDialog::reject);
-        connect(btnOk, &QPushButton::clicked, this, &QDialog::accept);
+        connect(btnOk, &QPushButton::clicked, this, [this]() {
+            commitMonthInput();
+            commitYearInput();
+            accept();
+        });
     }
 };
+
+void clearPagesWidgetChildren(QWidget *page) {
+    if (!page) return;
+    if (QLayout *oldLay = page->layout()) {
+        QLayoutItem *item;
+        while ((item = oldLay->takeAt(0)) != nullptr) {
+            if (QWidget *w = item->widget()) {
+                w->hide();
+                delete w;
+            }
+            delete item;
+        }
+        delete oldLay;
+    }
+    const QObjectList oldKids = page->children();
+    for (QObject *child : oldKids) {
+        if (auto *w = qobject_cast<QWidget*>(child)) {
+            w->hide();
+        }
+        delete child;
+    }
+}
 
 inline void styleCard(QWidget *card) {
     card->setStyleSheet(
@@ -1399,8 +1554,12 @@ StatisticView::StatisticView(MainWindow *mainWindow, QWidget *parent)
 }
 
 void StatisticView::refresh() {
-    refreshTab1();
-    refreshTab2();
+    try {
+        refreshTab1();
+        refreshTab2();
+    } catch (const std::exception &e) {
+        UIHelper::showWarning(this, "Lỗi thống kê", QString::fromUtf8(e.what()));
+    }
 }
 
 void StatisticView::showEvent(QShowEvent *event) {
@@ -1684,10 +1843,7 @@ void StatisticView::openDateDialog(bool isStartDate) {
 void StatisticView::refreshTab1() {
     if (!mainWindow || !pageTab1) return;
 
-    const QObjectList oldKids = pageTab1->children();
-    for (QObject *child : oldKids) {
-        delete child;
-    }
+    clearPagesWidgetChildren(pageTab1);
 
     auto *rootLay = new QVBoxLayout(pageTab1);
     rootLay->setContentsMargins(24, 18, 24, 20);
@@ -1696,22 +1852,31 @@ void StatisticView::refreshTab1() {
     auto *patients = mainWindow->getPatients();
     auto *doctors = mainWindow->getDoctors();
     auto *appts = mainWindow->getAppointments();
+    auto *symptomPatients = mainWindow->getSymptomPatients();
 
-    QDate curDate = QDate::currentDate();
-    QTime curTime = QTime::currentTime();
-    int curDay = curDate.day(), curMonth = curDate.month(), curYear = curDate.year();
-    int curHour = curTime.hour(), curMin = curTime.minute();
+    QDateTime nowDt = QDateTime::currentDateTime();
+    int curDay = nowDt.date().day(), curMonth = nowDt.date().month(), curYear = nowDt.date().year();
+    int curHour = nowDt.time().hour(), curMin = nowDt.time().minute(), curSec = nowDt.time().second();
+
+    int sDay = filterStartDate.day(), sMonth = filterStartDate.month(), sYear = filterStartDate.year();
+    int eDay = filterEndDate.day(), eMonth = filterEndDate.month(), eYear = filterEndDate.year();
 
     int completed = 0, pending = 0, delayed = 0, rescheduled = 0;
-    StatisticController::appointmentStatusCounts(appts, completed, pending, delayed, rescheduled, curDay, curMonth, curYear, curHour, curMin);
+    StatisticController::appointmentStatusCounts(
+        appts, completed, pending, delayed, rescheduled,
+        curDay, curMonth, curYear, curHour, curMin, curSec,
+        sDay, sMonth, sYear, eDay, eMonth, eYear
+    );
     int totalAppts = completed + pending + delayed + rescheduled;
 
     int male = 0, female = 0;
-    StatisticController::patientGenderCounts(patients, male, female);
-    int totalPatients = male + female;
-
     int under18 = 0, from18to45 = 0, from46to60 = 0, over60 = 0;
-    StatisticController::patientAgeDistribution(patients, under18, from18to45, from46to60, over60);
+    StatisticController::patientDemographicsInRange(
+        patients, appts, symptomPatients,
+        sDay, sMonth, sYear, eDay, eMonth, eYear,
+        male, female, under18, from18to45, from46to60, over60
+    );
+    int totalPatients = male + female;
 
     auto *row1 = new QHBoxLayout;
     row1->setSpacing(16);
@@ -1762,8 +1927,8 @@ void StatisticView::refreshTab1() {
     };
 
     chipsGrid->addWidget(makeStatusChip("#0d9488", "Đã khám", completed, totalAppts), 0, 0);
-    chipsGrid->addWidget(makeStatusChip("#ea580c", "Chưa khám", pending, totalAppts), 0, 1);
-    chipsGrid->addWidget(makeStatusChip("#f59e0b", "Trễ hẹn", delayed, totalAppts), 1, 0);
+    chipsGrid->addWidget(makeStatusChip("#f59e0b", "Chưa khám", pending, totalAppts), 0, 1);
+    chipsGrid->addWidget(makeStatusChip("#ea580c", "Trễ hẹn", delayed, totalAppts), 1, 0);
     chipsGrid->addWidget(makeStatusChip("#64748b", "Đã dời lịch", rescheduled, totalAppts), 1, 1);
     statusLay->addLayout(chipsGrid);
     statusLay->addStretch(1);
@@ -1781,12 +1946,13 @@ void StatisticView::refreshTab1() {
     demoLay->addWidget(demoTitle);
     demoLay->addSpacing(4);
 
-    double malePct = (totalPatients > 0) ? (male * 100.0 / totalPatients) : 0.0;
-    double femalePct = (totalPatients > 0) ? (female * 100.0 / totalPatients) : 0.0;
+    int genderCounts[2] = {male, female};
+    int genderPct[2] = {0, 0};
+    computeLargestRemainderPercentages(genderCounts, 2, genderPct);
     auto *genderH = new QHBoxLayout;
-    auto *maleLbl = new QLabel(QStringLiteral("Nam: <b>%1%</b> (%2)").arg(QString::number(malePct, 'f', 0)).arg(male));
+    auto *maleLbl = new QLabel(QStringLiteral("Nam: <b>%1%</b> (%2)").arg(genderPct[0]).arg(male));
     maleLbl->setStyleSheet("font-size: 11.5px; color: #0284c7; font-weight: 600;");
-    auto *femaleLbl = new QLabel(QStringLiteral("Nữ: <b>%1%</b> (%2)").arg(QString::number(femalePct, 'f', 0)).arg(female));
+    auto *femaleLbl = new QLabel(QStringLiteral("Nữ: <b>%1%</b> (%2)").arg(genderPct[1]).arg(female));
     femaleLbl->setStyleSheet("font-size: 11.5px; color: #db2777; font-weight: 600;");
     genderH->addWidget(maleLbl);
     genderH->addStretch();
@@ -1797,8 +1963,10 @@ void StatisticView::refreshTab1() {
     genderBar->setFixedHeight(6);
     genderBar->setTextVisible(false);
     genderBar->setRange(0, totalPatients > 0 ? totalPatients : 1);
-    genderBar->setValue(male);
-    genderBar->setStyleSheet("QProgressBar { background: #fce7f3; border-radius: 3px; border: none; } QProgressBar::chunk { background: #0284c7; border-radius: 3px; }");
+    genderBar->setValue(totalPatients > 0 ? male : 0);
+    genderBar->setStyleSheet(totalPatients > 0
+        ? "QProgressBar { background: #fce7f3; border-radius: 3px; border: none; } QProgressBar::chunk { background: #0284c7; border-radius: 3px; }"
+        : "QProgressBar { background: #e2e8f0; border-radius: 3px; border: none; } QProgressBar::chunk { background: #e2e8f0; border-radius: 3px; }");
     demoLay->addWidget(genderBar);
 
     demoLay->addSpacing(6);
@@ -1825,6 +1993,9 @@ void StatisticView::refreshTab1() {
         {"#f59e0b", "46 – 60 tuổi", from46to60},
         {"#8b5cf6", "Trên 60 tuổi", over60}
     };
+    int ageCounts[4] = {under18, from18to45, from46to60, over60};
+    int agePct[4] = {0, 0, 0, 0};
+    computeLargestRemainderPercentages(ageCounts, 4, agePct);
 
     for (int r = 0; r < 4; ++r) {
         auto *dot = new QLabel("●");
@@ -1840,8 +2011,7 @@ void StatisticView::refreshTab1() {
         countVal->setFixedWidth(24);
         countVal->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
-        double pct = (totalPatients > 0) ? (ageItems[r].count * 100.0 / totalPatients) : 0.0;
-        auto *pctVal = new QLabel(QStringLiteral("(%1%)").arg(QString::number(pct, 'f', 0)));
+        auto *pctVal = new QLabel(QStringLiteral("(%1%)").arg(agePct[r]));
         pctVal->setStyleSheet("font-size: 11.5px; color: #64748b; font-weight: 500;");
         pctVal->setFixedWidth(46);
         pctVal->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
@@ -1883,35 +2053,27 @@ void StatisticView::refreshTab1() {
     specScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     specScroll->setStyleSheet("QScrollArea { background: transparent; border: none; } QScrollBar:vertical, QScrollBar:horizontal { width: 0px; height: 0px; }");
 
-    auto *specContainer = new QWidget;
+    auto *specContainer = new QWidget(specScroll);
     specContainer->setStyleSheet("background: transparent;");
     auto *specListLay = new QVBoxLayout(specContainer);
     specListLay->setContentsMargins(0, 4, 8, 4);
     specListLay->setSpacing(10);
 
     SpecialtyDemandItem allSpecs[50];
-    int specCount = StatisticController::getSpecialtyDemand(appts, doctors, allSpecs, 50);
+    int specCount = StatisticController::getSpecialtyDemand(
+        appts, doctors, allSpecs, 50,
+        sDay, sMonth, sYear, eDay, eMonth, eYear
+    );
 
-    int maxDemand = 1;
-    int activeSpecCount = 0;
-    for (int i = 0; i < specCount; ++i) {
-        if (allSpecs[i].count > 0) {
-            activeSpecCount++;
-            if (allSpecs[i].count > maxDemand) maxDemand = allSpecs[i].count;
-        }
-    }
-
-    if (activeSpecCount > 0) {
-        int rank = 1;
+    if (specCount > 0) {
+        int maxDemand = qMax(1, allSpecs[0].count);
         for (int i = 0; i < specCount; ++i) {
-            if (allSpecs[i].count <= 0) continue;
-
             auto *itemBox = new QVBoxLayout;
             itemBox->setSpacing(3);
 
             auto *h = new QHBoxLayout;
             QString spName = mainWindow->specialty(allSpecs[i].spId);
-            auto *nameLbl = new QLabel(QStringLiteral("<b>%1. %2</b>").arg(rank++).arg(spName));
+            auto *nameLbl = new QLabel(QStringLiteral("<b>%1. %2</b>").arg(i + 1).arg(spName.toHtmlEscaped()));
             nameLbl->setStyleSheet("font-size: 12.5px; font-weight: 700; color: #1e293b;");
 
             auto *valLbl = new QLabel(QStringLiteral("<b>%1</b> lượt khám").arg(allSpecs[i].count));
@@ -1934,7 +2096,7 @@ void StatisticView::refreshTab1() {
         }
         specListLay->addStretch();
     } else {
-        auto *emptyLbl = new QLabel("Chưa có lượt khám nào.");
+        auto *emptyLbl = new QLabel("Chưa có lượt khám nào trong khoảng thời gian này.");
         emptyLbl->setStyleSheet("color: #94a3b8; font-style: italic;");
         specListLay->addWidget(emptyLbl);
     }
@@ -1949,7 +2111,7 @@ void StatisticView::refreshTab1() {
     docLay->setContentsMargins(22, 18, 22, 18);
     docLay->setSpacing(8);
 
-    auto *docTitle = new QLabel("Top bác sĩ nhận nhiều ca khám nhất");
+    auto *docTitle = new QLabel("Top bác sĩ hoàn thành nhiều ca nhất");
     docTitle->setStyleSheet("font-size: 14.5px; font-weight: 700; color: #0f172a; background: transparent; border: none;");
     docLay->addWidget(docTitle);
     docLay->addSpacing(4);
@@ -1966,7 +2128,7 @@ void StatisticView::refreshTab1() {
         docScroll->viewport()->update();
     });
 
-    auto *docContainer = new QWidget;
+    auto *docContainer = new QWidget(docScroll);
     docContainer->setStyleSheet("background: transparent; border: none;");
     auto *docListLay = new QVBoxLayout(docContainer);
     docListLay->setContentsMargins(4, 4, 8, 4);
@@ -1975,8 +2137,7 @@ void StatisticView::refreshTab1() {
     DoctorLeaderboardItem topDocs[10];
     int docRankCount = StatisticController::getTopDoctors(
         appts, doctors, topDocs, 10,
-        filterStartDate.day(), filterStartDate.month(), filterStartDate.year(),
-        filterEndDate.day(), filterEndDate.month(), filterEndDate.year()
+        sDay, sMonth, sYear, eDay, eMonth, eYear
     );
     const QString medals[3] = {"🥇", "🥈", "🥉"};
 
@@ -1988,7 +2149,6 @@ void StatisticView::refreshTab1() {
 
         QString frameStyle;
         if (i == 0) {
-
             frameStyle =
                 "QFrame#topDocCard0 { "
                 "   background-color: #fffbeb; "
@@ -2001,7 +2161,6 @@ void StatisticView::refreshTab1() {
                 "   border-radius: 8px; "
                 "}";
         } else if (i == 1) {
-
             frameStyle =
                 "QFrame#topDocCard1 { "
                 "   background-color: #f8fafc; "
@@ -2014,7 +2173,6 @@ void StatisticView::refreshTab1() {
                 "   border-radius: 8px; "
                 "}";
         } else if (i == 2) {
-
             frameStyle =
                 "QFrame#topDocCard2 { "
                 "   background-color: #fff7ed; "
@@ -2027,7 +2185,6 @@ void StatisticView::refreshTab1() {
                 "   border-radius: 8px; "
                 "}";
         } else {
-
             frameStyle = QStringLiteral(
                 "QFrame#topDocCard%1 { "
                 "   background-color: #f8fafc; "
@@ -2088,7 +2245,7 @@ void StatisticView::refreshTab1() {
         docListLay->addWidget(itemFrame);
     }
     if (docRankCount == 0) {
-        auto *emptyLbl = new QLabel("Chưa có bác sĩ nào có ca khám trong khoảng thời gian này.");
+        auto *emptyLbl = new QLabel("Chưa có bác sĩ nào hoàn thành ca khám trong khoảng thời gian này.");
         emptyLbl->setStyleSheet("color: #94a3b8; font-style: italic; font-size: 13px; padding: 28px 0;");
         emptyLbl->setAlignment(Qt::AlignCenter);
         docListLay->addWidget(emptyLbl);
@@ -2104,10 +2261,7 @@ void StatisticView::refreshTab1() {
 void StatisticView::refreshTab2() {
     if (!mainWindow || !pageTab2) return;
 
-    const QObjectList oldKids = pageTab2->children();
-    for (QObject *child : oldKids) {
-        delete child;
-    }
+    clearPagesWidgetChildren(pageTab2);
 
     auto *rootLay = new QVBoxLayout(pageTab2);
     rootLay->setContentsMargins(0, 0, 0, 0);
@@ -2119,7 +2273,7 @@ void StatisticView::refreshTab2() {
     scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     scrollArea->setStyleSheet("QScrollArea { background-color: #eaedf2; border: none; } QScrollBar:vertical, QScrollBar:horizontal { width: 0px; height: 0px; }");
 
-    auto *contentWidget = new QWidget;
+    auto *contentWidget = new QWidget(scrollArea);
     contentWidget->setStyleSheet("background-color: #eaedf2;");
     auto *contentLayout = new QVBoxLayout(contentWidget);
     contentLayout->setContentsMargins(24, 18, 24, 24);
@@ -2128,10 +2282,9 @@ void StatisticView::refreshTab2() {
     auto *doctors = mainWindow->getDoctors();
     auto *appts = mainWindow->getAppointments();
 
-    QDate curDate = QDate::currentDate();
-    QTime curTime = QTime::currentTime();
-    int curDay = curDate.day(), curMonth = curDate.month(), curYear = curDate.year();
-    int curHour = curTime.hour(), curMin = curTime.minute();
+    QDateTime nowDt = QDateTime::currentDateTime();
+    int curDay = nowDt.date().day(), curMonth = nowDt.date().month(), curYear = nowDt.date().year();
+    int curHour = nowDt.time().hour(), curMin = nowDt.time().minute(), curSec = nowDt.time().second();
 
     int daysDiff = filterStartDate.daysTo(filterEndDate);
     bool useMonthly = (daysDiff > 366);
@@ -2144,10 +2297,10 @@ void StatisticView::refreshTab2() {
     if (useMonthly) {
         itemCount = StatisticController::getTimeSeriesMonthlyRange(
             appts, doctors,
-            filterStartDate.month(), filterStartDate.year(),
-            filterEndDate.month(), filterEndDate.year(),
+            filterStartDate.day(), filterStartDate.month(), filterStartDate.year(),
+            filterEndDate.day(), filterEndDate.month(), filterEndDate.year(),
             curDay, curMonth, curYear, curHour, curMin,
-            items.get(), maxPoints
+            items.get(), maxPoints, curSec
         );
     } else {
         itemCount = StatisticController::getTimeSeriesDaily(
@@ -2155,7 +2308,7 @@ void StatisticView::refreshTab2() {
             filterStartDate.day(), filterStartDate.month(), filterStartDate.year(),
             filterEndDate.day(), filterEndDate.month(), filterEndDate.year(),
             curDay, curMonth, curYear, curHour, curMin,
-            items.get(), maxPoints
+            items.get(), maxPoints, curSec
         );
     }
 
@@ -2164,6 +2317,10 @@ void StatisticView::refreshTab2() {
     double totalFilterRev = 0.0;
     int totalFilterComp = 0, totalFilterDelay = 0, totalFilterResched = 0;
 
+    double peakRev = 0.0;
+    QString peakLabel = "—";
+    int peakMonth = 0, peakYear = 0;
+
     for (int i = 0; i < itemCount; ++i) {
         CoordPoint cp;
         cp.label = QString::fromStdString(items[i].label);
@@ -2171,8 +2328,15 @@ void StatisticView::refreshTab2() {
         revPoints.append(cp);
         totalFilterRev += items[i].revenue;
 
+        if (items[i].revenue > peakRev) {
+            peakRev = items[i].revenue;
+            peakLabel = cp.label;
+            peakMonth = items[i].month;
+            peakYear = items[i].year;
+        }
+
         StatusPoint sp;
-        sp.label = QString::fromStdString(items[i].label);
+        sp.label = cp.label;
         sp.completed = items[i].completedCount;
         sp.delayed = items[i].delayedCount;
         sp.rescheduled = items[i].rescheduledCount;
@@ -2184,14 +2348,18 @@ void StatisticView::refreshTab2() {
     }
 
     {
-        double peakRev = 0.0;
-        QString peakLabel = "—";
-        for (const auto &p : revPoints) {
-            if (p.value > peakRev) { peakRev = p.value; peakLabel = p.label; }
-        }
         const double avgRev = (itemCount > 0) ? totalFilterRev / itemCount : 0.0;
         const QLocale vi(QLocale::Vietnamese);
         auto money = [&vi](double v) { return vi.toString(v, 'f', 0) + QStringLiteral(" đ"); };
+
+        QString peakSub;
+        if (peakRev <= 0.0) {
+            peakSub = QStringLiteral("Chưa có dữ liệu");
+        } else if (useMonthly) {
+            peakSub = QStringLiteral("Tháng %1/%2").arg(peakMonth).arg(peakYear);
+        } else {
+            peakSub = QStringLiteral("Ngày %1").arg(peakLabel);
+        }
 
         auto *kpiRow = new QHBoxLayout;
         kpiRow->setSpacing(16);
@@ -2199,9 +2367,8 @@ void StatisticView::refreshTab2() {
                                       QStringLiteral("%1 – %2").arg(filterStartDate.toString("dd/MM/yyyy"),
                                                                     filterEndDate.toString("dd/MM/yyyy"))), 1);
         kpiRow->addWidget(makeKpiCard("#0284c7", useMonthly ? "Trung bình mỗi tháng" : "Trung bình mỗi ngày",
-                                      money(avgRev), QStringLiteral("%1 %2").arg(itemCount).arg(useMonthly ? "tháng" : "mốc thời gian")), 1);
-        kpiRow->addWidget(makeKpiCard("#f59e0b", "Cao nhất", money(peakRev),
-                                      peakRev > 0 ? QStringLiteral( "%1 %2").arg(useMonthly ? "Tại tháng" : "Tại ngày", peakLabel) : QStringLiteral("Chưa có dữ liệu")), 1);
+                                      money(avgRev), QStringLiteral("%1 %2").arg(itemCount).arg(useMonthly ? "tháng" : "ngày")), 1);
+        kpiRow->addWidget(makeKpiCard("#f59e0b", "Cao nhất", money(peakRev), peakSub), 1);
         kpiRow->addWidget(makeKpiCard("#16a34a", "Ca đã khám", QString::number(totalFilterComp),
                                       QStringLiteral("%1 trễ · %2 dời").arg(totalFilterDelay).arg(totalFilterResched)), 1);
         contentLayout->addLayout(kpiRow);
@@ -2214,7 +2381,7 @@ void StatisticView::refreshTab2() {
     revLay->setSpacing(12);
 
     auto *revHeader = new QHBoxLayout;
-    auto *revTitle = new QLabel("Biểu đồ doanh thu(VND)");
+    auto *revTitle = new QLabel("Biểu đồ doanh thu (VND)");
     revTitle->setStyleSheet("font-size: 14.5px; font-weight: 700; color: #0f172a; background: transparent; border: none;");
     auto *revTotalLbl = new QLabel(QStringLiteral("Tổng doanh thu: <b>%1 đ</b>").arg(QLocale(QLocale::Vietnamese).toString(totalFilterRev, 'f', 0)));
     revTotalLbl->setStyleSheet("font-size: 13px; color: #0f766e; font-weight: 600; background: transparent; border: none;");

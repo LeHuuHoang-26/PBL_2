@@ -13,7 +13,6 @@
 #include <QSpinBox>
 #include <QComboBox>
 #include <QCheckBox>
-#include <QLabel>
 #include <QScrollBar>
 #include <QFrame>
 #include <QHeaderView>
@@ -24,26 +23,22 @@
 #include <memory>
 
 namespace {
-libPBL2::AccountSortBy accountSortByColumn(int col) {
+AccountSortBy accountSortByColumn(int col) {
     switch (col) {
-        case 0: return libPBL2::AccountSortBy::Name;
-        case 1: return libPBL2::AccountSortBy::Username;
-        case 2: return libPBL2::AccountSortBy::Role;
-        case 3: return libPBL2::AccountSortBy::State;
-        default: return libPBL2::AccountSortBy::ID;
+        case 0: return AccountSortBy::Name;
+        case 1: return AccountSortBy::Username;
+        case 2: return AccountSortBy::Role;
+        case 3: return AccountSortBy::State;
+        default: return AccountSortBy::ID;
     }
 }
 }
 
 AccountView::AccountView(MainWindow *mainWindow, QWidget *parent)
     : QWidget(parent), mainWindow(mainWindow) {
-    if (mainWindow && mainWindow->getManagers()) {
-        libPBL2::sortManagers(mainWindow->getManagers(), libPBL2::AccountSortBy::ID, false);
-    }
     sortColumn = -1;
     sortAscending = false;
     setupUI();
-    refresh(false);
 }
 
 void AccountView::refresh(bool preserveScroll) {
@@ -135,7 +130,7 @@ void AccountView::refresh(bool preserveScroll) {
         bool isTargetRoot = ManagerController::isRootAdmin(m);
         bool canDeleteAccount = isAdmin && !isSelf && !isTargetRoot;
         if (canDeleteAccount) {
-            auto action = UIHelper::createActionCell(UIHelper::trashIcon(), "Xóa tài khoản");
+            auto action = UIHelper::createActionCell(UIHelper::trashIcon(), "Xóa tài khoản", table);
             connect(action.second, &QPushButton::clicked, this, [this, mid = m->getID(), name = UIHelper::qs(m->getfullName())]() {
                 if (!mainWindow) return;
                 auto *managers = mainWindow->getManagers();
@@ -166,42 +161,46 @@ void AccountView::refresh(bool preserveScroll) {
                     "Xóa tài khoản", "Hủy bỏ")) {
                     return;
                 }
-                Manager backupMgr = *target;
-                LinkList<PermissionManager> backupPerms;
-                auto *n = managers->getHeader()->next;
-                while (n && n->next) {
-                    if (n->info.getID() == mid) {
-                        managers->remove(n);
-                        break;
+                try {
+                    Manager backupMgr = *target;
+                    LinkList<PermissionManager> backupPerms;
+                    auto *n = managers->getHeader()->next;
+                    while (n && n->next) {
+                        if (n->info.getID() == mid) {
+                            managers->remove(n);
+                            break;
+                        }
+                        n = n->next;
                     }
-                    n = n->next;
-                }
-                auto *pRecords = mainWindow->getPermissionRecords();
-                if (pRecords && pRecords->getHeader()) {
-                    auto *pn = pRecords->getHeader()->next;
-                    while (pn && pn->next) {
-                        if (pn->info.getMA_id() == mid) {
-                            backupPerms.insert(pn->info);
-                            auto *toDel = pn;
+                    auto *pRecords = mainWindow->getPermissionRecords();
+                    if (pRecords && pRecords->getHeader()) {
+                        auto *pn = pRecords->getHeader()->next;
+                        while (pn && pn->next) {
+                            if (pn->info.getMA_id() == mid) {
+                                backupPerms.insert(pn->info);
+                                auto *toDel = pn;
+                                pn = pn->next;
+                                pRecords->remove(toDel);
+                                continue;
+                            }
                             pn = pn->next;
-                            pRecords->remove(toDel);
-                            continue;
-                        }
-                        pn = pn->next;
-                    }
-                }
-                if (!mainWindow->saveAll(SaveScope::Account, SaveAction::Normal)) {
-                    managers->insert(backupMgr);
-                    if (pRecords && backupPerms.getHeader()) {
-                        auto *bn = backupPerms.getHeader()->next;
-                        while (bn && bn->next) {
-                            pRecords->insert(bn->info);
-                            bn = bn->next;
                         }
                     }
-                    return;
+                    if (!mainWindow->saveAll(SaveScope::Account, SaveAction::Normal)) {
+                        managers->insert(backupMgr);
+                        if (pRecords && backupPerms.getHeader()) {
+                            auto *bn = backupPerms.getHeader()->next;
+                            while (bn && bn->next) {
+                                pRecords->insert(bn->info);
+                                bn = bn->next;
+                            }
+                        }
+                        return;
+                    }
+                    refresh(true);
+                } catch (const std::exception &e) {
+                    UIHelper::showWarning(this, "Lỗi hệ thống", QString("Không thể xóa tài khoản: %1").arg(QString::fromUtf8(e.what())));
                 }
-                refresh(true);
             });
             table->setCellWidget(r, 4, action.first);
         }
@@ -222,7 +221,7 @@ void AccountView::resetToFirstPage() {
     sortColumn = -1;
     sortAscending = false;
     if (mainWindow && mainWindow->getManagers()) {
-        libPBL2::sortManagers(mainWindow->getManagers(), libPBL2::AccountSortBy::ID, false);
+        ManagerController::sortManagers(mainWindow->getManagers(), AccountSortBy::ID, false, mainWindow->getPermissionRecords());
     }
     currentPage = 0;
     refresh(false);
@@ -231,10 +230,10 @@ void AccountView::resetToFirstPage() {
 void AccountView::reapplyCurrentSort() {
     if (!mainWindow || !mainWindow->getManagers()) return;
     if (sortColumn < 0 || sortColumn >= 4) {
-        libPBL2::sortManagers(mainWindow->getManagers(), libPBL2::AccountSortBy::ID, false, mainWindow->getPermissionRecords());
+        ManagerController::sortManagers(mainWindow->getManagers(), AccountSortBy::ID, false, mainWindow->getPermissionRecords());
         return;
     }
-    libPBL2::sortManagers(mainWindow->getManagers(), accountSortByColumn(sortColumn), sortAscending, mainWindow->getPermissionRecords());
+    ManagerController::sortManagers(mainWindow->getManagers(), accountSortByColumn(sortColumn), sortAscending, mainWindow->getPermissionRecords());
 }
 
 void AccountView::showEvent(QShowEvent *event) {
@@ -264,7 +263,7 @@ void AccountView::setupUI() {
     actions->addStretch();
     layout->addLayout(actions);
 
-    table = UIHelper::table({"HỌ VÀ TÊN", "TÀI KHOẢN", "VAI TRÒ", "TRẠNG THÁI", ""});
+    table = UIHelper::table({"HỌ VÀ TÊN", "TÀI KHOẢN", "VAI TRÒ", "TRẠNG THÁI", ""}, this);
     table->setWordWrap(false);
     table->setTextElideMode(Qt::ElideRight);
     table->verticalHeader()->setDefaultSectionSize(48);
@@ -286,7 +285,7 @@ void AccountView::setupUI() {
             sortAscending = true;
         }
         if (mainWindow && mainWindow->getManagers()) {
-            libPBL2::sortManagers(mainWindow->getManagers(), accountSortByColumn(logicalIndex), sortAscending, mainWindow->getPermissionRecords());
+            ManagerController::sortManagers(mainWindow->getManagers(), accountSortByColumn(logicalIndex), sortAscending, mainWindow->getPermissionRecords());
             currentPage = 0;
             refresh(false);
         }
@@ -456,12 +455,19 @@ bool AccountView::addManagerDialog() {
     saveBtn->setStyleSheet("QPushButton { background: #0d9488; border: none; border-radius: 8px; padding: 9px 22px; font-size: 13px; font-weight: 700; color: white; } QPushButton:hover { background: #0f766e; }");
 
     connect(saveBtn, &QPushButton::clicked, &dialog, [this, &dialog, name, phone, username, password, age, gender, role] {
+        QString nameStr = name->text().trimmed();
         QString userStr = username->text().trimmed();
         QString phoneStr = phone->text().trimmed();
         QString passStr = password->text().trimmed();
-        if (name->text().trimmed().isEmpty() || phoneStr.isEmpty() ||
+        if (nameStr.isEmpty() || phoneStr.isEmpty() ||
             userStr.isEmpty() || passStr.isEmpty()) {
             UIHelper::showWarning(&dialog, "Thiếu thông tin", "Vui lòng nhập đầy đủ các thông tin bắt buộc.");
+            return;
+        }
+        if (libPBL2::containsForbiddenStorageChars(UIHelper::ss(nameStr)) ||
+            libPBL2::containsForbiddenStorageChars(UIHelper::ss(userStr)) ||
+            libPBL2::containsForbiddenStorageChars(UIHelper::ss(passStr))) {
+            UIHelper::showWarning(&dialog, "Ký tự không hợp lệ", "Họ tên, tên đăng nhập và mật khẩu không được chứa ký tự '|' hoặc ký tự xuống dòng.");
             return;
         }
         if (userStr.contains(' ')) {
@@ -590,7 +596,7 @@ void AccountView::editManagerDialog(const std::string &managerId) {
     headerBox->addLayout(titleCol, 1);
     root->addLayout(headerBox);
 
-    auto *card = new QFrame;
+    auto *card = new QFrame(&dialog);
     card->setObjectName("editCard");
     card->setStyleSheet("QFrame#editCard { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; }");
     auto *cardLayout = new QVBoxLayout(card);
@@ -673,27 +679,42 @@ void AccountView::editManagerDialog(const std::string &managerId) {
         QSpinBox *spin = nullptr;
         int baseDays = 30;
         QDateTime baseExpiry;
+        bool initiallyGranted = false;
+        bool toggledOff = false;
     };
     auto checks = std::make_shared<QList<PermCheckItem>>();
 
+    auto computePer1Expiry = [](const PermCheckItem &item) -> QDateTime {
+        if (!item.spin) return QDateTime();
+        if (item.initiallyGranted && !item.toggledOff && item.baseExpiry.isValid()) {
+            return item.baseExpiry.addDays(item.spin->value() - item.baseDays);
+        }
+        return QDateTime::currentDateTime().addDays(item.spin->value());
+    };
+
     if (isCurrentRoot && !isTargetRoot && !isSelf) {
-        auto *permSection = new QWidget;
+        auto *permSection = new QWidget(card);
         auto *permLayout = new QVBoxLayout(permSection);
         permLayout->setContentsMargins(0, 0, 0, 0);
         permLayout->setSpacing(10);
 
-        auto *permDivider = new QFrame;
+        auto *permDivider = new QFrame(permSection);
         permDivider->setFrameShape(QFrame::HLine);
         permDivider->setStyleSheet("background-color: #f1f5f9; max-height: 1px; border: none; margin: 4px 0;");
         permLayout->addWidget(permDivider);
 
-        auto *permTitle = new QLabel("Phân quyền nâng cao (Quản trị viên gốc)");
+        auto *permTitle = new QLabel("Phân quyền nâng cao (Quản trị viên gốc)", permSection);
         permTitle->setStyleSheet("font-size: 13px; font-weight: 700; color: #0d9488;");
         permLayout->addWidget(permTitle);
 
         QStringList granted = ManagerController::getGrantedPermissions(managerId, mainWindow ? mainWindow->getPermissionRecords() : nullptr);
 
-        LinkList<Permission> *catalog = Permission::getSystemCatalog();
+        std::unique_ptr<LinkList<Permission>> catalog;
+        try {
+            catalog.reset(Permission::getSystemCatalog());
+        } catch (const std::exception &e) {
+            UIHelper::showWarning(this, "Lỗi phân quyền", QString("Không thể nạp danh mục quyền: %1").arg(QString::fromUtf8(e.what())));
+        }
         if (catalog && catalog->getHeader()) {
             auto *node = catalog->getHeader()->next;
             while (node && node->next) {
@@ -701,7 +722,7 @@ void AccountView::editManagerDialog(const std::string &managerId) {
                 std::string pId = entry.getPer_id();
                 QString pName = QString::fromUtf8(entry.getPer_Name().c_str());
 
-                auto *check = new QCheckBox(pName);
+                auto *check = new QCheckBox(pName, permSection);
                 check->setStyleSheet("QCheckBox { font-size: 12.5px; color: #334155; } QCheckBox:hover { color: #0d9488; }");
                 check->setChecked(granted.contains(QString::fromUtf8(pId.c_str())));
                 check->setProperty("permissionId", QString::fromUtf8(pId.c_str()));
@@ -715,9 +736,10 @@ void AccountView::editManagerDialog(const std::string &managerId) {
                 QSpinBox *duration = nullptr;
                 int baseDays = 30;
                 QDateTime baseExpiry;
+                bool initGranted = false;
 
                 if (pId == "Per_1") {
-                    badgeLabel = new QLabel;
+                    badgeLabel = new QLabel(permSection);
                     badgeLabel->setStyleSheet("font-size: 11.5px; font-weight: 700; color: #0f766e; background-color: #ccfbf1; border: 1px solid #99f6e4; border-radius: 6px; padding: 2px 8px;");
                     badgeLabel->setVisible(false);
                     rowLayout->addWidget(badgeLabel);
@@ -730,6 +752,7 @@ void AccountView::editManagerDialog(const std::string &managerId) {
                         if (remainingDays < 1) remainingDays = 1;
                         baseDays = remainingDays;
                         baseExpiry = currentExpiry;
+                        initGranted = true;
                         badgeLabel->setText(currentExpiry.toString("dd-MM-yyyy | HH:mm"));
                         badgeLabel->setVisible(check->isChecked());
                     } else {
@@ -742,13 +765,14 @@ void AccountView::editManagerDialog(const std::string &managerId) {
                 rowLayout->addStretch();
                 permLayout->addLayout(rowLayout);
 
+                int itemIndex = checks->size();
                 if (pId == "Per_1") {
                     auto *durRow = new QHBoxLayout;
                     durRow->setContentsMargins(20, 0, 0, 0);
-                    auto *durLbl = new QLabel("Thời hạn hiệu lực (ngày):");
+                    auto *durLbl = new QLabel("Thời hạn hiệu lực (ngày):", permSection);
                     durLbl->setStyleSheet("font-size: 12px; color: #64748b; font-weight: 600;");
-                    duration = new QSpinBox;
-                    duration->setRange(1, 3650);
+                    duration = new QSpinBox(permSection);
+                    duration->setRange(1, qMax(3650, baseDays));
                     duration->setValue(baseDays);
                     durRow->addWidget(durLbl);
                     durRow->addWidget(duration);
@@ -758,31 +782,32 @@ void AccountView::editManagerDialog(const std::string &managerId) {
                     durLbl->setVisible(check->isChecked());
                     duration->setVisible(check->isChecked());
 
-                    auto updateBadge = [check, duration, badgeLabel, baseDays, baseExpiry]() {
-                        if (badgeLabel) {
-                            if (check->isChecked()) {
-                                int delta = duration->value() - baseDays;
-                                QDateTime newExp = baseExpiry.addDays(delta);
-                                badgeLabel->setText(newExp.toString("dd-MM-yyyy | HH:mm"));
-                                badgeLabel->setVisible(true);
-                            } else {
-                                badgeLabel->setVisible(false);
-                            }
+                    auto updateBadge = [checks, itemIndex, badgeLabel, computePer1Expiry]() {
+                        if (!badgeLabel || itemIndex >= checks->size()) return;
+                        const auto &it = (*checks)[itemIndex];
+                        if (it.box && it.box->isChecked()) {
+                            QDateTime newExp = computePer1Expiry(it);
+                            badgeLabel->setText(newExp.toString("dd-MM-yyyy | HH:mm"));
+                            badgeLabel->setVisible(true);
+                        } else {
+                            badgeLabel->setVisible(false);
                         }
                     };
 
                     connect(duration, qOverload<int>(&QSpinBox::valueChanged), &dialog, updateBadge);
-                    connect(check, &QCheckBox::toggled, &dialog, [durLbl, duration, updateBadge](bool c) {
+                    connect(check, &QCheckBox::toggled, &dialog, [checks, itemIndex, durLbl, duration, updateBadge](bool c) {
+                        if (!c && itemIndex < checks->size()) {
+                            (*checks)[itemIndex].toggledOff = true;
+                        }
                         durLbl->setVisible(c);
                         duration->setVisible(c);
                         updateBadge();
                     });
                 }
-                checks->append({check, duration, baseDays, baseExpiry});
+                checks->append({check, duration, baseDays, baseExpiry, initGranted, false});
                 node = node->next;
             }
         }
-        delete catalog;
 
         cardLayout->addWidget(permSection);
         auto syncPermSectionVisibility = [permSection, &dialog](int idx) {
@@ -808,12 +833,28 @@ void AccountView::editManagerDialog(const std::string &managerId) {
     saveBtn->setDefault(false);
     saveBtn->setStyleSheet("QPushButton { background: #0d9488; border: none; border-radius: 8px; padding: 9px 22px; font-size: 13px; font-weight: 700; color: white; } QPushButton:hover { background: #0f766e; }");
 
-    connect(saveBtn, &QPushButton::clicked, &dialog, [this, &dialog, targetMgr, managerId, name, phone, age, gender, username, password, role, statusCombo, isTargetRoot, isSelf, isCurrentRoot, checks] {
+    connect(saveBtn, &QPushButton::clicked, &dialog, [this, &dialog, managerId, name, phone, age, gender, username, password, role, statusCombo, isTargetRoot, isSelf, isCurrentRoot, checks, computePer1Expiry] {
+        auto *managers = mainWindow->getManagers();
+        Manager *targetMgr = ManagerController::findById(managers, managerId);
+        if (!targetMgr) {
+            UIHelper::showWarning(&dialog, "Không tìm thấy", "Tài khoản không còn tồn tại trong hệ thống.");
+            dialog.reject();
+            return;
+        }
+
+        QString nameStr = name->text().trimmed();
         QString userStr = username->text().trimmed();
         QString phoneStr = phone->text().trimmed();
-        if (name->text().trimmed().isEmpty() || phoneStr.isEmpty() ||
-            userStr.isEmpty() || password->text().trimmed().isEmpty()) {
+        QString passStr = password->text().trimmed();
+        if (nameStr.isEmpty() || phoneStr.isEmpty() ||
+            userStr.isEmpty() || passStr.isEmpty()) {
             UIHelper::showWarning(&dialog, "Thiếu thông tin", "Vui lòng nhập đầy đủ các thông tin bắt buộc.");
+            return;
+        }
+        if (libPBL2::containsForbiddenStorageChars(UIHelper::ss(nameStr)) ||
+            libPBL2::containsForbiddenStorageChars(UIHelper::ss(userStr)) ||
+            libPBL2::containsForbiddenStorageChars(UIHelper::ss(passStr))) {
+            UIHelper::showWarning(&dialog, "Ký tự không hợp lệ", "Họ tên, tên đăng nhập và mật khẩu không được chứa ký tự '|' hoặc ký tự xuống dòng.");
             return;
         }
         if (userStr.contains(' ')) {
@@ -834,11 +875,10 @@ void AccountView::editManagerDialog(const std::string &managerId) {
 
         std::string newUsername = UIHelper::ss(userStr);
         std::string newPhone = UIHelper::ss(phoneStr);
-        auto *managers = mainWindow->getManagers();
         if (managers) {
             auto *n = managers->getHeader()->next;
             while (n && n->next) {
-                if (n->info.getID() != targetMgr->getID()) {
+                if (n->info.getID() != managerId) {
                     if (n->info.getUsername() == newUsername) {
                         UIHelper::showWarning(&dialog, "Trùng tài khoản", "Tên đăng nhập này đã được sử dụng. Vui lòng chọn tên khác.");
                         username->setFocus();
@@ -854,78 +894,93 @@ void AccountView::editManagerDialog(const std::string &managerId) {
             }
         }
 
-        Manager oldSnapshot = *targetMgr;
-        LinkList<PermissionManager> oldPermsBackup;
-        if (isCurrentRoot && !isTargetRoot && !isSelf && mainWindow && mainWindow->getPermissionRecords() && mainWindow->getPermissionRecords()->getHeader()) {
-            auto *pn = mainWindow->getPermissionRecords()->getHeader()->next;
-            while (pn && pn->next) {
-                if (pn->info.getMA_id() == managerId) {
-                    oldPermsBackup.insert(pn->info);
+        try {
+            Manager oldSnapshot = *targetMgr;
+            LinkList<PermissionManager> oldPermsBackup;
+            if (isCurrentRoot && !isTargetRoot && !isSelf && mainWindow && mainWindow->getPermissionRecords() && mainWindow->getPermissionRecords()->getHeader()) {
+                auto *pn = mainWindow->getPermissionRecords()->getHeader()->next;
+                while (pn && pn->next) {
+                    if (pn->info.getMA_id() == managerId) {
+                        oldPermsBackup.insert(pn->info);
+                    }
+                    pn = pn->next;
                 }
-                pn = pn->next;
             }
-        }
 
-        targetMgr->setfullName(UIHelper::ss(name->text().trimmed()));
-        targetMgr->setPhone(newPhone);
-        targetMgr->setAge(age->value());
-        targetMgr->setGender(gender->currentIndex() == 0);
-        if (!isTargetRoot) {
-            targetMgr->setUsername(newUsername);
-        }
-        targetMgr->setPassword(UIHelper::ss(password->text().trimmed()));
+            targetMgr->setfullName(UIHelper::ss(nameStr));
+            targetMgr->setPhone(newPhone);
+            targetMgr->setAge(age->value());
+            targetMgr->setGender(gender->currentIndex() == 0);
+            if (!isTargetRoot) {
+                targetMgr->setUsername(newUsername);
+            }
+            targetMgr->setPassword(UIHelper::ss(passStr));
 
-        ManagerRole newRole = targetMgr->getRole();
-        if (isCurrentRoot && !isTargetRoot && !isSelf) {
-            newRole = (role->currentIndex() == 2) ? ManagerRole::Administrator :
-                     ((role->currentIndex() == 1) ? ManagerRole::SpecialReceptionist : ManagerRole::Receptionist);
-            targetMgr->setRole(newRole);
-        }
+            ManagerRole newRole = targetMgr->getRole();
+            if (isCurrentRoot && !isTargetRoot && !isSelf) {
+                newRole = (role->currentIndex() == 2) ? ManagerRole::Administrator :
+                         ((role->currentIndex() == 1) ? ManagerRole::SpecialReceptionist : ManagerRole::Receptionist);
+                targetMgr->setRole(newRole);
+            }
 
-        if (!isTargetRoot && !isSelf) {
-            targetMgr->setState(statusCombo->currentIndex() == 0 ? 1 : 0);
-        }
+            if (!isTargetRoot && !isSelf) {
+                targetMgr->setState(statusCombo->currentIndex() == 0 ? 1 : 0);
+            }
 
-        if (isCurrentRoot && !isTargetRoot && !isSelf) {
-            LinkList<PermissionManager> newGrants;
-            if (newRole != ManagerRole::Administrator) {
-                for (const auto &entry : *checks) {
-                    if (entry.box->isChecked()) {
-                        std::string expiry;
-                        if (entry.spin) {
-                            int delta = entry.spin->value() - entry.baseDays;
-                            QDateTime finalExpiry = entry.baseExpiry.addDays(delta);
-                            expiry = UIHelper::ss(finalExpiry.toString(Qt::ISODate));
+            if (isCurrentRoot && !isTargetRoot && !isSelf) {
+                LinkList<PermissionManager> newGrants;
+                if (newRole != ManagerRole::Administrator) {
+                    for (const auto &entry : *checks) {
+                        if (entry.box && entry.box->isChecked()) {
+                            std::string expiry;
+                            if (entry.spin) {
+                                QDateTime finalExpiry = computePer1Expiry(entry);
+                                expiry = UIHelper::ss(finalExpiry.toString(Qt::ISODate));
+                            }
+                            newGrants.insert(PermissionManager(managerId, UIHelper::ss(entry.box->property("permissionId").toString()), expiry));
                         }
-                        newGrants.insert(PermissionManager(managerId, UIHelper::ss(entry.box->property("permissionId").toString()), expiry));
                     }
                 }
-            }
-            try {
-                if (mainWindow && mainWindow->getPermissionRecords()) {
-                    ManagerController::savePermissions(managerId, newGrants, mainWindow->getPermissionRecords());
+                try {
+                    if (mainWindow && mainWindow->getPermissionRecords()) {
+                        ManagerController::savePermissions(managerId, newGrants, mainWindow->getPermissionRecords());
+                    }
+                } catch (const std::exception &e) {
+                    *targetMgr = oldSnapshot;
+                    try {
+                        if (mainWindow && mainWindow->getPermissionRecords()) {
+                            ManagerController::savePermissions(managerId, oldPermsBackup, mainWindow->getPermissionRecords());
+                        }
+                    } catch (...) {}
+                    UIHelper::showWarning(&dialog, "Lỗi phân quyền", QString("Không thể cập nhật phân quyền: %1").arg(QString::fromUtf8(e.what())));
+                    return;
                 }
-            } catch (const AppException &e) {
-                UIHelper::showWarning(&dialog, "Lỗi phân quyền", QString::fromUtf8(e.what()));
-            } catch (const std::exception &e) {
-                UIHelper::showWarning(&dialog, "Lỗi phân quyền", QString("Đã xảy ra ngoại lệ: %1").arg(e.what()));
             }
-        }
 
-        if (!mainWindow->saveAll(SaveScope::Account, SaveAction::Normal)) {
-            *targetMgr = oldSnapshot;
-            if (isCurrentRoot && !isTargetRoot && !isSelf && mainWindow && mainWindow->getPermissionRecords()) {
-                ManagerController::savePermissions(managerId, oldPermsBackup, mainWindow->getPermissionRecords());
+            if (!mainWindow->saveAll(SaveScope::Account, SaveAction::Normal)) {
+                if (Manager *rollbackMgr = ManagerController::findById(managers, managerId)) {
+                    *rollbackMgr = oldSnapshot;
+                }
+                if (isCurrentRoot && !isTargetRoot && !isSelf && mainWindow && mainWindow->getPermissionRecords()) {
+                    try {
+                        ManagerController::savePermissions(managerId, oldPermsBackup, mainWindow->getPermissionRecords());
+                    } catch (...) {}
+                }
+                return;
             }
-            return;
+            if (isSelf && mainWindow && mainWindow->getCurrentManager()) {
+                if (Manager *freshSelf = ManagerController::findById(managers, managerId)) {
+                    *mainWindow->getCurrentManager() = *freshSelf;
+                }
+                mainWindow->updateUserProfileDisplay();
+                mainWindow->refreshPage(0);
+            }
+            refresh(true);
+            dialog.accept();
+            UIHelper::showSuccess(this, "Thành công", "Thông tin tài khoản đã được cập nhật thành công.");
+        } catch (const std::exception &e) {
+            UIHelper::showWarning(&dialog, "Lỗi hệ thống", QString("Không thể lưu thay đổi tài khoản: %1").arg(QString::fromUtf8(e.what())));
         }
-        if (isSelf && mainWindow && mainWindow->getCurrentManager()) {
-            *mainWindow->getCurrentManager() = *targetMgr;
-            mainWindow->updateUserProfileDisplay();
-        }
-        refresh(true);
-        dialog.accept();
-        UIHelper::showSuccess(this, "Thành công", "Thông tin tài khoản đã được cập nhật thành công.");
     });
 
     btnBox->addWidget(cancelBtn);

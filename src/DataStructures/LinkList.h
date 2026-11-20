@@ -1,7 +1,7 @@
 #ifndef LINKLIST_H
 #define LINKLIST_H
 
-#include "../Utils/AppExceptions.h"
+#include "AppExceptions.h"
 
 template <class T>
 class LinkList {

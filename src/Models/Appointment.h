@@ -31,13 +31,11 @@ public:
     bool hasPaidFee() const;
 
     void setId(const std::string &id);
-    void setSymptomPatientId(const std::string &spId);
-    void setDoctorId(const std::string &doctorId);
-    void setDateGet(const Date &dateGet);
     void setState(int state);
     void setPaidFee(double fee);
 
-    int computeEffectiveState(int currentDay, int currentMonth, int currentYear, int currentHour, int currentMinute) const;
+    int computeEffectiveState(int currentDay, int currentMonth, int currentYear, int currentHour, int currentMinute, int currentSecond = 0) const;
+    int computeEffectiveStateNow() const;
 
     bool isDefault() const;
     void setDefault();

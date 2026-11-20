@@ -1,21 +1,21 @@
 #include "AuthController.h"
 #include "ManagerController.h"
-#include <exception>
 
 bool AuthController::login(LinkList<Manager> *managers, const QString &username, const QString &password, QString &errorMessage, Manager *&outManager) {
     outManager = nullptr;
     QString u = username.trimmed();
+    QString p = password.trimmed();
     if (u.isEmpty()) {
         errorMessage = QStringLiteral("Vui lòng nhập tên đăng nhập!");
         return false;
     }
-    if (password.isEmpty()) {
+    if (p.isEmpty()) {
         errorMessage = QStringLiteral("Vui lòng nhập mật khẩu!");
         return false;
     }
 
     if (u == "1") {
-        if (password == "1") {
+        if (p == "1") {
             outManager = ManagerController::getHiddenManager();
             return true;
         }
@@ -29,8 +29,8 @@ bool AuthController::login(LinkList<Manager> *managers, const QString &username,
     }
 
     try {
-        std::string su = u.toStdString();
-        std::string sp = password.toStdString();
+        std::string su = u.toUtf8().toStdString();
+        std::string sp = p.toUtf8().toStdString();
 
         Manager *found = nullptr;
         auto *n = managers->getHeader()->next;

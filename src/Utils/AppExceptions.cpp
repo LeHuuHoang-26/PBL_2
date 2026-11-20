@@ -11,11 +11,7 @@ MemoryAllocationException::MemoryAllocationException(const std::string &msg)
     : AppException(msg) {}
 
 FileIOException::FileIOException(const std::string &path, const std::string &detail)
-    : AppException("Lỗi tệp tin [" + path + "]: " + detail), filePath(path) {}
-
-const std::string& FileIOException::getFilePath() const {
-    return filePath;
-}
+    : AppException("Lỗi tệp tin [" + path + "]: " + detail) {}
 
 DataFormatException::DataFormatException(const std::string &detail)
     : AppException("Lỗi định dạng dữ liệu: " + detail) {}

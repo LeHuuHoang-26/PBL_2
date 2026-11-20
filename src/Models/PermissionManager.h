@@ -23,10 +23,6 @@ public:
     std::string getPer_id() const;
     std::string getExpiresAt() const;
 
-    void setMA_id(const std::string &maId);
-    void setPer_id(const std::string &perId);
-    void setExpiresAt(const std::string &expiresAt);
-
     bool isDefault() const;
     void setDefault();
     bool isTemporary() const;

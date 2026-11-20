@@ -7,7 +7,6 @@
 class MainWindow;
 class QStackedWidget;
 class QPushButton;
-class QLabel;
 
 class StatisticView : public QWidget {
     Q_OBJECT

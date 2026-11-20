@@ -42,6 +42,7 @@ private:
     QLabel *m_lblMessage;
     QAction *m_actionTogglePassword;
     QPixmap m_originalIllustration;
+    QSize m_lastIllustrationPhysSize;
     bool m_isPasswordVisible;
 
     void setupUI();

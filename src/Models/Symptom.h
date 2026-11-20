@@ -28,15 +28,9 @@ public:
     std::string getSp_id() const;
     int getSScore() const;
 
-    void setS_id(const std::string &id);
-    void setSName(const std::string &name);
-    void setSp_id(const std::string &spId);
-    void setSScore(int score);
-
     std::string toString() const;
     static Symptom loadFromString(const std::string &str);
     static LinkList<Symptom>* loadFromFile(const std::string &path);
-    static bool saveToFile(const std::string &path, const LinkList<Symptom> *list);
 };
 
 #endif

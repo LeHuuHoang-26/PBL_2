@@ -1,8 +1,8 @@
 #ifndef AUTHCONTROLLER_H
 #define AUTHCONTROLLER_H
 
-#include "../Models/Manager.h"
-#include "../DataStructures/LinkList.h"
+#include "Manager.h"
+#include "LinkList.h"
 #include <QString>
 
 class AuthController {

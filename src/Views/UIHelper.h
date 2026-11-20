@@ -26,9 +26,9 @@ public:
     }
 
     static QWidget *page(const QString &title, const QString &subtitle, QWidget *parent = nullptr);
-    static QFrame *panel();
-    static QPushButton *button(const QString &text, const QString &kind = "primary");
-    static QTableWidget *table(const QStringList &headers);
+    static QFrame *panel(QWidget *parent = nullptr);
+    static QPushButton *button(const QString &text, const QString &kind = "primary", QWidget *parent = nullptr);
+    static QTableWidget *table(const QStringList &headers, QWidget *parent = nullptr);
     static QFrame *createTableCard(QTableWidget *table, QWidget *parent = nullptr);
     static void setupTableScaling(QTableWidget *table, const QVector<double> &ratios, int fixedLastColWidth = 0);
     static void cell(QTableWidget *t, int row, int column, const QString &text, Qt::Alignment align = Qt::AlignLeft | Qt::AlignVCenter);
@@ -36,7 +36,7 @@ public:
     static QPixmap createAvatar(const QString &fullName, int size = 38, const QColor &bgColor = QColor("#0d9488"), const QColor &textColor = Qt::white);
     static QIcon createEyeIcon(bool isVisible);
     static QIcon trashIcon(const QColor &color = QColor("#ef4444"));
-    static QPair<QWidget*, QPushButton*> createActionCell(const QIcon &icon, const QString &tooltip);
+    static QPair<QWidget*, QPushButton*> createActionCell(const QIcon &icon, const QString &tooltip, QWidget *parent = nullptr);
     static QString dialogFormStyle();
     static void applyCalendarStyle(QCalendarWidget *cal);
     static void setupPhoneInput(QLineEdit *lineEdit);

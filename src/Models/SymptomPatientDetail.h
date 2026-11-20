@@ -24,9 +24,6 @@ public:
     std::string getSP_id() const;
     std::string getS_id() const;
 
-    void setSP_id(const std::string &val);
-    void setS_id(const std::string &val);
-
     std::string toString() const;
     static SymptomPatientDetail loadFromString(const std::string &str);
     static LinkList<SymptomPatientDetail>* loadFromFile(const std::string &path);

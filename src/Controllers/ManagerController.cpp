@@ -1,6 +1,5 @@
 #include "ManagerController.h"
 #include "libPBL2.h"
-#include <cstdio>
 
 Manager *ManagerController::findById(LinkList<Manager> *managers, const std::string &id) {
     if (id.empty()) return nullptr;
@@ -12,6 +11,38 @@ Manager *ManagerController::findById(LinkList<Manager> *managers, const std::str
         node = node->next;
     }
     return nullptr;
+}
+
+void ManagerController::sortManagers(LinkList<Manager> &list, AccountSortBy criteria, bool ascending, const LinkList<PermissionManager> *permissionRecords) {
+    libPBL2::qsort(list, [criteria, ascending, permissionRecords](const Manager &a, const Manager &b) {
+        int cmp = 0;
+        switch (criteria) {
+            case AccountSortBy::ID:
+                cmp = libPBL2::compareNatural(a.getID(), b.getID());
+                break;
+            case AccountSortBy::Username:
+                cmp = libPBL2::compareNatural(a.getUsername(), b.getUsername());
+                break;
+            case AccountSortBy::Name:
+                cmp = libPBL2::compareVietnameseNames(a.getfullName(), b.getfullName());
+                break;
+            case AccountSortBy::Role: {
+                int ra = static_cast<int>(ManagerController::getEffectiveRole(&a, permissionRecords));
+                int rb = static_cast<int>(ManagerController::getEffectiveRole(&b, permissionRecords));
+                if (ra != rb) cmp = (ra < rb) ? -1 : 1;
+                break;
+            }
+            case AccountSortBy::State:
+                if (a.getState() != b.getState()) cmp = (a.getState() > b.getState()) ? -1 : 1;
+                break;
+        }
+        if (cmp == 0) cmp = libPBL2::compareNatural(a.getID(), b.getID());
+        return ascending ? (cmp < 0) : (cmp > 0);
+    });
+}
+
+void ManagerController::sortManagers(LinkList<Manager> *list, AccountSortBy criteria, bool ascending, const LinkList<PermissionManager> *permissionRecords) {
+    if (list) sortManagers(*list, criteria, ascending, permissionRecords);
 }
 
 EffectiveRole ManagerController::getEffectiveRole(const Manager *m, const LinkList<PermissionManager> *permissionRecords) {
@@ -60,6 +91,9 @@ bool ManagerController::isHiddenAccount(const std::string &username, const std::
 
 QDateTime ManagerController::permissionExpiry(const std::string &managerId, const std::string &permissionId, const LinkList<PermissionManager> *permissionRecords) {
     if (!permissionRecords || !permissionRecords->getHeader()) return QDateTime();
+    QDateTime now = QDateTime::currentDateTime();
+    QDateTime bestActive;
+    QDateTime bestFallback;
     auto *curr = permissionRecords->getHeader()->next;
     while (curr && curr->next) {
         if (curr->info.getMA_id() == managerId && curr->info.getPer_id() == permissionId && curr->info.isTemporary()) {
@@ -67,11 +101,19 @@ QDateTime ManagerController::permissionExpiry(const std::string &managerId, cons
             if (!parsed.isValid()) {
                 parsed = QDateTime::fromString(QString::fromUtf8(curr->info.getExpiresAt().c_str()), "yyyy-MM-dd HH:mm:ss");
             }
-            return parsed;
+            if (parsed.isValid()) {
+                if (parsed > now) {
+                    if (!bestActive.isValid() || parsed > bestActive) {
+                        bestActive = parsed;
+                    }
+                } else if (!bestFallback.isValid() || parsed > bestFallback) {
+                    bestFallback = parsed;
+                }
+            }
         }
         curr = curr->next;
     }
-    return QDateTime();
+    return bestActive.isValid() ? bestActive : bestFallback;
 }
 
 bool ManagerController::isTemporaryAdmin(const Manager *m, const LinkList<PermissionManager> *permissionRecords) {

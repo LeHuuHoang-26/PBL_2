@@ -1,4 +1,5 @@
 #include "UIHelper.h"
+#include "libPBL2.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -20,20 +21,23 @@
 #include <QTimer>
 #include <QEvent>
 #include <QKeyEvent>
+#include <QSignalBlocker>
 
 namespace {
+
+inline bool isAsciiDigitQChar(QChar ch) {
+    return ch >= QLatin1Char('0') && ch <= QLatin1Char('9');
+}
 
 class TableColumnScaler : public QObject {
 public:
     TableColumnScaler(QTableWidget *table, const QVector<double> &ratios, int fixedLastColWidth, QObject *parent = nullptr)
         : QObject(parent), m_table(table), m_ratios(ratios), m_fixedLast(fixedLastColWidth) {
         if (m_table) {
-            m_table->installEventFilter(this);
             if (auto *vp = m_table->viewport()) {
                 vp->installEventFilter(this);
-            }
-            if (auto *header = m_table->horizontalHeader()) {
-                header->installEventFilter(this);
+            } else {
+                m_table->installEventFilter(this);
             }
         }
     }
@@ -42,33 +46,42 @@ public:
         if (!m_table || m_isScaling) return;
         m_isScaling = true;
 
-        int totalW = m_table->viewport()->width();
+        int totalW = m_table->viewport() ? m_table->viewport()->width() : m_table->width();
         if (totalW <= 0) totalW = m_table->width();
         if (totalW <= 50) {
             m_isScaling = false;
             return;
         }
 
-        int remainW = totalW - m_fixedLast;
+        int colCount = m_table->columnCount();
+        int n = qMin(static_cast<int>(m_ratios.size()), colCount);
+        if (n <= 0) {
+            m_isScaling = false;
+            return;
+        }
+        bool hasFixedLast = (m_fixedLast > 0 && n < colCount);
+        int remainW = totalW - (hasFixedLast ? m_fixedLast : 0);
         if (remainW <= 0) {
             m_isScaling = false;
             return;
         }
 
         int allocated = 0;
-        int n = m_ratios.size();
         for (int i = 0; i < n; ++i) {
             int w = 0;
             if (i == n - 1) {
-                w = remainW - allocated;
+                w = qMax(20, remainW - allocated);
             } else {
-                w = static_cast<int>(remainW * m_ratios[i]);
+                w = qMax(20, static_cast<int>(remainW * m_ratios[i]));
+                int maxAllowed = remainW - allocated - 20 * (n - 1 - i);
+                if (maxAllowed >= 20 && w > maxAllowed) {
+                    w = maxAllowed;
+                }
                 allocated += w;
             }
-            if (w < 20) w = 20;
             m_table->setColumnWidth(i, w);
         }
-        if (m_fixedLast > 0 && n < m_table->columnCount()) {
+        if (hasFixedLast) {
             m_table->setColumnWidth(n, m_fixedLast);
         }
         m_isScaling = false;
@@ -104,16 +117,19 @@ protected:
             if (ke->key() == Qt::Key_Backspace || ke->key() == Qt::Key_Delete ||
                 ke->key() == Qt::Key_Left || ke->key() == Qt::Key_Right ||
                 ke->key() == Qt::Key_Home || ke->key() == Qt::Key_End ||
-                ke->key() == Qt::Key_Tab || ke->key() == Qt::Key_Return ||
-                ke->key() == Qt::Key_Enter ||
+                ke->key() == Qt::Key_Tab || ke->key() == Qt::Key_Backtab ||
+                ke->key() == Qt::Key_Return || ke->key() == Qt::Key_Enter ||
+                ke->key() == Qt::Key_Escape ||
                 (ke->modifiers() & (Qt::ControlModifier | Qt::AltModifier))) {
                 return false;
             }
 
             QString txt = ke->text();
             if (!txt.isEmpty()) {
-                if (!txt[0].isDigit()) {
-                    return true;
+                for (const QChar &ch : txt) {
+                    if (!isAsciiDigitQChar(ch)) {
+                        return true;
+                    }
                 }
                 auto *le = qobject_cast<QLineEdit*>(obj);
                 if (le && le->text().length() >= m_maxLen && !le->hasSelectedText()) {
@@ -126,21 +142,6 @@ protected:
 
 private:
     int m_maxLen = 10;
-};
-
-class CalendarNoTriggerFilter : public QObject {
-public:
-    using QObject::QObject;
-protected:
-    bool eventFilter(QObject *obj, QEvent *ev) override {
-        if (ev->type() == QEvent::MouseButtonPress ||
-            ev->type() == QEvent::MouseButtonRelease ||
-            ev->type() == QEvent::MouseButtonDblClick ||
-            ev->type() == QEvent::ContextMenu) {
-            return true;
-        }
-        return QObject::eventFilter(obj, ev);
-    }
 };
 
 }
@@ -164,8 +165,8 @@ QWidget *UIHelper::page(const QString &title, const QString &subtitle, QWidget *
     return w;
 }
 
-QFrame *UIHelper::panel() {
-    auto *f = new QFrame;
+QFrame *UIHelper::panel(QWidget *parent) {
+    auto *f = new QFrame(parent);
     f->setObjectName("panel");
     auto *shadow = new QGraphicsDropShadowEffect(f);
     shadow->setBlurRadius(18);
@@ -175,15 +176,15 @@ QFrame *UIHelper::panel() {
     return f;
 }
 
-QPushButton *UIHelper::button(const QString &text, const QString &kind) {
-    auto *b = new QPushButton(text);
+QPushButton *UIHelper::button(const QString &text, const QString &kind, QWidget *parent) {
+    auto *b = new QPushButton(text, parent);
     b->setObjectName(kind);
     b->setCursor(Qt::PointingHandCursor);
     return b;
 }
 
-QTableWidget *UIHelper::table(const QStringList &headers) {
-    auto *t = new QTableWidget;
+QTableWidget *UIHelper::table(const QStringList &headers, QWidget *parent) {
+    auto *t = new QTableWidget(parent);
     t->setColumnCount(headers.size());
     t->setHorizontalHeaderLabels(headers);
     t->verticalHeader()->setVisible(false);
@@ -312,49 +313,36 @@ void UIHelper::cell(QTableWidget *t, int row, int column, const QString &text, Q
 }
 
 QString UIHelper::formatRoom(const QString &rawRoom) {
-    QString r = rawRoom.trimmed();
-    if (r.isEmpty()) {
-        return "";
-    }
-    if (r.startsWith("Room_", Qt::CaseInsensitive)) {
-        return "Room " + r.mid(5).trimmed();
-    }
-    if (r.startsWith("Room ", Qt::CaseInsensitive)) {
-        return r;
-    }
-    if (r.startsWith("Room", Qt::CaseInsensitive)) {
-        return "Room " + r.mid(4).trimmed();
-    }
-    if (r.startsWith("R_", Qt::CaseInsensitive)) {
-        return "Room " + r.mid(2).trimmed();
-    }
-    if (r.startsWith("R", Qt::CaseInsensitive) && r.length() > 1 && r[1].isDigit()) {
-        return "Room " + r.mid(1).trimmed();
-    }
-    return "Room " + r;
+    return qs(libPBL2::formatRoomDisplay(ss(rawRoom)));
 }
 
 QPixmap UIHelper::createAvatar(const QString &fullName, int size, const QColor &bgColor, const QColor &textColor) {
-    QPixmap pix(size, size);
+    if (size <= 0) return QPixmap();
+    constexpr int dpr = 2;
+    QPixmap pix(size * dpr, size * dpr);
     pix.fill(Qt::transparent);
-    QPainter p(&pix);
-    p.setRenderHint(QPainter::Antialiasing);
+    {
+        QPainter p(&pix);
+        p.setRenderHint(QPainter::Antialiasing);
+        p.scale(dpr, dpr);
 
-    p.setBrush(QBrush(bgColor));
-    p.setPen(Qt::NoPen);
-    p.drawEllipse(0, 0, size, size);
+        p.setBrush(QBrush(bgColor));
+        p.setPen(Qt::NoPen);
+        p.drawEllipse(0, 0, size, size);
 
-    QString initial = "U";
-    QStringList parts = fullName.trimmed().split(' ', Qt::SkipEmptyParts);
-    if (!parts.isEmpty()) {
-        initial = parts.last().left(1).toUpper();
+        QString initial = "U";
+        QStringList parts = fullName.trimmed().split(' ', Qt::SkipEmptyParts);
+        if (!parts.isEmpty()) {
+            initial = parts.last().left(1).toUpper();
+        }
+        p.setPen(textColor);
+        QFont f("Be Vietnam Pro");
+        f.setPixelSize(qMax(10, static_cast<int>(size / 2.2)));
+        f.setBold(true);
+        p.setFont(f);
+        p.drawText(QRect(0, 0, size, size), Qt::AlignCenter, initial);
     }
-    p.setPen(textColor);
-    QFont f("Be Vietnam Pro");
-    f.setPixelSize(qMax(10, static_cast<int>(size / 2.2)));
-    f.setBold(true);
-    p.setFont(f);
-    p.drawText(QRect(0, 0, size, size), Qt::AlignCenter, initial);
+    pix.setDevicePixelRatio(dpr);
     return pix;
 }
 
@@ -437,18 +425,18 @@ QIcon UIHelper::trashIcon(const QColor &color) {
 
     QIcon icon;
     icon.addPixmap(drawTrash(color), QIcon::Normal);
-    icon.addPixmap(drawTrash(QColor("#b91c1c")), QIcon::Active);
+    icon.addPixmap(drawTrash(color.darker(120)), QIcon::Active);
     return icon;
 }
 
-QPair<QWidget*, QPushButton*> UIHelper::createActionCell(const QIcon &icon, const QString &tooltip) {
-    auto *widget = new QWidget;
+QPair<QWidget*, QPushButton*> UIHelper::createActionCell(const QIcon &icon, const QString &tooltip, QWidget *parent) {
+    auto *widget = new QWidget(parent);
     widget->setCursor(Qt::ArrowCursor);
     auto *layout = new QHBoxLayout(widget);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setAlignment(Qt::AlignCenter);
 
-    auto *btn = new QPushButton;
+    auto *btn = new QPushButton(widget);
     btn->setIcon(icon);
     btn->setIconSize(QSize(16, 16));
     btn->setCursor(Qt::PointingHandCursor);
@@ -565,7 +553,7 @@ QString UIHelper::dialogFormStyle() {
             image: url(:/assets/textures/arrow_down_white.png);
         }
         QComboBox {
-            padding-right: 4px;
+            padding-right: 28px;
         }
         QComboBox:disabled {
             padding-right: 12px;
@@ -633,51 +621,13 @@ QString UIHelper::dialogFormStyle() {
             width: 0px;
             height: 0px;
         }
-        QMessageBox {
-            background-color: #ffffff;
-            border: 1px solid #cbd5e1;
-            border-radius: 12px;
-        }
-        QMessageBox QLabel {
-            color: #0f172a;
-            font-size: 13.5px;
-            background: transparent;
-        }
-        QMessageBox QPushButton {
-            background-color: #f1f5f9;
-            color: #334155;
-            border: 1.5px solid #cbd5e1;
-            border-radius: 8px;
-            padding: 8px 18px;
-            font-size: 13px;
-            font-weight: 600;
-            min-width: 80px;
-            min-height: 22px;
-        }
-        QMessageBox QPushButton:hover {
-            background-color: #e2e8f0;
-            color: #0f172a;
-            border-color: #94a3b8;
-        }
-        QMessageBox QPushButton:pressed {
-            background-color: #cbd5e1;
-        }
-        QMessageBox QPushButton:default {
-            background-color: #0d9488;
-            color: #ffffff;
-            border: none;
-            font-weight: 700;
-        }
-        QMessageBox QPushButton:default:hover {
-            background-color: #0f766e;
-        }
     )");
 }
 
 void UIHelper::applyCalendarStyle(QCalendarWidget *cal) {
     if (!cal) return;
-    cal->setLocale(QLocale(QLocale::English, QLocale::UnitedStates));
-    cal->setFirstDayOfWeek(Qt::Sunday);
+    cal->setLocale(QLocale(QLocale::Vietnamese, QLocale::Vietnam));
+    cal->setFirstDayOfWeek(Qt::Monday);
     cal->setHorizontalHeaderFormat(QCalendarWidget::ShortDayNames);
     cal->setVerticalHeaderFormat(QCalendarWidget::NoVerticalHeader);
 
@@ -712,7 +662,6 @@ void UIHelper::applyCalendarStyle(QCalendarWidget *cal) {
         monthBtn->setCursor(Qt::ArrowCursor);
         monthBtn->setFocusPolicy(Qt::NoFocus);
         monthBtn->setAttribute(Qt::WA_TransparentForMouseEvents, true);
-        monthBtn->installEventFilter(new CalendarNoTriggerFilter(monthBtn));
     }
     if (auto *monthMenu = cal->findChild<QMenu*>("qt_calendar_monthmenu")) {
         monthMenu->clear();
@@ -724,7 +673,6 @@ void UIHelper::applyCalendarStyle(QCalendarWidget *cal) {
         yearBtn->setCursor(Qt::ArrowCursor);
         yearBtn->setFocusPolicy(Qt::NoFocus);
         yearBtn->setAttribute(Qt::WA_TransparentForMouseEvents, true);
-        yearBtn->installEventFilter(new CalendarNoTriggerFilter(yearBtn));
     }
     if (auto *yearEdit = cal->findChild<QSpinBox*>("qt_calendar_yearedit")) {
         yearEdit->hide();
@@ -880,28 +828,23 @@ void setupDigitsInput(QLineEdit *lineEdit, int maxLen) {
     lineEdit->installEventFilter(new DigitsOnlyFilter(maxLen, lineEdit));
 
     QObject::connect(lineEdit, &QLineEdit::textChanged, lineEdit, [lineEdit, maxLen](const QString &text) {
+        int rawPos = lineEdit->cursorPosition();
         QString digits;
-        for (const QChar &ch : text) {
-            if (ch.isDigit()) {
-                digits.append(ch);
-                if (digits.length() == maxLen) break;
+        int newPos = 0;
+        for (int i = 0; i < text.length(); ++i) {
+            if (isAsciiDigitQChar(text[i])) {
+                if (digits.length() < maxLen) {
+                    digits.append(text[i]);
+                    if (i < rawPos) newPos++;
+                }
             }
         }
         if (digits != text) {
-            int pos = lineEdit->cursorPosition();
+            QSignalBlocker blocker(lineEdit);
             lineEdit->setText(digits);
-            lineEdit->setCursorPosition(qMin(pos, digits.length()));
+            lineEdit->setCursorPosition(qMin(newPos, digits.length()));
         }
     });
-}
-
-bool isValidDigitsStartingWithZero(const QString &value, int expectedLen) {
-    QString s = value.trimmed();
-    if (s.length() != expectedLen || !s.startsWith('0')) return false;
-    for (const QChar &c : s) {
-        if (!c.isDigit()) return false;
-    }
-    return true;
 }
 
 void showStandardMessageBox(QMessageBox::Icon icon, QWidget *parent, const QString &title, const QString &message) {
@@ -931,8 +874,6 @@ void showStandardMessageBox(QMessageBox::Icon icon, QWidget *parent, const QStri
         }
     )");
     box.setWindowModality(Qt::ApplicationModal);
-    box.raise();
-    box.activateWindow();
     box.exec();
 }
 
@@ -947,11 +888,11 @@ void UIHelper::setupCccdInput(QLineEdit *lineEdit) {
 }
 
 bool UIHelper::isValidPhone(const QString &phone) {
-    return isValidDigitsStartingWithZero(phone, 10);
+    return libPBL2::isValidPhone(ss(phone));
 }
 
 bool UIHelper::isValidCccd(const QString &cccd) {
-    return isValidDigitsStartingWithZero(cccd, 12);
+    return libPBL2::isValidCccd(ss(cccd));
 }
 
 bool UIHelper::confirmDelete(QWidget *parent, const QString &title, const QString &message,
@@ -961,8 +902,8 @@ bool UIHelper::confirmDelete(QWidget *parent, const QString &title, const QStrin
     QPushButton *cancelBtn = box.addButton(cancelText, QMessageBox::RejectRole);
     box.setDefaultButton(cancelBtn);
 
-    confirmBtn->setObjectName("confirmBtnNeutral");
-    cancelBtn->setObjectName("cancelBtnRed");
+    confirmBtn->setObjectName("confirmBtnRed");
+    cancelBtn->setObjectName("cancelBtnNeutral");
 
     box.setStyleSheet(R"(
         QMessageBox {
@@ -981,27 +922,25 @@ bool UIHelper::confirmDelete(QWidget *parent, const QString &title, const QStrin
             min-width: 80px;
             min-height: 24px;
         }
-        QPushButton#cancelBtnRed {
+        QPushButton#confirmBtnRed {
             background-color: #dc2626;
             color: #ffffff;
             border: none;
         }
-        QPushButton#cancelBtnRed:hover {
+        QPushButton#confirmBtnRed:hover {
             background-color: #b91c1c;
         }
-        QPushButton#confirmBtnNeutral {
+        QPushButton#cancelBtnNeutral {
             background-color: #f1f5f9;
             color: #475569;
             border: 1px solid #cbd5e1;
         }
-        QPushButton#confirmBtnNeutral:hover {
+        QPushButton#cancelBtnNeutral:hover {
             background-color: #e2e8f0;
             color: #1e293b;
         }
     )");
     box.setWindowModality(Qt::ApplicationModal);
-    box.raise();
-    box.activateWindow();
     box.exec();
     return box.clickedButton() == confirmBtn;
 }
@@ -1049,8 +988,6 @@ bool UIHelper::confirmWarning(QWidget *parent, const QString &title, const QStri
         }
     )");
     box.setWindowModality(Qt::ApplicationModal);
-    box.raise();
-    box.activateWindow();
     box.exec();
     return box.clickedButton() == confirmBtn;
 }
