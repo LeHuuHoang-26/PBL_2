@@ -5,7 +5,7 @@
 #include <new>
 
 template <class T>
-LinkList<T>::LinkList() : header(nullptr), footer(nullptr), count(0) {
+LinkList<T>::LinkList() : header(nullptr), footer(nullptr), cursor(nullptr), count(0) {
     try {
         header = new Node;
         footer = new Node;
@@ -29,7 +29,7 @@ LinkList<T>::LinkList() : header(nullptr), footer(nullptr), count(0) {
 }
 
 template <class T>
-LinkList<T>::LinkList(const LinkList &L) : header(nullptr), footer(nullptr), count(0) {
+LinkList<T>::LinkList(const LinkList &L) : header(nullptr), footer(nullptr), cursor(nullptr), count(0) {
     try {
         header = new Node;
         footer = new Node;
@@ -65,6 +65,7 @@ LinkList<T>::~LinkList() {
     }
     header = nullptr;
     footer = nullptr;
+    cursor = nullptr;
     count = 0;
 }
 
@@ -76,6 +77,20 @@ typename LinkList<T>::Node *LinkList<T>::getHeader() const {
 template <class T>
 typename LinkList<T>::Node *LinkList<T>::getFooter() const {
     return footer;
+}
+
+template <class T>
+typename LinkList<T>::Node *LinkList<T>::getCursor() const {
+    return cursor;
+}
+
+template <class T>
+void LinkList<T>::setCursor(Node *N) const {
+    if (N && N != header && N != footer) {
+        cursor = N;
+    } else {
+        cursor = nullptr;
+    }
 }
 
 template <class T>
@@ -110,6 +125,16 @@ template <class T>
 bool LinkList<T>::remove(Node *N) {
     if (!N || N == header || N == footer) {
         return false;
+    }
+
+    if (cursor == N) {
+        if (N->prev && N->prev != header) {
+            cursor = N->prev;
+        } else if (N->next && N->next != footer) {
+            cursor = N->next;
+        } else {
+            cursor = nullptr;
+        }
     }
 
     if (N->next) {

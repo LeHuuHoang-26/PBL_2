@@ -31,13 +31,7 @@ static const QList<QPair<QString, QString>> &getSpecializationListRef(const std:
 }
 
 Doctor *DoctorController::findById(LinkList<Doctor> *doctors, const std::string &id) {
-    if (id.empty() || !doctors || !doctors->getHeader()) return nullptr;
-    auto *node = doctors->getHeader()->next;
-    while (node && node->next) {
-        if (!node->info.isDefault() && node->info.getID() == id) return &node->info;
-        node = node->next;
-    }
-    return nullptr;
+    return libPBL2::findByIdWithCursor(doctors, id, [](const Doctor &d) { return d.getID(); });
 }
 
 void DoctorController::sortDoctors(LinkList<Doctor> &list, DoctorSortBy criteria, bool ascending, const std::string &specPath) {

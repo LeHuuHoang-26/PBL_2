@@ -298,13 +298,7 @@ bool findReplacementDoctorAndSlot(
 }
 
 Appointment *AppointmentController::findById(LinkList<Appointment> *appointments, const std::string &id) {
-    if (id.empty() || !appointments || !appointments->getHeader()) return nullptr;
-    auto *n = appointments->getHeader()->next;
-    while (n && n->next) {
-        if (!n->info.isDefault() && n->info.getId() == id) return &n->info;
-        n = n->next;
-    }
-    return nullptr;
+    return libPBL2::findByIdWithCursor(appointments, id, [](const Appointment &a) { return a.getId(); });
 }
 
 void AppointmentController::sortAppointmentsById(LinkList<Appointment> &list, bool ascending) {
@@ -572,15 +566,13 @@ bool AppointmentController::isPatientSlotBooked(
             }
             if (libPBL2::compareDates(an->info.getDateGet(), targetTime) == 0) {
                 std::string spId = an->info.getSymptomPatientId();
-                auto *spn = symptomPatients->getHeader()->next;
-                while (spn && spn->next) {
-                    if (spn->info.getSP_id() == spId) {
-                        if (spn->info.getP_id() == patientId) {
-                            return true;
-                        }
-                        break;
-                    }
-                    spn = spn->next;
+                SymptomPatient *sp = libPBL2::findByIdWithCursor(
+                    const_cast<LinkList<SymptomPatient>*>(symptomPatients),
+                    spId,
+                    [](const SymptomPatient &item) { return item.getSP_id(); }
+                );
+                if (sp && sp->getP_id() == patientId) {
+                    return true;
                 }
             }
         }
@@ -898,14 +890,14 @@ int AppointmentController::reassignAppointmentsForDoctor(
         std::string patientId;
         std::string spSpec = oldDocSpec;
         if (symptomPatients->getHeader()) {
-            auto *spn = symptomPatients->getHeader()->next;
-            while (spn && spn->next) {
-                if (spn->info.getSP_id() == oldSpId) {
-                    patientId = spn->info.getP_id();
-                    if (spSpec.empty()) spSpec = spn->info.getSp_id();
-                    break;
-                }
-                spn = spn->next;
+            SymptomPatient *sp = libPBL2::findByIdWithCursor(
+                symptomPatients,
+                oldSpId,
+                [](const SymptomPatient &item) { return item.getSP_id(); }
+            );
+            if (sp) {
+                patientId = sp->getP_id();
+                if (spSpec.empty()) spSpec = sp->getSp_id();
             }
         }
         if (patientId.empty()) {
@@ -1021,14 +1013,14 @@ int AppointmentController::rescheduleAppointmentsLinear(
         std::string patientId = "";
         std::string spSpec = "";
         if (symptomPatients && symptomPatients->getHeader()) {
-            auto *spn = symptomPatients->getHeader()->next;
-            while (spn && spn->next) {
-                if (spn->info.getSP_id() == oldSpId) {
-                    patientId = spn->info.getP_id();
-                    spSpec = spn->info.getSp_id();
-                    break;
-                }
-                spn = spn->next;
+            SymptomPatient *sp = libPBL2::findByIdWithCursor(
+                symptomPatients,
+                oldSpId,
+                [](const SymptomPatient &item) { return item.getSP_id(); }
+            );
+            if (sp) {
+                patientId = sp->getP_id();
+                spSpec = sp->getSp_id();
             }
         }
 

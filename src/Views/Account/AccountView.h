@@ -35,7 +35,7 @@ private:
     int currentPage = 0;
     int sortColumn = -1;
     bool sortAscending = true;
-    static const int PAGE_SIZE = 8;
+    static const int PAGE_SIZE = 20;
 
     void setupUI();
     bool addManagerDialog();

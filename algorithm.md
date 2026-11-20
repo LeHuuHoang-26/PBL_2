@@ -3,7 +3,7 @@
 > **Dự án:** Hệ thống Quản lý Phòng Khám Đa Khoa An Tâm (**MngCareBook**)  
 > **Học phần:** Đồ án Cơ sở Ngành Công nghệ Thông tin (PBL 2)  
 > **Ngôn ngữ:** C++20 / C++23 (`-std=gnu++2b`) | **Framework Giao diện:** Qt 6 (`Qt6Core`, `Qt6Gui`, `Qt6Widgets`)  
-> **Nguyên tắc cốt lõi:** Tuân thủ nghiêm ngặt quy tắc **Zero Forbidden STL** (tự xây dựng danh sách liên kết đôi có nút canh giữ `LinkList<T>` và khung thuật toán sắp xếp `libPBL2::qsort`), kết hợp hệ thống **Ngoại lệ An toàn (`AppException`)** và **Lưu trữ Nguyên tử (`safeAtomicCommit`)**.
+> **Nguyên tắc cốt lõi:** Tuân thủ nghiêm ngặt quy tắc **Zero Forbidden STL** (tự xây dựng danh sách liên kết đôi có nút canh giữ `LinkList<T>` tích hợp con trỏ gợi ý vị trí `cursor`, thuật toán tìm kiếm hai chiều `libPBL2::findByIdWithCursor` và khung thuật toán sắp xếp `libPBL2::qsort`), kết hợp hệ thống **Ngoại lệ An toàn (`AppException`)** và **Lưu trữ Nguyên tử (`safeAtomicCommit`)**.
 
 ---
 
@@ -18,9 +18,10 @@
    - [2.1. Sơ đồ Lớp Hướng Đối Tượng Toàn Hệ Thống (UML Class Diagram)](#21-sơ-đồ-lớp-hướng-đối-tượng-toàn-hệ-thống-uml-class-diagram)
    - [2.2. Sơ đồ Thực thể Liên kết Dữ liệu (Entity-Relationship Diagram - ERD)](#22-sơ-đồ-thực-thể-liên-kết-dữ-liệu-entity-relationship-diagram---erd)
    - [2.3. Sơ đồ Tương tác MVC giữa các Đối tượng (Object Interaction Diagram)](#23-sơ-đồ-tương-tác-mvc-giữa-các-đối-tượng-object-interaction-diagram)
-3. [Cấu Trúc Dữ Liệu Cốt Lõi: Danh Sách Liên Kết Đôi `LinkList<T>`](#3-cấu-trúc-dữ-liệu-cốt-lõi-danh-sách-liên-kết-đôi-linklistt)
-   - [3.1. Kiến trúc Nút Canh Giữ (`header` & `footer` Sentinels)](#31-kiến-trúc-nút-canh-giữ-header--footer-sentinels)
-   - [3.2. Đặc tả Thuật toán Chèn, Xóa, Sao chép sâu & Quản lý Bộ nhớ](#32-đặc-tả-thuật-toán-chèn-xóa-sao-chép-sâu--quản-lý-bộ-nhớ)
+3. [Cấu Trúc Dữ Liệu Cốt Lõi: Danh Sách Liên Kết Đôi `LinkList<T>` & Tìm Kiếm Hai Chiều `findByIdWithCursor`](#3-cấu-trúc-dữ-liệu-cốt-lõi-danh-sách-liên-kết-đôi-linklistt--tìm-kiếm-hai-chiều-findbyidwithcursor)
+   - [3.1. Kiến trúc Nút Canh Giữ (`header` & `footer` Sentinels) và Con trỏ Gợi ý (`cursor`)](#31-kiến-trúc-nút-canh-giữ-header--footer-sentinels-và-con-trỏ-gợi-ý-cursor)
+   - [3.2. Đặc tả Thuật toán Chèn, Xóa tự bảo vệ `cursor`, Sao chép sâu & Quản lý Bộ nhớ](#32-đặc-tả-thuật-toán-chèn-xóa-tự-bảo-vệ-cursor-sao-chép-sâu--quản-lý-bộ-nhớ)
+   - [3.3. Thuật toán Tìm kiếm Hai chiều Có Nhớ Vị trí (`libPBL2::findByIdWithCursor`)](#33-thuật-toán-tìm-kiếm-hai-chiều-có-nhớ-vị-trí-libpbl2findbyidwithcursor)
 4. [Khung Thuật Toán Sắp Xếp Đa Năng `libPBL2::qsort`](#4-khung-thuật-toán-sắp-xếp-đa-năng-libpbl2qsort)
    - [4.1. Thuật toán MergeSort Tái Nối Con Trỏ Trên `LinkList<T>`](#41-thuật-toán-mergesort-tái-nối-con-trỏ-trên-linklistt)
    - [4.2. Thuật toán QuickSort Trên Mảng Thô & Danh sách Truy cập Ngẫu nhiên](#42-thuật-toán-quicksort-trên-mảng-thô--danh-sách-truy-cập-ngẫu-nhiên)
@@ -35,7 +36,7 @@
    - [5.6. Thuật toán Xóa Tầng Toàn Vẹn Dữ Liệu (Cascade Deletion & Atomic Rollback)](#56-thuật-toán-xóa-tầng-toàn-vẹn-dữ-liệu-cascade-deletion--atomic-rollback)
    - [5.7. Thuật toán Thống kê Chỉ số Y tế & Chuỗi Thời gian Doanh thu ($O(N \log D)$)](#57-thuật-toán-thống-kê-chỉ-số-y-tế--chuỗi-thời-gian-doanh-thu-on-log-d)
    - [5.8. Thuật toán Gia hạn Quyền Quản trị Tạm thời Bảo toàn Mốc Giờ:Phút (`Per_1`)](#58-thuật-toán-gia-hạn-quyền-quản-trị-tạm-thời-bảo-toàn-mốc-giờphút-per_1)
-   - [5.9. Thuật toán Bộ nhớ đệm Phân trang (`cachedFiltered`) & Lưu File Nguyên tử (`safeAtomicCommit`)](#59-thuật-toán-bộ-nhớ-đệm-phân-trang-cachedfiltered--lưu-file-nguyên-tử-safeatomiccommit)
+   - [5.9. Thuật toán Tìm kiếm Debounce (`QTimer`), Bộ nhớ đệm Phân trang (`cachedFiltered`) & Lưu File Nguyên tử (`safeAtomicCommit`)](#59-thuật-toán-tìm-kiếm-debounce-qtimer-bộ-nhớ-đệm-phân-trang-cachedfiltered--lưu-file-nguyên-tử-safeatomiccommit)
 6. [Bảng Ma Trận Độ Phức Tạp Thuật Toán Toàn Hệ Thống](#6-bảng-ma-trận-độ-phức-tạp-thuật-toán-toàn-hệ-thống)
 
 ---
@@ -48,31 +49,31 @@ Toàn bộ mã nguồn được chia thành **4 tầng đối tượng** độc 
 
 | Tên Lớp / Namespace | Tệp Mã Nguồn | Thuộc Tính Chính | Phương Thức & Trách Nhiệm Cốt Lõi |
 | :--- | :--- | :--- | :--- |
-| **`LinkList<T>`** | [LinkList.h](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/DataStructures/LinkList.h)<br>[LinkList.cpp](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/DataStructures/LinkList.cpp) | `Node *header`<br>`Node *footer`<br>`int count` | Danh sách liên kết đôi mẫu có 2 nút canh giữ (`header`, `footer`). Cung cấp `insert(T)`, `remove(Node*)`, `clear()`, Copy Constructor, `operator=`, `getCount()`. |
-| **`LinkList<T>::Node`** | [LinkList.h](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/DataStructures/LinkList.h) | `T info`<br>`Node *prev`<br>`Node *next` | Đơn vị nút lưu trữ đối tượng thực thể `T` cùng 2 liên kết hai chiều `prev` và `next`. |
-| **`Date`** | [Date.h](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Utils/Date.h)<br>[Date.cpp](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Utils/Date.cpp) | `int day, month, year`<br>`int hour, minute` | Quản lý thời gian đến từng phút (`yyyy-MM-dd HH:mm`), kiểm định năm nhuận Gregorian, nạp/xuất chuỗi (`loadFromString`, `toString`) và các toán tử `<, >, ==, <=, >=`. |
-| **`libPBL2`** | [libPBL2.h](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Utils/libPBL2.h)<br>[libPBL2.cpp](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Utils/libPBL2.cpp) | `QCollator *ptr` (static cache) | Thư viện giải thuật lõi: `qsort` (MergeSort trên `LinkList<T>` & QuickSort trên mảng/container), `compareNatural`, `compareVietnameseNames`, `compareVietnameseStrings`, `compareDates`, `generateNextId`, `safeAtomicCommit`, `canonicalRoomKey`. |
-| **`AppException`** & các lớp con | [AppExceptions.h](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Utils/AppExceptions.h)<br>[AppExceptions.cpp](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Utils/AppExceptions.cpp) | `ErrorCode code`<br>`std::string message`<br>`std::string filePath`<br>`int lineNumber` | Cây phân cấp ngoại lệ kế thừa `std::runtime_error`:<br>• `FileIOException` (lỗi đọc/ghi tệp)<br>• `DataFormatException` (lỗi sai định dạng dòng dữ liệu)<br>• `ValidationException` (lỗi vi phạm quy tắc nghiệp vụ)<br>• `MemoryAllocationException` (lỗi cấp phát Heap). |
-| **`AppConstants`** | [AppConstants.h](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Utils/AppConstants.h) | `APPOINTMENT_GRACE_MINUTES = 20`<br>`APPOINTMENT_SLOT_MINUTES = 45`<br>`Paths::*` | Tập trung toàn bộ hằng số thời gian ân hạn (20 phút), độ dài ca khám (45 phút), giới hạn năm lịch (`2000..2099`) và đường dẫn tệp dữ liệu. |
+| **`LinkList<T>`** | `src/DataStructures/LinkList.h`<br>`src/DataStructures/LinkList.cpp` | `Node *header`<br>`Node *footer`<br>`mutable Node *cursor`<br>`int count` | Danh sách liên kết đôi mẫu có 2 nút canh giữ (`header`, `footer`) và con trỏ nhớ vị trí `cursor`. Cung cấp `insert(T)`, `remove(Node*)` (tự động dịch `cursor` an toàn khi xóa), Copy Constructor, `getHeader()`, `getFooter()`, `getCursor()`, `setCursor(Node*)`, `getCount()`. |
+| **`LinkList<T>::Node`** | `src/DataStructures/LinkList.h` | `T info`<br>`Node *next`<br>`Node *prev` | Đơn vị nút lưu trữ đối tượng thực thể `T` cùng 2 liên kết hai chiều `prev` và `next`. |
+| **`Date`** | `src/Utils/Date.h`<br>`src/Utils/Date.cpp` | `int day, month, year`<br>`int hour, minute` | Quản lý thời gian đến từng phút (`yyyy-MM-dd HH:mm`), kiểm định lịch Gregorian năm nhuận (`isValidCalendarDateTime`), nạp/xuất chuỗi (`loadFromString`, `toString`) và lấy thời gian thực `Date::now()`. |
+| **`libPBL2`** | `src/Utils/libPBL2.h`<br>`src/Utils/libPBL2.cpp` | `QCollator *ptr` (static cache) | Thư viện giải thuật lõi: `findByIdWithCursor` (tìm kiếm 2 chiều từ `cursor`), `qsort` (MergeSort trên `LinkList<T>` & QuickSort trên mảng/container), `compareNatural`, `compareVietnameseNames`, `compareVietnameseStrings`, `compareDates`, `generateNextId`, `safeAtomicCommit`, `extractRoomCode`, `canonicalRoomKey`, `formatRoomDisplay`, `storageRoomId`. |
+| **`AppException`** & các lớp con | `src/Utils/AppExceptions.h`<br>`src/Utils/AppExceptions.cpp` | `std::string message` | Cây phân cấp ngoại lệ kế thừa `std::exception`:<br>• `FileIOException` (lỗi đọc/ghi tệp)<br>• `DataFormatException` (lỗi sai định dạng dòng dữ liệu kèm số dòng)<br>• `ValidationException` (lỗi vi phạm quy tắc nghiệp vụ)<br>• `MemoryAllocationException` (lỗi cấp phát Heap). |
+| **`AppConstants`** | `src/Utils/AppConstants.h` | `APPOINTMENT_GRACE_MINUTES = 20`<br>`APPOINTMENT_SLOT_MINUTES = 45`<br>`Paths::*` | Tập trung toàn bộ hằng số thời gian ân hạn (20 phút), độ dài ca khám (45 phút), giới hạn năm lịch (`2000..2099`) và đường dẫn tệp dữ liệu chuẩn. |
 
 ---
 
 ### 1.2. Tầng Mô hình Thực thể Y tế (`Models`)
 
-Nhóm đối tượng nhân sự & con người kế thừa từ lớp cơ sở trừu tượng **`Human`**:
+Nhóm đối tượng nhân sự & con người kế thừa từ lớp cơ sở **`Human`**:
 
 | Tên Lớp Đối Tượng | Kế Thừa | Thuộc Tính Riêng | Vai Trò & Tệp Dữ Liệu Ánh Xạ |
 | :--- | :---: | :--- | :--- |
-| **`Human`** | *(Lớp cơ sở)* | `std::string id`<br>`std::string fullName`<br>`std::string phone`<br>`bool gender`<br>`int age` | Lớp cha định nghĩa các thuộc tính nhân khẩu học chung và phương thức ảo `toString()`, `isDefault()`, `setDefault()`. |
-| **`Doctor`** | `: public Human` | `std::string spId`<br>`int state` (`1`, `0`, `-1`)<br>`std::string roomId`<br>`double fee`<br>`double rating` | Thực thể Bác sĩ ([Data/Doctor/Doctor.txt](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/Data/Doctor/Doctor.txt)). Quản lý chuyên khoa `Sp_ID`, phòng khám `Room_ID`, phí khám, điểm đánh giá và trạng thái công tác (`1`: Đang làm việc, `0`: Tạm nghỉ, `-1`: Đã xóa/nghỉ hẳn). |
-| **`Patient`** | `: public Human` | `std::string CCCD`<br>`int state` (`1`, `-1`) | Thực thể Bệnh nhân ([Data/Patient.txt](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/Data/Patient.txt)). Quản lý số CCCD 12 chữ số và trạng thái hồ sơ (`1`: Hoạt động, `-1`: Đã xóa mềm). |
-| **`Manager`** | `: public Human` | `std::string username`<br>`std::string password`<br>`ManagerRole role`<br>`int state` (`1`, `0`, `-1`) | Thực thể Nhân viên quản lý ([Data/Manager.txt](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/Data/Manager.txt)). Hỗ trợ 3 vai trò `ManagerRole`: `Receptionist (1)`, `SpecialReceptionist (2)`, `Administrator (3)`. |
-| **`Appointment`** | *(Độc lập)* | `std::string id` (`A_XXX`)<br>`std::string symptomPatientId` (`SP_XXX`)<br>`std::string doctorId` (`D_XXX`)<br>`Date dateGet`<br>`int state` (`0`, `1`, `-1`, `-2`)<br>`double paidFee` | Thực thể Ca hẹn khám ([Data/Appointment.txt](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/Data/Appointment.txt)). Chứa hàm `computeEffectiveState(...)` tự động suy diễn trạng thái `Chưa khám (0)`, `Đã khám (1)`, `Trễ hẹn (-1)`, `Đã dời lịch (-2)` và chốt phí thực thu `paidFee`. |
-| **`Symptom`** | *(Độc lập)* | `std::string S_id` (`S_XXX`)<br>`std::string S_Name`<br>`std::string Sp_id` (`Sp_XXX`)<br>`int S_Score` | Thực thể Triệu chứng lâm sàng ([Data/Symptom/Symptom.txt](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/Data/Symptom/Symptom.txt)). Lưu trọng số điểm `S_Score` gắn với chuyên khoa `Sp_id` phục vụ thuật toán gợi ý chuyên khoa. |
-| **`SymptomPatient`** | *(Độc lập)* | `std::string SP_id` (`SP_XXX`)<br>`std::string P_id` (`P_XXX`)<br>`std::string Sp_id` (`Sp_XXX`)<br>`Date date` | Thực thể Phiếu tiếp nhận triệu chứng của bệnh nhân ([Data/Symptom/SymptomPatient.txt](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/Data/Symptom/SymptomPatient.txt)), đóng vai trò thực thể trung gian nối `Patient` với `Appointment` và lưu thời điểm tạo phiếu hẹn. |
-| **`SymptomPatientDetail`** | *(Độc lập)* | `std::string SP_id` (`SP_XXX`)<br>`std::string S_id` (`S_XXX`) | Thực thể Chi tiết triệu chứng ([Data/Symptom/SymptomPatientDetail.txt](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/Data/Symptom/SymptomPatientDetail.txt)), biểu diễn quan hệ nhiều-nhiều ($N:N$) giữa phiếu `SymptomPatient` và danh mục `Symptom`. |
-| **`Permission`** | *(Độc lập)* | `std::string Per_id` (`Per_1..Per_5`)<br>`std::string Per_Name` | Thực thể Danh mục quyền hệ thống nạp từ [Config/Permission.txt](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/Config/Permission.txt). |
-| **`PermissionManager`** | *(Độc lập)* | `std::string MA_id` (`MA_XXX`)<br>`std::string Per_id` (`Per_X`)<br>`std::string expiresAt` (ISO-8601) | Thực thể Bản ghi cấp quyền cho nhân sự ([Data/PermissionManager.txt](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/Data/PermissionManager.txt)). Hỗ trợ cả quyền vĩnh viễn (`expiresAt == ""`) và quyền tạm thời có hạn (`isTemporary()`, `isExpiredAt()`). |
+| **`Human`** | *(Lớp cơ sở)* | `std::string id`<br>`std::string fullName`<br>`std::string phone`<br>`bool gender`<br>`int age` | Lớp cha định nghĩa các thuộc tính nhân khẩu học chung và giao diện ảo `toString()`, `isDefault()`, `setDefault()`. |
+| **`Doctor`** | `: public Human` | `std::string spId`<br>`int state` (`1`, `0`, `-1`)<br>`std::string roomId`<br>`double fee`<br>`double rating` | Thực thể Bác sĩ (`Data/Doctor/Doctor.txt`). Quản lý chuyên khoa `Sp_ID`, phòng khám `Room_ID`, phí khám, điểm đánh giá và trạng thái công tác (`1`: Đang làm việc, `0`: Tạm nghỉ, `-1`: Đã xóa/nghỉ hẳn). |
+| **`Patient`** | `: public Human` | `std::string CCCD`<br>`int state` (`1`, `-1`) | Thực thể Bệnh nhân (`Data/Patient.txt`). Quản lý số CCCD 12 chữ số và trạng thái hồ sơ (`1`: Hoạt động, `-1`: Đã xóa mềm). |
+| **`Manager`** | `: public Human` | `std::string username`<br>`std::string password`<br>`ManagerRole role`<br>`int state` (`1`, `0`) | Thực thể Nhân viên quản lý (`Data/Manager.txt`). Hỗ trợ 3 vai trò `ManagerRole`: `Receptionist (1)`, `SpecialReceptionist (2)`, `Administrator (3)`. |
+| **`Appointment`** | *(Độc lập)* | `std::string id` (`A_XXX`)<br>`std::string symptomPatientId` (`SP_XXX`)<br>`std::string doctorId` (`D_XXX`)<br>`Date dateGet`<br>`int state` (`0`, `1`, `-1`, `-2`)<br>`double paidFee` | Thực thể Ca hẹn khám (`Data/Appointment.txt`). Chứa hàm `computeEffectiveState(...)` và `computeEffectiveStateNow()` tự động suy diễn trạng thái `Chưa khám (0)`, `Đã khám (1)`, `Trễ hẹn (-1)`, `Đã dời lịch (-2)` và chốt phí thực thu `paidFee`. |
+| **`Symptom`** | *(Độc lập)* | `std::string S_id` (`S_XXX`)<br>`std::string sName`<br>`std::string Sp_id` (`Sp_XXX`)<br>`int sScore` | Thực thể Triệu chứng lâm sàng (`Data/Symptom/Symptom.txt`). Lưu trọng số điểm `sScore` gắn với chuyên khoa `Sp_id` phục vụ thuật toán gợi ý chuyên khoa. |
+| **`SymptomPatient`** | *(Độc lập)* | `std::string SP_id` (`SP_XXX`)<br>`std::string P_id` (`P_XXX`)<br>`std::string Sp_id` (`Sp_XXX`)<br>`Date date` | Thực thể Phiếu tiếp nhận triệu chứng của bệnh nhân (`Data/Symptom/SymptomPatient.txt`), đóng vai trò thực thể trung gian nối `Patient` với `Appointment` và lưu thời điểm tạo phiếu hẹn (`Ngày lên lịch hẹn`). |
+| **`SymptomPatientDetail`** | *(Độc lập)* | `std::string SP_id` (`SP_XXX`)<br>`std::string S_id` (`S_XXX`) | Thực thể Chi tiết triệu chứng (`Data/Symptom/SymptomPatientDetail.txt`), biểu diễn quan hệ nhiều-nhiều ($N:N$) giữa phiếu `SymptomPatient` và danh mục `Symptom`. |
+| **`Permission`** | *(Độc lập)* | `std::string Per_id` (`Per_1..Per_5`)<br>`std::string Per_Name`<br>`std::string description` | Thực thể Danh mục quyền hệ thống nạp từ `Config/Permission.txt`. |
+| **`PermissionManager`** | *(Độc lập)* | `std::string MA_id` (`MA_XXX`)<br>`std::string Per_id` (`Per_X`)<br>`std::string Expires_At` (ISO-8601) | Thực thể Bản ghi cấp quyền cho nhân sự (`Data/PermissionManager.txt`). Hỗ trợ cả quyền vĩnh viễn (`Expires_At == ""`) và quyền tạm thời có hạn (`isTemporary()`, `isExpired()`). |
 
 ---
 
@@ -80,32 +81,32 @@ Nhóm đối tượng nhân sự & con người kế thừa từ lớp cơ sở 
 
 Các lớp Controller được thiết kế dưới dạng các dịch vụ tĩnh không trạng thái (Stateless Static Controllers), thao tác trực tiếp trên các con trỏ `LinkList<T>*`:
 
-1. **`AuthController`** ([AuthController.h](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Controllers/AuthController.h)):
-   - `authenticate(username, password, managers, outErrorMessage)`: Kiểm tra thông tin đăng nhập, hỗ trợ tài khoản ẩn quản trị hệ thống (`1 / 1`) và chặn tài khoản bị khóa (`state == 0`).
-2. **`AppointmentController`** ([AppointmentController.h](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Controllers/AppointmentController.h)):
-   - Điều phối toàn bộ vòng đời lịch khám: `validateBooking`, `isSlotBooked`, `isPatientSlotBooked`, `rankSpecialtiesBySymptoms`, `syncExpiredAppointments`.
-   - Tính lịch âm thiên văn UTC+7 (`getLunarNewYear`, `getHungKingsDay`, `isTetHoliday`, `isHoliday`) và tự động dời lịch hàng loạt khi bác sĩ nghỉ (`rescheduleOrCancelFutureAppointmentsForDoctor`) hoặc khi thêm ngày nghỉ lễ (`rescheduleAppointmentsLinear`).
-3. **`DoctorController`** ([DoctorController.h](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Controllers/DoctorController.h)):
-   - Tìm kiếm `findById`, sắp xếp đa tiêu chí `sortDoctors` (ID, Tên, Chuyên khoa, Phòng, Phí khám, Rating, Trạng thái) và bộ đệm tra cứu tên chuyên khoa (`getSpecialty`, `getSpecializationList`).
-4. **`PatientController`** ([PatientController.h](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Controllers/PatientController.h)):
-   - Tìm kiếm `findById`, sắp xếp `sortPatients` (ID, Tên tiếng Việt, Tuổi, CCCD, Số điện thoại, Giới tính) và sinh mã tự động `generateNextId`.
-5. **`ManagerController`** ([ManagerController.h](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Controllers/ManagerController.h)):
-   - Quản lý ma trận phân quyền RBAC: `getEffectiveRole`, `isRootAdmin`, `isAdministrator`, `isTemporaryAdmin`, `hasPermission`, `cleanExpiredPermissions`, `grantPermission`, `revokeAllPermissions`, `permissionExpiry`.
-6. **`StatisticController`** ([StatisticController.h](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Controllers/StatisticController.h)):
+1. **`AuthController`** (`src/Controllers/AuthController.h`):
+   - `login(managers, username, password, errorMessage, loggedInManager)`: Kiểm tra thông tin đăng nhập, hỗ trợ tài khoản ẩn quản trị hệ thống (`1 / 1`) và chặn tài khoản bị khóa (`state == 0`).
+2. **`AppointmentController`** (`src/Controllers/AppointmentController.h`):
+   - Điều phối toàn bộ vòng đời lịch khám: `findById` (dùng `findByIdWithCursor`), `sortAppointmentsById`, `validateBooking`, `isSlotBooked`, `isPatientSlotBooked`, `rankSpecialtiesBySymptoms`, `syncExpiredAppointments`.
+   - Tính lịch âm thiên văn UTC+7 (`getLunarNewYear`, `getHungKingsDay`, `isTetHoliday`, `isHoliday`, `isHolidayInList`) và tự động dời lịch hàng loạt khi bác sĩ nghỉ (`reassignAppointmentsForDoctor`) hoặc khi thêm ngày nghỉ lễ (`rescheduleAppointmentsLinear`) kèm hoàn tác nguyên tử (`rollbackInsertedAppointments`).
+3. **`DoctorController`** (`src/Controllers/DoctorController.h`):
+   - Tìm kiếm `findById` (dùng `findByIdWithCursor`), sắp xếp đa tiêu chí `sortDoctors` (ID, Tên, Chuyên khoa, Phòng, Phí khám, Rating, Trạng thái), sinh mã `generateNextId` và bộ đệm tra cứu tên chuyên khoa (`getSpecialty`, `getSpecializationList`, `clearSpecialtyCache`).
+4. **`PatientController`** (`src/Controllers/PatientController.h`):
+   - Tìm kiếm `findById` (dùng `findByIdWithCursor`) và sắp xếp đa tiêu chí `sortPatients` (ID, Tên tiếng Việt, Tuổi, CCCD, Số điện thoại, Giới tính).
+5. **`ManagerController`** (`src/Controllers/ManagerController.h`):
+   - Quản lý ma trận phân quyền RBAC: `findById`, `sortManagers`, `getEffectiveRole`, `displayRoleName`, `isRootAdmin`, `isAdministrator`, `isTemporaryAdmin`, `getPrivilegeLevel`, `canViewAccount`, `canViewPassword`, `hasPermission`, `getGrantedPermissions`, `cleanExpiredPermissions`, `savePermissions`, `permissionExpiry`.
+6. **`StatisticController`** (`src/Controllers/StatisticController.h`):
    - Tổng hợp báo cáo y tế với bảng tra cứu nhị phân nội bộ (`DoctorLookupTable`, `SpPatientTable`, `PatientLookupTable`): `getOverviewMetrics`, `getPatientDemographics`, `getSpecialtyDemands`, `getTopDoctors`, `getTimeSeriesDaily`, `getTimeSeriesMonthlyRange`.
 
 ---
 
 ### 1.4. Tầng Giao diện Người dùng (`Views`)
 
-1. **`MainWindow`** ([MainWindow.h](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Views/MainWindow.h)): Đối tượng cửa sổ chính (Application Shell) sở hữu toàn bộ 8 con trỏ `LinkList<T>*` dữ liệu trong RAM, bộ đếm thời gian `clockTimer` (kiểm tra hết hạn quyền `Per_1` mỗi giây), thanh điều hướng Sidebar và `QStackedWidget *pages` chứa 7 phân hệ.
-2. **`Login`** ([Login.h](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Views/Login/Login.h)): Giao diện đăng nhập với hiệu ứng đổ bóng, nút ẩn/hiện mật khẩu (`createEyeIcon`) và kiểm tra lỗi trực quan.
-3. **`AppointmentView`** ([AppointmentView.h](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Views/Appointment/AppointmentView.h)): Quản lý 3 màn hình lớn (**Tổng quan Dashboard**, **Lịch khám theo ngày & Đặt lịch**, **Danh sách lịch hẹn**) cùng các hộp thoại **Đặt lịch mới** (`SideCalendarTimeWidget`), **Chi tiết/Xác nhận/Dời lịch khám**, **Quản lý ngày nghỉ lễ** và **Bảng tổng kết dời lịch tự động**.
-4. **`PatientView`** ([PatientView.h](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Views/Patient/PatientView.h)): Bảng quản lý bệnh nhân, hộp thoại thêm mới và hộp thoại chi tiết bệnh nhân tích hợp lịch sử khám bệnh & nút đặt lịch nhanh.
-5. **`DoctorView`** ([DoctorView.h](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Views/Doctor/DoctorView.h)): Bảng quản lý bác sĩ, hộp thoại thêm/sửa bác sĩ tích hợp lịch sử ca khám và tự động kích hoạt điều phối lịch hẹn khi chuyển trạng thái bác sĩ sang Tạm nghỉ / Xóa.
-6. **`StatisticView`** ([StatisticView.h](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Views/Statistic/StatisticView.h)): Dashboard phân tích gồm 2 Tab với bộ lọc kỳ thống kê (`PeriodSelectionDialog`, `DateSelectionDialog`) và 4 lớp biểu đồ tự vẽ bằng `QPainter` (`LinearStatusBar`, `PatientDonutChart`, `RevenueLineChart`, `StatusMultiLineChart`).
-7. **`AccountView`** ([AccountView.h](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Views/Account/AccountView.h)): Bảng quản lý tài khoản nhân sự và hộp thoại cấp quyền chi tiết (`Per_1..Per_5`) kèm bộ chọn số ngày hiệu lực cho quyền Quản trị viên tạm thời.
-8. **`UIHelper`** ([UIHelper.h](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Views/UIHelper.h)): Lớp tiện ích giao diện chuẩn hóa bảng, nút bấm, thẻ bo góc, bộ co giãn cột tự động (`TableColumnScaler`), kiểm định input SĐT/CCCD và hộp thoại xác nhận.
+1. **`MainWindow`** (`src/Views/MainWindow.h`): Đối tượng cửa sổ chính (Application Shell) sở hữu toàn bộ 8 con trỏ `LinkList<T>*` dữ liệu trong RAM, bộ đếm thời gian `clockTimer` (kiểm tra hết hạn quyền `Per_1` mỗi giây), thanh điều hướng Sidebar và `QStackedWidget *pages` chứa 7 phân hệ.
+2. **`Login`** (`src/Views/Login/Login.h`): Giao diện đăng nhập với hiệu ứng đổ bóng, nút ẩn/hiện mật khẩu và kiểm tra lỗi trực quan.
+3. **`AppointmentView`** (`src/Views/Appointment/AppointmentView.h`): Quản lý 3 màn hình lớn (**Tổng quan Dashboard**, **Lịch khám theo ngày & Đặt lịch**, **Danh sách lịch hẹn**) cùng các hộp thoại **Đặt lịch mới** (`SideCalendarTimeWidget`, `SearchablePatientComboBox`), **Chi tiết/Xác nhận/Dời lịch khám**, **Quản lý ngày nghỉ lễ** và **Bảng tổng kết dời lịch tự động**.
+4. **`PatientView`** (`src/Views/Patient/PatientView.h`): Bảng quản lý bệnh nhân, hộp thoại thêm mới và hộp thoại chi tiết bệnh nhân tích hợp lịch sử khám bệnh & nút đặt lịch nhanh.
+5. **`DoctorView`** (`src/Views/Doctor/DoctorView.h`): Bảng quản lý bác sĩ, hộp thoại thêm/sửa bác sĩ tích hợp lịch sử ca khám và tự động kích hoạt điều phối lịch hẹn khi chuyển trạng thái bác sĩ sang Tạm nghỉ / Xóa.
+6. **`StatisticView`** (`src/Views/Statistic/StatisticView.h`): Dashboard phân tích gồm 2 Tab với bộ lọc kỳ thống kê (`PeriodSelectionDialog`, `DateSelectionDialog`) và 4 lớp biểu đồ tự vẽ bằng `QPainter` (`LinearStatusBar`, `PatientDonutChart`, `RevenueLineChart`, `StatusMultiLineChart`).
+7. **`AccountView`** (`src/Views/Account/AccountView.h`): Bảng quản lý tài khoản nhân sự và hộp thoại cấp quyền chi tiết (`Per_1..Per_5`) kèm bộ chọn số ngày hiệu lực cho quyền Quản trị viên tạm thời.
+8. **`UIHelper`** (`src/Views/UIHelper.h`): Lớp tiện ích giao diện chuẩn hóa bảng, nút bấm, thẻ bo góc, bộ co giãn cột tự động (`setupTableScaling`), kiểm định input SĐT/CCCD và hộp thoại xác nhận.
 
 ---
 
@@ -122,13 +123,15 @@ classDiagram
     class LinkList~T~ {
         -Node* header
         -Node* footer
+        -Node* cursor
         -int count
-        +insert(T value)
-        +remove(Node* node)
-        +clear()
+        +insert(T info) bool
+        +remove(Node* N) bool
         +getCount() int
         +getHeader() Node*
         +getFooter() Node*
+        +getCursor() Node*
+        +setCursor(Node* N)
     }
 
     class Date {
@@ -140,6 +143,7 @@ classDiagram
         +isDefault() bool
         +toString() string
         +loadFromString(string)$ Date
+        +now()$ Date
     }
 
     class Human {
@@ -208,9 +212,9 @@ classDiagram
 
     class Symptom {
         -string S_id
-        -string S_Name
+        -string sName
         -string Sp_id
-        -int S_Score
+        -int sScore
         +loadFromFile(string)$ LinkList~Symptom~*
     }
 
@@ -233,15 +237,16 @@ classDiagram
     class Permission {
         -string Per_id
         -string Per_Name
+        -string description
         +getSystemCatalog()$ LinkList~Permission~*
     }
 
     class PermissionManager {
         -string MA_id
         -string Per_id
-        -string expiresAt
+        -string Expires_At
         +isTemporary() bool
-        +isExpiredAt(string) bool
+        +isExpired() bool
         +loadFromFile(string)$ LinkList~PermissionManager~*
         +saveToFile(string, LinkList~PermissionManager~*)$ bool
     }
@@ -305,7 +310,7 @@ erDiagram
     DOCTOR ||--o{ APPOINTMENT : "D_ID (1:N)"
 
     MANAGER {
-        string M_ID PK "Mã nhân viên (MA_001..)"
+        string M_ID PK "Mã nhân viên (MA_001..MA_035)"
         string FullName "Họ và tên"
         string Phone "SĐT 10 số"
         int Gender "1: Nam, 0: Nữ"
@@ -333,20 +338,20 @@ erDiagram
     }
 
     DOCTOR {
-        string D_ID PK "Mã bác sĩ (D_001..)"
+        string D_ID PK "Mã bác sĩ (D_001..D_150)"
         string D_FullName "Họ và tên bác sĩ"
         string D_Phone "SĐT 10 số"
         int D_Gender "1: Nam, 0: Nữ"
         int D_Age "Tuổi"
         string Sp_ID FK "Mã chuyên khoa"
         int D_State "1: Đang làm, 0: Tạm nghỉ, -1: Đã nghỉ"
-        string Room_ID "Mã phòng (Room_101..)"
+        string Room_ID "Mã phòng (Room_101..Room_1005)"
         double Consultation_Fee "Phí khám (VNĐ)"
         double Rating "Điểm đánh giá (0.0..5.0)"
     }
 
     PATIENT {
-        string P_ID PK "Mã bệnh nhân (P_001..)"
+        string P_ID PK "Mã bệnh nhân (P_001..P_800)"
         string P_FullName "Họ và tên bệnh nhân"
         string P_Phone "SĐT 10 số"
         int P_Gender "1: Nam, 0: Nữ"
@@ -363,7 +368,7 @@ erDiagram
     }
 
     SYMPTOM_PATIENT {
-        string SP_ID PK "Mã phiếu triệu chứng (SP_001..)"
+        string SP_ID PK "Mã phiếu triệu chứng (SP_001..SP_5400)"
         string P_ID FK "Mã bệnh nhân"
         string Sp_ID FK "Chuyên khoa kết luận"
         string Date "Thời điểm tạo phiếu (yyyy-MM-dd HH:mm)"
@@ -375,7 +380,7 @@ erDiagram
     }
 
     APPOINTMENT {
-        string A_ID PK "Mã lịch hẹn (A_001..)"
+        string A_ID PK "Mã lịch hẹn (A_001..A_5400)"
         string SP_ID FK "Mã phiếu triệu chứng"
         string D_ID FK "Mã bác sĩ phụ trách"
         string A_DateGet "Ngày giờ khám (yyyy-MM-dd HH:mm)"
@@ -421,12 +426,12 @@ flowchart LR
     end
 
     LG -->|"handleLogin()"| MW
-    MW -->|"authenticate()"| AUC
+    MW -->|"login()"| AUC
     AUC --> LL_M
 
     MW --> AV & PV & DV & SV & ACV
 
-    AV -->|"validateBooking / reschedule / rankSpecialties"| APC
+    AV -->|"validateBooking / reassign / rankSpecialties"| APC
     APC --> LL_A & LL_SP & LL_SPD & LL_S & LL_D & LL_P
 
     PV -->|"findById / sortPatients"| PTC
@@ -438,24 +443,24 @@ flowchart LR
     SV -->|"getOverviewMetrics / getTimeSeries"| STC
     STC --> LL_A & LL_D & LL_P & LL_SP
 
-    ACV -->|"hasPermission / grantPermission / cleanExpired"| MGC
+    ACV -->|"hasPermission / savePermissions / cleanExpired"| MGC
     MGC --> LL_M & LL_PM
 ```
 
 ---
 
-## 3. CẤU TRÚC DỮ LIỆU CỐT LÕI: DANH SÁCH LIÊN KẾT ĐÔI `LinkList<T>`
+## 3. CẤU TRÚC DỮ LIỆU CỐT LÕI: DANH SÁCH LIÊN KẾT ĐÔI `LinkList<T>` & TÌM KIẾM HAI CHIỀU `findByIdWithCursor`
 
-### 3.1. Kiến trúc Nút Canh Giữ (`header` & `footer` Sentinels)
+### 3.1. Kiến trúc Nút Canh Giữ (`header` & `footer` Sentinels) và Con trỏ Gợi ý (`cursor`)
 
-Mọi danh sách `LinkList<T>` ([LinkList.h](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/DataStructures/LinkList.h)) luôn duy trì hai nút canh giữ cố định ở hai đầu là `header` và `footer`:
+Mọi danh sách `LinkList<T>` (`src/DataStructures/LinkList.h`) duy trì hai nút canh giữ cố định ở hai đầu là `header` và `footer`, đồng thời tích hợp con trỏ gợi ý vị trí truy cập gần nhất `mutable Node *cursor`:
 
 ```text
-[header] <===> [Node 1] <===> [Node 2] <===> ... <===> [Node N] <===> [footer]
-(Sentinel)      (Data)         (Data)                   (Data)       (Sentinel)
+[header] <===> [Node 1] <===> ... <===> [Node k (cursor)] <===> ... <===> [Node N] <===> [footer]
+(Sentinel)      (Data)                  (Last Visited)                    (Data)        (Sentinel)
 ```
 
-- **Khi danh sách rỗng (`count == 0`):** `header->next == footer` và `footer->prev == header`.
+- **Khi danh sách rỗng (`count == 0`):** `header->next == footer`, `footer->prev == header` và `cursor == nullptr`.
 - **Chuẩn duyệt an toàn trên toàn hệ thống:**
   ```cpp
   auto *node = list->getHeader()->next;
@@ -465,30 +470,58 @@ Mọi danh sách `LinkList<T>` ([LinkList.h](file:///d:/Documents/Universe_Mater
   }
   ```
 
-### 3.2. Đặc tả Thuật toán Chèn, Xóa, Sao chép sâu & Quản lý Bộ nhớ
+### 3.2. Đặc tả Thuật toán Chèn, Xóa tự bảo vệ `cursor`, Sao chép sâu & Quản lý Bộ nhớ
 
-1. **Chèn cuối danh sách (`insert(const T &value)`) — $O(1)$:**
-   - Cấp phát nút mới `Node *newNode = new Node(value)` trong khối `try-catch(std::bad_alloc)` (ném `MemoryAllocationException` nếu hết RAM).
-   - Nối trực tiếp vào giữa `footer->prev` và `footer`:
+1. **Chèn cuối danh sách (`insert(const T &info)`) — $O(1)$:**
+   - Cấp phát nút mới `Node *tmp = new Node` trong khối `try-catch(std::bad_alloc)` (ném `MemoryAllocationException` nếu hết RAM).
+   - Nối trực tiếp vào giữa `footer->prev` và `footer` trong $O(1)$.
+2. **Xóa nút bất kỳ kèm bảo vệ con trỏ gợi ý (`remove(Node *N)`) — $O(1)$:**
+   - Kiểm tra bảo vệ: từ chối xóa nếu `N == nullptr`, `N == header` hoặc `N == footer`.
+   - **Tự động cập nhật `cursor` chống lỗi con trỏ treo (Dangling Pointer Protection):**
      ```cpp
-     Node *last = footer->prev;
-     last->next = newNode;
-     newNode->prev = last;
-     newNode->next = footer;
-     footer->prev = newNode;
-     ++count;
+     if (cursor == N) {
+         if (N->prev && N->prev != header) cursor = N->prev;
+         else if (N->next && N->next != footer) cursor = N->next;
+         else cursor = nullptr;
+     }
      ```
-2. **Xóa nút bất kỳ (`remove(Node *node)`) — $O(1)$:**
-   - Kiểm tra bảo vệ: từ chối xóa nếu `node == nullptr`, `node == header` hoặc `node == footer`.
-   - Ngắt liên kết 2 chiều và giải phóng vùng nhớ:
-     ```cpp
-     node->prev->next = node->next;
-     node->next->prev = node->prev;
-     delete node;
-     --count;
-     ```
+   - Ngắt liên kết 2 chiều (`N->next->prev = N->prev; N->prev->next = N->next;`) và giải phóng vùng nhớ `delete N;`.
 3. **Sao chép sâu an toàn ngoại lệ (Exception-Safe Deep Copy):**
-   - Trong Copy Constructor và `operator=`, nếu quá trình sao chép nút thứ $k$ gặp lỗi cấp phát bộ nhớ, khối `catch(...)` sẽ tự động gọi `clear()` và giải phóng `header`/`footer` của bản sao đang tạo dở, đảm bảo không rò rỉ bất kỳ byte bộ nhớ nào.
+   - Trong Copy Constructor `LinkList(const LinkList &L)`, nếu quá trình sao chép nút thứ $k$ gặp lỗi cấp phát bộ nhớ, khối `catch(...)` sẽ tự động giải phóng toàn bộ chuỗi nút đã tạo dở, đảm bảo không rò rỉ bộ nhớ.
+
+### 3.3. Thuật toán Tìm kiếm Hai chiều Có Nhớ Vị trí (`libPBL2::findByIdWithCursor`)
+
+Trong các nghiệp vụ lọc và tìm kiếm lịch khám (5.400 bản ghi `Appointment` ánh xạ sang 5.400 bản ghi `SymptomPatient`), việc tìm kiếm tuyến tính một chiều từ `header->next` tốn trung bình $5.400 \times 2.700 \approx 14,58 \text{ triệu}$ bước nhảy con trỏ. Để giải quyết triệt để mà vẫn giữ nguyên 100% cấu trúc `LinkList<T>`, hệ thống triển khai thuật toán **`libPBL2::findByIdWithCursor`** (`src/Utils/libPBL2.cpp`):
+
+```mermaid
+flowchart TD
+    Start["findByIdWithCursor(list, id, getId)"]
+    CheckCur{"cursor hợp lệ & khớp tại<br/>cursor / cursor->prev / cursor->next?"}
+    HitNear["Cập nhật cursor (nếu ở prev/next)<br/>& trả về ngay trong O(1)"]
+    CheckEnds{"Khớp tại header->next<br/>hoặc footer->prev?"}
+    HitEnd["Cập nhật cursor về đầu/cuối danh sách<br/>& trả về ngay trong O(1)"]
+    InitBi["Khởi tạo 2 con trỏ mở rộng ngược chiều từ cursor:<br/>fwd = cursor->next->next; bwd = cursor->prev->prev"]
+    LoopBi{"fwd != footer HOẶC bwd != header?"}
+    StepBi["Kiểm tra đồng thời fwd (tiến về footer)<br/>và bwd (lùi về header)"]
+    FoundBi["Cập nhật list->setCursor(foundNode)<br/>& trả về địa chỉ &foundNode->info"]
+    NotFound["Trả về nullptr"]
+
+    Start --> CheckCur
+    CheckCur -- Có --> HitNear
+    CheckCur -- Không --> CheckEnds
+    CheckEnds -- Có --> HitEnd
+    CheckEnds -- Không --> InitBi --> LoopBi
+    LoopBi -- Còn nút --> StepBi
+    StepBi -- "Khớp id" --> FoundBi
+    StepBi -- "Chưa khớp" --> LoopBi
+    LoopBi -- Hết danh sách --> NotFound
+```
+
+- **Hiệu quả đột phá trên `LinkList<T>`:**
+  - Khi duyệt `LinkList<Appointment>` theo chiều giảm dần (`A_5400` $\to$ `A_001`) trong khi `LinkList<SymptomPatient>` đang xếp tăng dần (`SP_001` $\to$ `SP_5400`):
+    - Lịch hẹn đầu tiên (`A_5400` $\to$ `SP_5400`) khớp ngay lập tức tại `footer->prev` (**1 bước**) và đặt `cursor = SP_5400`.
+    - Toàn bộ 5.399 lịch hẹn tiếp theo (`A_5399` $\to$ `A_001`) đều khớp ngay tại `cursor->prev` (**1 bước**).
+  - Tổng số bước nhảy con trỏ khi quét toàn bộ 5.400 lịch hẹn giảm từ **14.580.000 bước xuống đúng 5.400 bước** (nhanh hơn **2.700 lần**, đạt độ phức tạp $O(1)$ khấu hao cho mỗi lần tra cứu tuần tự).
 
 ---
 
@@ -496,7 +529,7 @@ Mọi danh sách `LinkList<T>` ([LinkList.h](file:///d:/Documents/Universe_Mater
 
 ### 4.1. Thuật toán MergeSort Tái Nối Con Trỏ Trên `LinkList<T>`
 
-Khi sắp xếp trực tiếp trên `LinkList<T>` (`DoctorController::sortDoctors`, `PatientController::sortPatients`, `AppointmentController::sortAppointmentsById`, `ManagerController::sortManagers`), hệ thống sử dụng thuật toán **MergeSort tái nối liên kết nút (`sortNodeChain` & `mergeSortedNodes`)** tại [libPBL2.cpp](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Utils/libPBL2.cpp#L354-L439):
+Khi sắp xếp trực tiếp trên `LinkList<T>` (`DoctorController::sortDoctors`, `PatientController::sortPatients`, `AppointmentController::sortAppointmentsById`, `ManagerController::sortManagers`), hệ thống sử dụng thuật toán **MergeSort tái nối liên kết nút (`sortNodeChain` & `mergeSortedNodes`)** tại `src/Utils/libPBL2.cpp`:
 
 ```mermaid
 flowchart TD
@@ -517,18 +550,17 @@ flowchart TD
 
 ### 4.2. Thuật toán QuickSort Trên Mảng Thô & Danh sách Truy cập Ngẫu nhiên
 
-Đối với mảng động (`T*`) và `QList<T>` trong các bộ lọc hiển thị và bảng tra cứu thống kê ([libPBL2.cpp](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Utils/libPBL2.cpp#L447-L488)):
+Đối với mảng động (`T*`) và `QList<T>` trong các bộ lọc hiển thị và bảng tra cứu thống kê (`src/Utils/libPBL2.cpp`):
 - Chọn chốt ở vị trí trung tâm (`center = low + (high - low) / 2`) để tránh suy biến $O(N^2)$ trên dữ liệu đã sắp xếp sẵn.
 - Phân hoạch Lomuto cải tiến và đệ quy hai nửa `[low .. sep - 1]` và `[sep + 1 .. high]`.
 
 ### 4.3. Thuật toán Tiền Tính Toán Khóa Sắp Xếp (Schwartzian Transform / Precomputed Keys)
 
-Khi sắp xếp danh sách 5.400+ lịch hẹn theo **Tên bệnh nhân**, **Tên bác sĩ**, **Chuyên khoa**, hoặc **Trạng thái** tại [AppointmentView.cpp](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Views/Appointment/AppointmentView.cpp#L76-L147):
-- Thay vì tra cứu `findPatientForAppointment` bên trong hàm so sánh của QuickSort (gây tốn $O(N \log N \times M)$ bước duyệt danh sách liên kết), hệ thống thực hiện **Tiền tính toán khóa (Precomputed Sort Keys)**:
-  1. Duyệt qua $N$ lịch hẹn **đúng 1 lần duy nhất**, trích xuất sẵn khóa chính `key1` (tên gọi / chuyên khoa / trạng thái) và khóa phụ `key2` (họ tên đầy đủ) vào cấu trúc `ApptSortEntry`.
+Khi sắp xếp danh sách 5.400+ lịch hẹn theo **Tên bệnh nhân**, **Tên bác sĩ**, **Chuyên khoa**, hoặc **Trạng thái** tại `src/Views/Appointment/AppointmentView.cpp`:
+- Thay vì tra cứu `findPatientForAppointment` bên trong hàm so sánh của QuickSort (gây tốn $O(N \log N)$ lần tra cứu liên bảng), hệ thống thực hiện **Tiền tính toán khóa (Precomputed Sort Keys)**:
+  1. Duyệt qua $N$ lịch hẹn **đúng 1 lần duy nhất** (kết hợp `findByIdWithCursor`), trích xuất sẵn khóa chính `key1` (tên gọi / chuyên khoa / trạng thái) và khóa phụ `key2` (họ tên đầy đủ) vào cấu trúc `ApptSortEntry`.
   2. Chạy `libPBL2::qsort` trên danh sách `ApptSortEntry` với phép so sánh chuỗi trực tiếp trong RAM.
   3. Ghi lại thứ tự con trỏ `Appointment*` đã sắp xếp vào danh sách kết quả.
-- **Hiệu quả:** Giảm số lần tra cứu liên bảng từ $\sim 270.000$ lần xuống đúng $N = 5.400$ lần, tăng tốc độ Sort lên hơn **50 lần**.
 
 ### 4.4. Bốn Động Cơ So Sánh Chuyên Biệt (Comparison Engines)
 
@@ -543,7 +575,7 @@ Khi sắp xếp danh sách 5.400+ lịch hẹn theo **Tên bệnh nhân**, **Tê
 
 ### 5.1. Luồng Xác thực & Phân quyền RBAC Thời gian thực (`Per_1..Per_5`)
 
-Hệ thống kết hợp **Vai trò cơ sở (`ManagerRole`)** và **Quyền cấp thêm (`PermissionManager`)** để suy diễn **Vai trò hiệu lực (`EffectiveRole`)**:
+Hệ thống kết hợp **Vai trò cơ sở (`ManagerRole`)** và **Quyền cấp thêm (`PermissionManager`)** để suy diễn **Vai trò hiệu lực (`EffectiveRole`)** và **Cấp độ đặc quyền (`getPrivilegeLevel` từ `0` đến `3`)**:
 
 ```mermaid
 flowchart TD
@@ -558,7 +590,7 @@ flowchart TD
     CleanPerm["ManagerController::cleanExpiredPermissions():<br/>Tự động thu hồi các quyền Per_1 đã quá hạn ISO-8601"]
     SetupShell["MainWindow::setupShell():<br/>Khởi tạo giao diện theo quyền & bật clockTimer (1000ms)"]
     TickCheck["Mỗi 1 giây: Kiểm tra nếu phiên hiện tại là TempAdmin (Per_1)<br/>và thời gian hiện tại >= Expires_At"]
-    ForceLogout["handleTemporaryAdminExpired():<br/>Cảnh báo hết hạn quyền & tự động đăng xuất an toàn"]
+    ForceLogout["handleTemporaryAdminExpired():<br/>Lưu toàn bộ dữ liệu, cảnh báo hết hạn quyền & tự động đăng xuất"]
 
     LoginReq --> CheckHidden
     CheckHidden -- Có --> GrantHidden --> SetupShell
@@ -616,7 +648,7 @@ flowchart TD
     V5{"isSlotBooked(doctorId, targetDateTime)?<br/>(Bỏ qua ca state == -1 và -2)"}
     V6{"isPatientSlotBooked(patientId, targetDateTime)?<br/>(Chặn bệnh nhân khám 2 nơi cùng giờ)"}
     Reject["Ném ngoại lệ ValidationException với thông điệp tiếng Việt chi tiết"]
-    Commit["1. Sinh mã SP_XXX & A_XXX mới<br/>2. Chèn SymptomPatient, SymptomPatientDetail, Appointment<br/>3. Ghi đĩa nguyên tử (safeAtomicCommit)؛ nếu lỗi thì Rollback RAM"]
+    Commit["1. Sinh mã SP_XXX & A_XXX mới<br/>2. Chèn SymptomPatient, SymptomPatientDetail, Appointment<br/>3. Ghi đĩa nguyên tử (safeAtomicCommit); nếu lỗi thì Rollback RAM"]
 
     Input --> V1
     V1 -- Sai --> Reject
@@ -650,7 +682,7 @@ $$\text{EffectiveState} = \begin{cases}
 
 ### 5.5. Luồng Tự động Điều phối Lịch khám Khi Bác sĩ Nghỉ hoặc Thêm Ngày Nghỉ Lễ
 
-Khi một bác sĩ chuyển sang trạng thái **Tạm nghỉ (`0`) / Xóa (`-1`)** hoặc khi Quản trị viên **thêm một ngày nghỉ lễ mới** trùng với các lịch hẹn đang chờ:
+Khi một bác sĩ chuyển sang trạng thái **Tạm nghỉ (`0`) / Xóa (`-1`)** (`reassignAppointmentsForDoctor`) hoặc khi Quản trị viên **thêm một ngày nghỉ lễ mới** trùng với các lịch hẹn đang chờ (`rescheduleAppointmentsLinear`):
 
 ```mermaid
 flowchart TD
@@ -688,7 +720,7 @@ flowchart TD
 
 ### 5.7. Thuật toán Thống kê Chỉ số Y tế & Chuỗi Thời gian Doanh thu ($O(N \log D)$)
 
-Khi tổng hợp dữ liệu trên hàng nghìn ca khám trong `StatisticController` ([StatisticController.cpp](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Controllers/StatisticController.cpp)):
+Khi tổng hợp dữ liệu trên hàng nghìn ca khám trong `StatisticController` (`src/Controllers/StatisticController.cpp`):
 1. **Xây dựng Bảng tra cứu Nhị phân Nội bộ (`DoctorLookupTable`, `SpPatientTable`, `PatientLookupTable`):**
    - Thay vì duyệt tuyến tính `LinkList<Doctor>` và `LinkList<SymptomPatient>` cho từng lịch hẹn (tốn $O(N \times (D + M))$), `StatisticController` trích xuất các khóa vào mảng động `std::unique_ptr<Entry[]>`, sắp xếp bằng `libPBL2::qsort` và tra cứu bằng **Tìm kiếm nhị phân (Binary Search)** trong $O(\log D)$ và $O(\log M)$.
 2. **Định giá Doanh thu Lịch sử Chính xác (`resolvedCompletedAppointmentFee`):**
@@ -702,7 +734,7 @@ Khi tổng hợp dữ liệu trên hàng nghìn ca khám trong `StatisticControl
 
 ### 5.8. Thuật toán Gia hạn Quyền Quản trị Tạm thời Bảo toàn Mốc Giờ:Phút (`Per_1`)
 
-Trong hộp thoại phân quyền nâng cao ([AccountView.cpp](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Views/Account/AccountView.cpp#L687-L796)):
+Trong hộp thoại phân quyền nâng cao (`src/Views/Account/AccountView.cpp`):
 1. **Tính số ngày còn lại theo quy tắc làm tròn lên (`Ceil-to-Day`):**
    $$\Delta t = \text{secsTo}(T_{\text{now}}, T_{\text{exp}}), \quad \text{baseDays} = \max\left(1, \left\lfloor \frac{\Delta t + 86399}{86400} \right\rfloor\right)$$
 2. **Bảo toàn mốc Giờ:Phút gốc (`Anchor-based Expiry Preservation`):**
@@ -713,13 +745,17 @@ Trong hộp thoại phân quyền nâng cao ([AccountView.cpp](file:///d:/Docume
 
 ---
 
-### 5.9. Thuật toán Bộ nhớ đệm Phân trang (`cachedFiltered`) & Lưu File Nguyên tử (`safeAtomicCommit`)
+### 5.9. Thuật toán Tìm kiếm Debounce (`QTimer`), Bộ nhớ đệm Phân trang (`cachedFiltered`) & Lưu File Nguyên tử (`safeAtomicCommit`)
 
-1. **Bộ nhớ đệm Phân trang (`cachedFiltered` & `cacheDirty`):**
-   - Tại trang Danh sách lịch hẹn ([AppointmentView.cpp](file:///d:/Documents/Universe_Material/Semester_3/PBL_2/src/Views/Appointment/AppointmentView.cpp#L3707-L3805)), kết quả sau khi Lọc và Sắp xếp được lưu trong `cachedFiltered`.
+1. **Tìm kiếm Không Độ Trễ với Debounce `QTimer` (120 ms) + `findByIdWithCursor`:**
+   - Tại ô tìm kiếm danh sách lịch hẹn và `SearchablePatientComboBox` (`src/Views/Appointment/AppointmentView.cpp`), một `QTimer` (`SingleShot`, `120 ms`) được gắn vào sự kiện `QLineEdit::textChanged`.
+   - Khi người dùng gõ liên tục hoặc tổ hợp dấu tiếng Việt (Unikey/EVKey phát sinh nhiều sự kiện `textChanged` cho 1 chữ), bộ đếm tự động reset và chỉ kích hoạt lọc **1 lần duy nhất** khi ngừng tay `120 ms` (hoặc kích hoạt ngay lập tức khi xóa trắng ô tìm kiếm / nhấn `Enter`).
+   - Bên trong vòng lặp lọc 5.400 lịch hẹn, việc tra cứu `SymptomPatient`, `Patient` và `Doctor` sử dụng `libPBL2::findByIdWithCursor` đạt $O(1)$ khấu hao cho mỗi lịch hẹn.
+2. **Bộ nhớ đệm Phân trang (`cachedFiltered` & `cacheDirty`):**
+   - Tại trang Danh sách lịch hẹn, kết quả sau khi Lọc và Sắp xếp được lưu trong `cachedFiltered`.
    - Cờ `cacheDirty` chỉ bật lên `true` khi người dùng thay đổi điều kiện lọc, bấm tiêu đề cột để Sort, hoặc thêm/sửa/hủy ca khám.
    - Khi người dùng bấm **`Trang trước` / `Trang sau`**, `*cacheDirty == false` nên chương trình bỏ qua hoàn toàn bước Lọc và Sort, cắt trực tiếp 50 dòng từ `cachedFiltered[startIdx .. endIdx - 1]` trong thời gian **$O(1)$ (0 ms)**.
-2. **Giao thức Lưu File Nguyên tử 3 Bước (`libPBL2::safeAtomicCommit`):**
+3. **Giao thức Lưu File Nguyên tử 3 Bước (`libPBL2::safeAtomicCommit`):**
    - **Bước 1:** Ghi toàn bộ dữ liệu mới vào tệp tạm `<path>.tmp` và kiểm tra `f.flush()`, `f.good()`.
    - **Bước 2:** Đổi tên tệp gốc `<path>` sang bản sao lưu `<path>.bak`.
    - **Bước 3:** Đổi tên `<path>.tmp` thành `<path>`. Nếu thành công thì xóa `<path>.bak`; nếu thất bại thì tự động khôi phục `<path>.bak` về lại `<path>`, đảm bảo tệp dữ liệu không bao giờ bị cụt hoặc hỏng khi mất điện hay lỗi ổ cứng.
@@ -730,15 +766,17 @@ Trong hộp thoại phân quyền nâng cao ([AccountView.cpp](file:///d:/Docume
 
 | Tên Thuật Toán / Nghiệp Vụ | Mô-đun Thực Hiện | Thời Gian (Trung Bình) | Thời Gian (Xấu Nhất) | Bộ Nhớ Phụ Trợ |
 | :--- | :--- | :---: | :---: | :---: |
-| Chèn / Xóa nút trên danh sách liên kết | `LinkList<T>::insert / remove` | $O(1)$ | $O(1)$ | $O(1)$ |
+| Chèn / Xóa nút bảo vệ `cursor` trên DSLK | `LinkList<T>::insert / remove` | $O(1)$ | $O(1)$ | $O(1)$ |
+| Tìm kiếm 2 chiều có nhớ vị trí `cursor` | `libPBL2::findByIdWithCursor` | $O(1)$ (duyệt tuần tự) | $O(N)$ | $O(1)$ |
 | Sắp xếp MergeSort bảo toàn địa chỉ nút | `libPBL2::qsort(LinkList<T>&)` | $O(N \log N)$ | $O(N \log N)$ | $O(\log N)$ stack |
-| Sắp xếp lịch hẹn với khóa tiền tính toán | `sortAppointmentPtrList` | $O(N \cdot M + K \log K)$ | $O(N \cdot M + K^2)$ | $O(K)$ entries |
-| Chuyển trang phân trang có bộ nhớ đệm | `createAppointmentListWidget` | $O(P)$ ($P = 50$) | $O(P)$ | $O(1)$ |
+| Sắp xếp lịch hẹn với khóa tiền tính toán | `sortAppointmentPtrList` | $O(N + K \log K)$ | $O(N \cdot P + K^2)$ | $O(K)$ entries |
+| Lọc tìm kiếm danh sách 5.400 lịch hẹn | `createAppointmentListWidget` | $O(N \cdot (P + D))$ | $O(N \cdot (M + P + D))$ | $O(K)$ |
+| Chuyển trang phân trang có bộ nhớ đệm | `createAppointmentListWidget` | $O(B)$ ($B = 50$) | $O(B)$ | $O(1)$ |
 | Sàng lọc triệu chứng & xếp hạng chuyên khoa | `rankSpecialtiesBySymptoms` | $O(m \cdot S)$ | $O(m \cdot S + C \log C)$ | $O(C)$ |
 | Tính ngày Tết & Giỗ Tổ Âm lịch thiên văn | `convertLunarToSolarVN` | $O(1)$ | $O(1)$ | $O(1)$ |
-| Kiểm định đặt lịch & chống trùng khung giờ | `validateBooking` | $O(N + M)$ | $O(N + M)$ | $O(1)$ |
+| Kiểm định đặt lịch & chống trùng khung giờ | `validateBooking` | $O(N)$ | $O(N \cdot M)$ | $O(1)$ |
 | Điều phối lịch khám tự động khi nghỉ lễ | `rescheduleAppointmentsLinear` | $O(A \cdot D \cdot N)$ | $O(A \cdot 365 \cdot 11 \cdot N)$ | $O(A)$ |
 | Suy diễn trạng thái ca khám (ân hạn 20p) | `computeEffectiveState` | $O(1)$ | $O(1)$ | $O(1)$ |
 | Tổng hợp thống kê với bảng tra cứu nhị phân | `StatisticController::get*` | $O(D \log D + M \log M + N \log M)$ | $O((D + M + N) \log M)$ | $O(D + M + P)$ |
 
-*(Ký hiệu: $N$ = số lượng lịch hẹn, $K$ = số lịch hẹn sau khi lọc, $M$ = số phiếu triệu chứng `SymptomPatient`, $D$ = số bác sĩ, $P$ = số bệnh nhân, $S$ = số triệu chứng trong danh mục, $C$ = số chuyên khoa, $m \le 5$ = số triệu chứng bệnh nhân chọn, $A$ = số ca khám bị ảnh hưởng bởi ngày nghỉ).*
+*(Ký hiệu: $N = 5.400$ là số lượng lịch hẹn, $K$ là số lịch hẹn sau khi lọc, $M = 5.400$ là số phiếu triệu chứng `SymptomPatient`, $D = 150$ là số bác sĩ, $P = 800$ là số bệnh nhân, $B = 50$ là kích thước mỗi trang hiển thị, $S = 30$ là số triệu chứng trong danh mục, $C = 10$ là số chuyên khoa, $m \le 5$ là số triệu chứng bệnh nhân chọn, $A$ là số ca khám bị ảnh hưởng bởi ngày nghỉ).*

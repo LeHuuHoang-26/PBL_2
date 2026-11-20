@@ -30,6 +30,9 @@ namespace libPBL2 {
     template <typename T, typename IdGetter>
     std::string generateNextId(const LinkList<T> *list, const std::string &prefix, IdGetter getId, const std::string &altPrefix = "");
 
+    template <typename T, typename IdGetter>
+    T *findByIdWithCursor(LinkList<T> *list, const std::string &id, IdGetter getId);
+
     inline int compareNatural(const std::string &a, const std::string &b);
     inline std::string extractLastName(const std::string &fullName);
     inline int compareVietnameseStrings(const std::string &s1, const std::string &s2);

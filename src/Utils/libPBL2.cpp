@@ -252,6 +252,63 @@ std::string generateNextId(const LinkList<T> *list, const std::string &prefix, I
     return std::string(buffer);
 }
 
+template <typename T, typename IdGetter>
+T *findByIdWithCursor(LinkList<T> *list, const std::string &id, IdGetter getId) {
+    if (id.empty() || !list || !list->getHeader() || !list->getFooter()) return nullptr;
+    auto *header = list->getHeader();
+    auto *footer = list->getFooter();
+    if (header->next == footer) return nullptr;
+
+    auto *cur = list->getCursor();
+    if (cur && cur->prev && cur->next) {
+        if (!cur->info.isDefault() && getId(cur->info) == id) {
+            return &cur->info;
+        }
+        if (cur->prev != header && !cur->prev->info.isDefault() && getId(cur->prev->info) == id) {
+            list->setCursor(cur->prev);
+            return &cur->prev->info;
+        }
+        if (cur->next != footer && !cur->next->info.isDefault() && getId(cur->next->info) == id) {
+            list->setCursor(cur->next);
+            return &cur->next->info;
+        }
+    }
+
+    if (!header->next->info.isDefault() && getId(header->next->info) == id) {
+        list->setCursor(header->next);
+        return &header->next->info;
+    }
+    if (!footer->prev->info.isDefault() && getId(footer->prev->info) == id) {
+        list->setCursor(footer->prev);
+        return &footer->prev->info;
+    }
+
+    auto *fwd = (cur && cur->prev && cur->next)
+        ? (cur->next != footer ? cur->next->next : footer)
+        : header->next->next;
+    auto *bwd = (cur && cur->prev && cur->next)
+        ? (cur->prev != header ? cur->prev->prev : header)
+        : header;
+
+    while ((fwd && fwd != footer) || (bwd && bwd != header)) {
+        if (fwd && fwd != footer) {
+            if (!fwd->info.isDefault() && getId(fwd->info) == id) {
+                list->setCursor(fwd);
+                return &fwd->info;
+            }
+            fwd = fwd->next;
+        }
+        if (bwd && bwd != header) {
+            if (!bwd->info.isDefault() && getId(bwd->info) == id) {
+                list->setCursor(bwd);
+                return &bwd->info;
+            }
+            bwd = bwd->prev;
+        }
+    }
+    return nullptr;
+}
+
 inline int compareNatural(const std::string &a, const std::string &b) {
     size_t ia = 0, ib = 0;
     const size_t szA = a.size(), szB = b.size();

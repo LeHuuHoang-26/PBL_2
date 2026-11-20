@@ -2,13 +2,7 @@
 #include "libPBL2.h"
 
 Patient *PatientController::findById(LinkList<Patient> *patients, const std::string &id) {
-    if (id.empty() || !patients || !patients->getHeader()) return nullptr;
-    auto *node = patients->getHeader()->next;
-    while (node && node->next) {
-        if (!node->info.isDefault() && node->info.getID() == id) return &node->info;
-        node = node->next;
-    }
-    return nullptr;
+    return libPBL2::findByIdWithCursor(patients, id, [](const Patient &p) { return p.getID(); });
 }
 
 void PatientController::sortPatients(LinkList<Patient> &list, PatientSortBy criteria, bool ascending) {

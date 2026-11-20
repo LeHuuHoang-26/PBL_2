@@ -650,6 +650,7 @@ protected:
 class SearchablePatientComboBox : public NoWheelComboBox {
 private:
     SearchLineEdit *searchEdit = nullptr;
+    QTimer *searchDebounceTimer = nullptr;
 
 public:
     explicit SearchablePatientComboBox(QWidget *parent = nullptr) : NoWheelComboBox(parent) {
@@ -735,11 +736,31 @@ public:
                 boxLay->insertWidget(0, searchEdit);
             }
 
+            searchDebounceTimer = new QTimer(this);
+            searchDebounceTimer->setSingleShot(true);
+            searchDebounceTimer->setInterval(120);
+            connect(searchDebounceTimer, &QTimer::timeout, this, [this]() {
+                if (searchEdit) filterItems(searchEdit->text());
+            });
+
             connect(searchEdit, &QLineEdit::textChanged, this, [this](const QString &text) {
-                filterItems(text);
+                if (!searchDebounceTimer) {
+                    filterItems(text);
+                    return;
+                }
+                searchDebounceTimer->stop();
+                if (text.isEmpty()) {
+                    filterItems(QString());
+                } else {
+                    searchDebounceTimer->start();
+                }
             });
 
             connect(searchEdit, &QLineEdit::returnPressed, this, [this]() {
+                if (searchDebounceTimer && searchDebounceTimer->isActive()) {
+                    searchDebounceTimer->stop();
+                    if (searchEdit) filterItems(searchEdit->text());
+                }
                 auto *lv = qobject_cast<QListView*>(this->view());
                 auto *m = qobject_cast<QStandardItemModel*>(this->model());
                 if (!lv || !m) return;
@@ -760,6 +781,7 @@ public:
             view()->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         }
         NoWheelComboBox::showPopup();
+        if (searchDebounceTimer) searchDebounceTimer->stop();
         if (searchEdit) {
             searchEdit->clear();
             filterItems("");
@@ -770,6 +792,7 @@ public:
     }
 
     void hidePopup() override {
+        if (searchDebounceTimer) searchDebounceTimer->stop();
         if (searchEdit) {
             searchEdit->clear();
             filterItems("");
@@ -3978,8 +4001,21 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
     };
     auto fill = [fillPtr](bool preserveScroll = true) { if (*fillPtr) (*fillPtr)(preserveScroll); };
 
-    connect(t->horizontalHeader(), &QHeaderView::sectionClicked, w, [this, fill, sortColumn, sortAscending, currentPage, cacheDirty](int logicalIndex) {
+    auto *searchDebounceTimer = new QTimer(w);
+    searchDebounceTimer->setSingleShot(true);
+    searchDebounceTimer->setInterval(120);
+
+    auto applySearchFilter = [fill, currentPage, cacheDirty]() {
+        *currentPage = 0;
+        *cacheDirty = true;
+        fill(false);
+    };
+
+    connect(searchDebounceTimer, &QTimer::timeout, w, applySearchFilter);
+
+    connect(t->horizontalHeader(), &QHeaderView::sectionClicked, w, [this, fill, sortColumn, sortAscending, currentPage, cacheDirty, searchDebounceTimer](int logicalIndex) {
         if (logicalIndex < 0 || logicalIndex >= 5) return;
+        searchDebounceTimer->stop();
         if (*sortColumn == logicalIndex) {
             *sortAscending = !*sortAscending;
         } else {
@@ -3993,16 +4029,30 @@ QWidget *AppointmentView::createAppointmentListWidget(QWidget *parent) {
         fill(false);
     });
 
-    connect(searchEdit, &QLineEdit::textChanged, w, [fill, currentPage, cacheDirty] { *currentPage = 0; *cacheDirty = true; fill(false); });
-    connect(doctor, qOverload<int>(&QComboBox::currentIndexChanged), w, [fill, currentPage, cacheDirty] { *currentPage = 0; *cacheDirty = true; fill(false); });
-    connect(date, &QDateEdit::dateChanged, w, [fill, currentPage, cacheDirty] { *currentPage = 0; *cacheDirty = true; fill(false); });
-    connect(allDates, &QAbstractButton::toggled, w, [fill, currentPage, date, cacheDirty](bool c) {
+    connect(searchEdit, &QLineEdit::textChanged, w, [searchDebounceTimer, applySearchFilter](const QString &text) {
+        searchDebounceTimer->stop();
+        if (text.isEmpty()) {
+            applySearchFilter();
+        } else {
+            searchDebounceTimer->start();
+        }
+    });
+    connect(searchEdit, &QLineEdit::returnPressed, w, [searchDebounceTimer, applySearchFilter] {
+        if (searchDebounceTimer->isActive()) {
+            searchDebounceTimer->stop();
+            applySearchFilter();
+        }
+    });
+    connect(doctor, qOverload<int>(&QComboBox::currentIndexChanged), w, [searchDebounceTimer, applySearchFilter] { searchDebounceTimer->stop(); applySearchFilter(); });
+    connect(date, &QDateEdit::dateChanged, w, [searchDebounceTimer, applySearchFilter] { searchDebounceTimer->stop(); applySearchFilter(); });
+    connect(allDates, &QAbstractButton::toggled, w, [fill, currentPage, date, cacheDirty, searchDebounceTimer](bool c) {
+        searchDebounceTimer->stop();
         *currentPage = 0;
         *cacheDirty = true;
         date->setEnabled(!c);
         fill(false);
     });
-    connect(status, qOverload<int>(&QComboBox::currentIndexChanged), w, [fill, currentPage, cacheDirty] { *currentPage = 0; *cacheDirty = true; fill(false); });
+    connect(status, qOverload<int>(&QComboBox::currentIndexChanged), w, [searchDebounceTimer, applySearchFilter] { searchDebounceTimer->stop(); applySearchFilter(); });
 
     connect(prevBtn, &QPushButton::clicked, w, [fill, currentPage] {
         if (*currentPage > 0) {

@@ -598,15 +598,7 @@ Doctor *MainWindow::findDoctor(const string &id) const
 
 SymptomPatient *MainWindow::findSymptomPatient(const string &id) const
 {
-    if (!symptomPatients || id.empty()) return nullptr;
-    auto *node = symptomPatients->getHeader()->next;
-    while (node && node->next) {
-        if (node->info.getSP_id() == id) {
-            return &node->info;
-        }
-        node = node->next;
-    }
-    return nullptr;
+    return libPBL2::findByIdWithCursor(symptomPatients, id, [](const SymptomPatient &sp) { return sp.getSP_id(); });
 }
 
 Patient *MainWindow::findPatientForAppointment(const Appointment &a) const

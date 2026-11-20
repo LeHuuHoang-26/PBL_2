@@ -15,6 +15,7 @@ public:
 private:
     Node *header;
     Node *footer;
+    mutable Node *cursor = nullptr;
     int count;
 
 public:
@@ -25,6 +26,8 @@ public:
 
     Node *getHeader() const;
     Node *getFooter() const;
+    Node *getCursor() const;
+    void setCursor(Node *N) const;
     int getCount() const;
 
     bool insert(const T &info);
